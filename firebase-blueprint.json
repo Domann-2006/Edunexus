@@ -1,0 +1,92 @@
+{
+  "entities": {
+    "School": {
+      "title": "School",
+      "description": "Represents a school entity in the system.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "superAdminId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "superAdminId"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Staff or student account.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["SUPER_ADMIN", "SCHOOL_ADMIN", "TEACHER", "STUDENT"] },
+        "schoolId": { "type": "string" },
+        "passwordHash": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role", "passwordHash"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student specific data.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "classId": { "type": "string" },
+        "admissionNumber": { "type": "string" },
+        "guardianName": { "type": "string" },
+        "guardianPhone": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "schoolId"]
+    },
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Teacher specific data.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "specialization": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "schoolId"]
+    },
+    "Class": {
+      "title": "Class",
+      "description": "A school class.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "schoolId"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "A curriculum subject.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "classId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "schoolId"]
+    }
+  },
+  "firestore": {
+    "schools": { "schema": "School", "description": "Collection of schools." },
+    "users": { "schema": "User", "description": "Collection of users." },
+    "students": { "schema": "Student", "description": "Collection of students." },
+    "teachers": { "schema": "Teacher", "description": "Collection of teachers." },
+    "classes": { "schema": "Class", "description": "Collection of classes." },
+    "subjects": { "schema": "Subject", "description": "Collection of subjects." }
+  }
+}

@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && getUserData().role == 'SUPER_ADMIN';
+    }
+
+    function isSchoolAdmin(schoolId) {
+      return isSignedIn() && (getUserData().role == 'SCHOOL_ADMIN' && getUserData().schoolId == schoolId);
+    }
+
+    function isTeacher(schoolId) {
+       return isSignedIn() && (getUserData().role == 'TEACHER' && getUserData().schoolId == schoolId);
+    }
+
+    function isStudent(schoolId) {
+       return isSignedIn() && (getUserData().role == 'STUDENT' && getUserData().schoolId == schoolId);
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Schools
+    match /schools/{schoolId} {
+      allow read: if isSuperAdmin() || isSchoolAdmin(schoolId) || isTeacher(schoolId) || isStudent(schoolId);
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read: if isSuperAdmin() || (isSignedIn() && (request.auth.uid == userId || getUserData().schoolId == resource.data.schoolId));
+      allow write: if isSuperAdmin() || (isSignedIn() && request.auth.uid == userId);
+    }
+
+    // Students
+    match /students/{studentId} {
+      allow read: if isSuperAdmin() || (isSignedIn() && getUserData().schoolId == resource.data.schoolId);
+      allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
+    }
+
+    // Teachers
+    match /teachers/{teacherId} {
+      allow read: if isSuperAdmin() || (isSignedIn() && getUserData().schoolId == resource.data.schoolId);
+      allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
+    }
+
+    // Classes
+    match /classes/{classId} {
+      allow read: if isSuperAdmin() || (isSignedIn() && getUserData().schoolId == resource.data.schoolId);
+      allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
+    }
+
+    // Subjects
+    match /subjects/{subjectId} {
+      allow read: if isSuperAdmin() || (isSignedIn() && getUserData().schoolId == resource.data.schoolId);
+      allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
+    }
+  }
+}
