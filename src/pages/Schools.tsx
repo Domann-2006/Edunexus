@@ -13,6 +13,8 @@ export default function Schools() {
     name: '',
     address: '',
     phone: '',
+    plan: 'BASIC',
+    logoUrl: '',
   });
 
   useEffect(() => {
@@ -37,7 +39,10 @@ export default function Schools() {
       if (editingId) {
         await schoolService.update(editingId, formData);
       } else {
-        await schoolService.create(formData);
+        await schoolService.create({ 
+          ...formData, 
+          userLimit: formData.plan === 'BASIC' ? 50 : formData.plan === 'PRO' ? 500 : 5000 
+        });
       }
       setIsModalOpen(false);
       fetchData();
@@ -63,10 +68,12 @@ export default function Schools() {
         name: school.name,
         address: school.address || '',
         phone: school.phone || '',
+        plan: school.plan || 'BASIC',
+        logoUrl: school.logoUrl || '',
       });
     } else {
       setEditingId(null);
-      setFormData({ name: '', address: '', phone: '' });
+      setFormData({ name: '', address: '', phone: '', plan: 'BASIC', logoUrl: '' });
     }
     setIsModalOpen(true);
   };
@@ -199,6 +206,18 @@ export default function Schools() {
                             className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 font-mono"
                             placeholder="+1 234 567 890"
                         />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Subscription Plan</label>
+                        <select
+                            value={formData.plan}
+                            onChange={(e) => setFormData({...formData, plan: e.target.value})}
+                            className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
+                        >
+                          <option value="BASIC">BASIC (50 students)</option>
+                          <option value="PRO">PRO (500 students)</option>
+                          <option value="PREMIUM">PREMIUM (Unlimited)</option>
+                        </select>
                     </div>
                   </div>
 

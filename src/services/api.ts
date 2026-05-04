@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   withCredentials: true,
 });
 
@@ -48,6 +48,27 @@ export const classService = {
   create: (data: any) => api.post('/v1/classes', data),
   update: (id: string, data: any) => api.put(`/v1/classes/${id}`, data),
   delete: (id: string) => api.delete(`/v1/classes/${id}`),
+};
+
+export const subjectService = {
+  list: () => api.get('/v1/subjects'),
+  create: (data: any) => api.post('/v1/subjects', data),
+  update: (id: string, data: any) => api.put(`/v1/subjects/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/subjects/${id}`),
+};
+
+export const resultService = {
+  list: (params?: any) => api.get('/v1/results', { params }),
+  create: (data: any) => api.post('/v1/results', data),
+  update: (id: string, data: any) => api.put(`/v1/results/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/results/${id}`),
+};
+
+export const sessionService = {
+  list: () => api.get('/v1/sessions'),
+  create: (data: any) => api.post('/v1/sessions', data),
+  update: (id: string, data: any) => api.put(`/v1/sessions/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/sessions/${id}`),
 };
 
 export const dashboardService = {

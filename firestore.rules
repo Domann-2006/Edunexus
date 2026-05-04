@@ -71,5 +71,17 @@ service cloud.firestore {
       allow read: if isSuperAdmin() || (isSignedIn() && getUserData().schoolId == resource.data.schoolId);
       allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
     }
+
+    // Results
+    match /results/{resultId} {
+      allow read: if isSuperAdmin() || (isSignedIn() && getUserData().schoolId == resource.data.schoolId);
+      allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId) || isTeacher(resource.data.schoolId);
+    }
+
+    // Sessions
+    match /sessions/{sessionId} {
+      allow read: if isSuperAdmin() || (isSignedIn() && getUserData().schoolId == resource.data.schoolId);
+      allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
+    }
   }
 }

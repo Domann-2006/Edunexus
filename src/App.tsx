@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import Teachers from './pages/Teachers';
 import Classes from './pages/Classes';
+import Subjects from './pages/Subjects';
+import Results from './pages/Results';
 import Schools from './pages/Schools';
 import Layout from './components/Layout';
 
@@ -65,6 +67,22 @@ export default function App() {
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
               <Classes />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/subjects" element={
+          <ProtectedRoute>
+            <Layout user={user} onLogout={handleLogout}>
+              <Subjects />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/results" element={
+          <ProtectedRoute>
+            <Layout user={user} onLogout={handleLogout}>
+              <Results />
             </Layout>
           </ProtectedRoute>
         } />

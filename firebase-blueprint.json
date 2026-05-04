@@ -8,6 +8,9 @@
         "name": { "type": "string" },
         "address": { "type": "string" },
         "phone": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "plan": { "type": "string", "enum": ["BASIC", "PRO", "PREMIUM"] },
+        "userLimit": { "type": "number" },
         "superAdminId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -38,6 +41,8 @@
         "admissionNumber": { "type": "string" },
         "guardianName": { "type": "string" },
         "guardianPhone": { "type": "string" },
+        "dateOfBirth": { "type": "string" },
+        "gender": { "type": "string", "enum": ["MALE", "FEMALE"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "schoolId"]
@@ -57,7 +62,7 @@
     },
     "Class": {
       "title": "Class",
-      "description": "A school class.",
+      "description": "A school class (e.g. SS1, JSS2).",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
@@ -74,11 +79,42 @@
       "properties": {
         "name": { "type": "string" },
         "schoolId": { "type": "string" },
-        "teacherId": { "type": "string" },
-        "classId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "schoolId"]
+    },
+    "Result": {
+      "title": "Result",
+      "description": "Student academic performance for a subject in a term.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "classId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "ca1": { "type": "number" },
+        "ca2": { "type": "number" },
+        "exam": { "type": "number" },
+        "total": { "type": "number" },
+        "grade": { "type": "string" },
+        "term": { "type": "string", "enum": ["1st", "2nd", "3rd"] },
+        "session": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "classId", "subjectId", "schoolId", "term", "session"]
+    },
+    "Session": {
+       "title": "Session",
+       "description": "Academic year (e.g. 2023/2024).",
+       "type": "object",
+       "properties": {
+         "name": { "type": "string" },
+         "schoolId": { "type": "string" },
+         "isCurrent": { "type": "boolean" },
+         "createdAt": { "type": "string", "format": "date-time" }
+       },
+       "required": ["name", "schoolId"]
     }
   },
   "firestore": {
@@ -87,6 +123,8 @@
     "students": { "schema": "Student", "description": "Collection of students." },
     "teachers": { "schema": "Teacher", "description": "Collection of teachers." },
     "classes": { "schema": "Class", "description": "Collection of classes." },
-    "subjects": { "schema": "Subject", "description": "Collection of subjects." }
+    "subjects": { "schema": "Subject", "description": "Collection of subjects." },
+    "results": { "schema": "Result", "description": "Collection of student results." },
+    "sessions": { "schema": "Session", "description": "Academic years." }
   }
 }

@@ -17,6 +17,8 @@ export default function Students() {
     classId: '',
     guardianName: '',
     guardianPhone: '',
+    dateOfBirth: '',
+    gender: 'MALE',
   });
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export default function Students() {
       }
       setIsModalOpen(false);
       setEditingId(null);
-      setFormData({ name: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '' });
+      setFormData({ name: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
       fetchData();
     } catch (err) {
       alert('Operation failed');
@@ -75,10 +77,12 @@ export default function Students() {
         classId: student.classId,
         guardianName: student.guardianName,
         guardianPhone: student.guardianPhone,
+        dateOfBirth: student.dateOfBirth || '',
+        gender: student.gender || 'MALE',
       });
     } else {
       setEditingId(null);
-      setFormData({ name: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '' });
+      setFormData({ name: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
     }
     setIsModalOpen(true);
   };
@@ -219,6 +223,26 @@ export default function Students() {
                         required
                         value={formData.admissionNumber}
                         onChange={(e) => setFormData({...formData, admissionNumber: e.target.value})}
+                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Gender</label>
+                      <select
+                        value={formData.gender}
+                        onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                      >
+                        <option value="MALE">Male</option>
+                        <option value="FEMALE">Female</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Date of Birth</label>
+                      <input
+                        type="date"
+                        value={formData.dateOfBirth}
+                        onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
                         className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
                       />
                     </div>
