@@ -1,20 +1,46 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# EduNexus - School Management System
 
-# Run and deploy your AI Studio app
+A multi-tenant school management system built with React, Node.js (Express), and Firebase.
 
-This contains everything you need to run your app locally.
+## Local Development
 
-View your app in AI Studio: https://ai.studio/apps/776b6521-6608-43ec-80a6-ec658d1ac2eb
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-## Run Locally
+2. **Environment Variables**:
+   Create a `.env` file based on `.env.example`. Ensure `GEMINI_API_KEY` is set if using AI features.
 
-**Prerequisites:**  Node.js
+3. **Run Dev Server**:
+   ```bash
+   npm run dev
+   ```
+   The app will be available at `http://localhost:3000`.
 
+4. **Initial Setup**:
+   Go to the login page and click "First time here?" to create your first Super Admin account.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Hosting & Deployment
+
+### 1. Build
+```bash
+npm run build
+```
+This generates optimized static files in the `dist` folder.
+
+### 2. Server
+The `server.ts` file is a unified entry point. In production, it serves the static files and handles API requests.
+```bash
+npm start
+```
+
+### 3. Firebase
+- This app uses **Firestore** for data and **Firebase Auth** for user management.
+- Ensure you have deployed `firestore.rules` to your Firebase project.
+- Service account credentials should be configured in `firebase-applet-config.json` or via environment variables if modifying `src/lib/firebase-admin.ts`.
+
+## Tech Stack
+- **Frontend**: React (Vite), Tailwind CSS, Framer Motion, Lucide Icons, Recharts.
+- **Backend**: Node.js, Express, JWT, Bcrypt.
+- **Database**: Google Cloud Firestore.
