@@ -1,18 +1,8 @@
-import express from 'express';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'edunexus_super_secret_key';
 
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-    schoolId: string;
-  };
-}
-
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticate = (req, res, next) => {
   const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
 
   if (!token) {
@@ -20,7 +10,7 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
@@ -28,8 +18,8 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 };
 
-export const authorize = (roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authorize = (roles) => {
+  return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -6,8 +7,8 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 
 // Routes
-import authRoutes from './src/routes/auth.ts';
-import apiRoutes from './src/routes/api.ts';
+import authRoutes from './src/routes/auth.js';
+import apiRoutes from './src/routes/api.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

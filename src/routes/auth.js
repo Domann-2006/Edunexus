@@ -1,16 +1,16 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { db } from '../lib/firebase-admin.ts';
+import { db } from '../lib/firebase-admin.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'edunexus_super_secret_key';
 
 // Helper to find user by email
-const findUserByEmail = async (email: string) => {
+const findUserByEmail = async (email) => {
   const snapshot = await db.collection('users').where('email', '==', email).limit(1).get();
   if (snapshot.empty) return null;
-  return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
+  return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
 };
 
 router.post('/login', async (req, res) => {
@@ -50,7 +50,7 @@ router.post('/login', async (req, res) => {
         schoolId: user.schoolId
       }
     });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
@@ -79,7 +79,7 @@ router.post('/setup-initial', async (req, res) => {
     });
 
     res.status(201).json({ message: 'Initial user created', id: userRef.id });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });

@@ -1,7 +1,7 @@
 import express from 'express';
-import { db } from '../lib/firebase-admin.ts';
-import { authenticate, authorize, AuthRequest } from '../middleware/auth.ts';
-import { calculateGrade } from '../lib/grading.ts';
+import { db } from '../lib/firebase-admin.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import { calculateGrade } from '../lib/grading.js';
 
 const router = express.Router();
 
@@ -13,27 +13,27 @@ const PLAN_LIMITS = {
 };
 
 // Generic CRUD helper
-const createCRUD = (collectionName: string, roles: string[], transform?: (data: any) => any) => {
+const createCRUD = (collectionName, roles, transform) => {
   const crudRouter = express.Router();
 
   // Create
-  crudRouter.get('/', authenticate, async (req: AuthRequest, res) => {
+  crudRouter.get('/', authenticate, async (req, res) => {
     try {
-      let query: any = db.collection(collectionName);
+      let query = db.collection(collectionName);
       if (req.user?.role !== 'SUPER_ADMIN') {
         query = query.where('schoolId', '==', req.user?.schoolId);
       } else if (req.query.schoolId) {
         query = query.where('schoolId', '==', req.query.schoolId);
       }
       const snapshot = await query.get();
-      const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       res.json(docs);
-    } catch (err: any) {
+    } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  crudRouter.post('/', authenticate, authorize(roles), async (req: AuthRequest, res) => {
+  crudRouter.post('/', authenticate, authorize(roles), async (req, res) => {
     try {
       let data = {
         ...req.body,
@@ -49,12 +49,12 @@ const createCRUD = (collectionName: string, roles: string[], transform?: (data: 
 
       const ref = await db.collection(collectionName).add(data);
       res.status(201).json({ id: ref.id, ...data });
-    } catch (err: any) {
+    } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  crudRouter.get('/:id', authenticate, async (req: AuthRequest, res) => {
+  crudRouter.get('/:id', authenticate, async (req, res) => {
     try {
       const doc = await db.collection(collectionName).doc(req.params.id).get();
       if (!doc.exists) return res.status(404).json({ message: 'Not found' });
@@ -63,12 +63,12 @@ const createCRUD = (collectionName: string, roles: string[], transform?: (data: 
         return res.status(403).json({ message: 'Forbidden' });
       }
       res.json({ id: doc.id, ...data });
-    } catch (err: any) {
+    } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  crudRouter.put('/:id', authenticate, authorize(roles), async (req: AuthRequest, res) => {
+  crudRouter.put('/:id', authenticate, authorize(roles), async (req, res) => {
     try {
       const docRef = db.collection(collectionName).doc(req.params.id);
       const doc = await docRef.get();
@@ -81,12 +81,12 @@ const createCRUD = (collectionName: string, roles: string[], transform?: (data: 
       if (transform) updateData = transform(updateData);
       await docRef.update(updateData);
       res.json({ message: 'Updated successfully' });
-    } catch (err: any) {
+    } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  crudRouter.delete('/:id', authenticate, authorize(roles), async (req: AuthRequest, res) => {
+  crudRouter.delete('/:id', authenticate, authorize(roles), async (req, res) => {
     try {
       const docRef = db.collection(collectionName).doc(req.params.id);
       const doc = await docRef.get();
@@ -97,7 +97,7 @@ const createCRUD = (collectionName: string, roles: string[], transform?: (data: 
       }
       await docRef.delete();
       res.json({ message: 'Deleted successfully' });
-    } catch (err: any) {
+    } catch (err) {
       res.status(500).json({ message: err.message });
     }
   });
@@ -106,7 +106,7 @@ const createCRUD = (collectionName: string, roles: string[], transform?: (data: 
 };
 
 // Result transformation (Auto-grade)
-const resultTransform = (data: any) => {
+const resultTransform = (data) => {
   const ca1 = Number(data.ca1) || 0;
   const ca2 = Number(data.ca2) || 0;
   const exam = Number(data.exam) || 0;
@@ -125,13 +125,13 @@ router.use('/results', createCRUD('results', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TE
 router.use('/sessions', createCRUD('sessions', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 
 // Dashboard Stats
-router.get('/dashboard-stats', authenticate, async (req: AuthRequest, res) => {
+router.get('/dashboard-stats', authenticate, async (req, res) => {
   try {
     const schoolId = req.user?.schoolId;
     const isSuper = req.user?.role === 'SUPER_ADMIN';
 
-    const getCount = async (coll: string) => {
-      let q: any = db.collection(coll);
+    const getCount = async (coll) => {
+      let q = db.collection(coll);
       if (!isSuper) q = q.where('schoolId', '==', schoolId);
       const snap = await q.get();
       return snap.size;
@@ -145,11 +145,11 @@ router.get('/dashboard-stats', authenticate, async (req: AuthRequest, res) => {
     };
 
     if (isSuper) {
-      (stats as any).schools = await getCount('schools');
+      stats.schools = await getCount('schools');
     }
 
     res.json(stats);
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });

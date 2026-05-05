@@ -1,4 +1,4 @@
-export const calculateGrade = (total: number) => {
+export const calculateGrade = (total) => {
   if (total >= 75) return { grade: 'A1', remark: 'Excellent' };
   if (total >= 70) return { grade: 'B2', remark: 'Very Good' };
   if (total >= 65) return { grade: 'B3', remark: 'Good' };
