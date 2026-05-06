@@ -70,8 +70,9 @@ export default function Results() {
 
       const initialScores: any = {};
       classStudents.forEach((student: any) => {
-        const result = resRes.data.find((r: any) => r.studentId === student.userId);
-        initialScores[student.userId] = {
+        const studentId = student.userId || student.id;
+        const result = resRes.data.find((r: any) => r.studentId === studentId);
+        initialScores[studentId] = {
           ca1: result?.ca1 || 0,
           ca2: result?.ca2 || 0,
           exam: result?.exam || 0
@@ -100,11 +101,12 @@ export default function Results() {
     setSaving(true);
     try {
       const promises = students.map(student => {
-        const studentScores = scores[student.userId];
-        const existingResult = results.find(r => r.studentId === student.userId);
+        const studentId = student.userId || student.id;
+        const studentScores = scores[studentId];
+        const existingResult = results.find(r => r.studentId === studentId);
         const data = {
           ...studentScores,
-          studentId: student.userId,
+          studentId: studentId,
           classId: filters.classId,
           subjectId: filters.subjectId,
           sessionId: filters.sessionId,
@@ -132,11 +134,12 @@ export default function Results() {
     if (students.length === 0) return;
     const headers = ['Student Name', 'Admission #', 'CA 1', 'CA 2', 'Exam', 'Total', 'Grade', 'Remark'];
     const rows = students.map(student => {
-      const s = scores[student.userId];
+      const studentId = student.userId || student.id;
+      const s = scores[studentId];
       const total = s.ca1 + s.ca2 + s.exam;
       // In a real app we'd get these from the server calculated result, but for export we can re-calc
       // Or better, use the results array
-      const res = results.find(r => r.studentId === student.userId);
+      const res = results.find(r => r.studentId === studentId);
       return [
         student.name,
         student.admissionNumber,
@@ -275,8 +278,9 @@ export default function Results() {
                   </tr>
                 ) : (
                   students.map((student) => {
-                    const s = scores[student.userId] || { ca1: 0, ca2: 0, exam: 0 };
-                    const res = results.find(r => r.studentId === student.userId);
+                    const studentId = student.userId || student.id;
+                    const s = scores[studentId] || { ca1: 0, ca2: 0, exam: 0 };
+                    const res = results.find(r => r.studentId === studentId);
                     const total = s.ca1 + s.ca2 + s.exam;
                     
                     return (
@@ -290,7 +294,7 @@ export default function Results() {
                             type="number" 
                             max={20}
                             value={s.ca1}
-                            onChange={(e) => handleScoreChange(student.userId, 'ca1', e.target.value)}
+                            onChange={(e) => handleScoreChange(studentId, 'ca1', e.target.value)}
                             className="w-16 px-3 py-2 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-blue-500/20 text-center font-bold text-gray-900 outline-none"
                           />
                         </td>
@@ -299,7 +303,7 @@ export default function Results() {
                             type="number" 
                             max={20}
                             value={s.ca2}
-                            onChange={(e) => handleScoreChange(student.userId, 'ca2', e.target.value)}
+                            onChange={(e) => handleScoreChange(studentId, 'ca2', e.target.value)}
                             className="w-16 px-3 py-2 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-blue-500/20 text-center font-bold text-gray-900 outline-none"
                           />
                         </td>
@@ -308,7 +312,7 @@ export default function Results() {
                             type="number" 
                             max={60}
                             value={s.exam}
-                            onChange={(e) => handleScoreChange(student.userId, 'exam', e.target.value)}
+                            onChange={(e) => handleScoreChange(studentId, 'exam', e.target.value)}
                             className="w-16 px-3 py-2 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-blue-500/20 text-center font-bold text-gray-900 outline-none"
                           />
                         </td>

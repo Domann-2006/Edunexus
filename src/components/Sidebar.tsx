@@ -26,7 +26,7 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
     { name: 'Results', path: '/results', icon: FileSpreadsheet },
   ];
 
-  if (user.role === 'SUPER_ADMIN') {
+  if (user?.role === 'SUPER_ADMIN') {
     menuItems.push({ name: 'Schools', path: '/schools', icon: School });
   }
 
@@ -55,7 +55,7 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
               }`
             }
           >
-            <item.icon size={18} className={({ isActive }: any) => isActive ? '' : 'group-hover:scale-110 transition-transform'} />
+            <item.icon size={18} className="group-hover:scale-110 transition-transform" />
             <span className="text-sm tracking-tight">{item.name}</span>
           </NavLink>
         ))}
@@ -63,9 +63,9 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
 
       <div className="p-6">
         <div className="bg-gray-50/80 rounded-3xl p-5 mb-4 border border-gray-100">
-          <div className="font-bold text-sm text-gray-900 truncate tracking-tight">{user.name}</div>
+          <div className="font-bold text-sm text-gray-900 truncate tracking-tight">{user?.name || 'User'}</div>
           <div className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-1 opacity-70">
-            {user.role.replace('_', ' ')}
+            {user?.role?.replace('_', ' ') || 'GUEST'}
           </div>
         </div>
         <button

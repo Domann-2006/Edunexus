@@ -45,7 +45,7 @@ export default function Dashboard({ user }: { user: any }) {
     { name: 'Subjects', value: stats?.subjects || 0, icon: Book, color: 'amber', link: '/subjects' },
   ];
 
-  if (user.role === 'SUPER_ADMIN') {
+  if (user?.role === 'SUPER_ADMIN') {
     statCards.push({ name: 'Schools', value: stats?.schools || 0, icon: School, color: 'rose', link: '/schools' });
   }
 
@@ -69,7 +69,7 @@ export default function Dashboard({ user }: { user: any }) {
             <Calendar size={18} className="text-blue-600" />
             <span className="text-sm font-bold text-gray-700 tracking-tight">May 4, 2026</span>
           </div>
-          {user.role === 'SCHOOL_ADMIN' && (
+          {user?.role === 'SCHOOL_ADMIN' && (
             <button className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-100">
               <Zap size={20} />
             </button>

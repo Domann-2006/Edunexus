@@ -11,14 +11,27 @@ import Schools from './pages/Schools';
 import Layout from './components/Layout';
 
 export default function App() {
-  const [user, setUser] = useState<any>(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+    } catch (err) {
+      console.error('Failed to parse saved user:', err);
+      localStorage.removeItem('user');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const handleLogin = (userData: any) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
+    const userToSave = userData.user || userData; // Handle both nested and flat responses
+    setUser(userToSave);
+    localStorage.setItem('user', JSON.stringify(userToSave));
     localStorage.setItem('token', userData.token);
   };
 
@@ -29,8 +42,16 @@ export default function App() {
   };
 
   const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?: string[] }) => {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      );
+    }
     if (!user) return <Navigate to="/login" replace />;
-    if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
+    if (roles && user?.role && !roles.includes(user.role)) return <Navigate to="/" replace />;
+    if (roles && !user?.role) return <Navigate to="/" replace />;
     return <>{children}</>;
   };
 
