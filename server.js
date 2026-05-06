@@ -13,7 +13,10 @@ async function startServer() {
   // but prioritizing process.env.PORT for Render production.
   const PORT = process.env.PORT || 3000;
 
-  app.use(cors());
+  app.use(cors({
+    origin: true, // Reflects the request origin
+    credentials: true,
+  }));
   app.use(express.json());
   app.use(cookieParser());
 
