@@ -204,13 +204,15 @@ export default function Students({ user }: { user: any }) {
                       <div className="flex justify-end gap-2 text-xs">
                         <button 
                           onClick={() => openModal(student)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
+                          title="Edit Student"
                         >
                           <Edit2 size={16} />
                         </button>
                         <button 
                           onClick={() => handleDelete(student.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
+                          title="Delete Student"
                         >
                           <Trash2 size={16} />
                         </button>

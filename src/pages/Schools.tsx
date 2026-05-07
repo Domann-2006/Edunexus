@@ -125,16 +125,18 @@ export default function Schools() {
                     <SchoolIcon size={28} />
                   )}
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-2">
                   <button 
                     onClick={() => openModal(school)}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                    className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all"
+                    title="Edit School"
                   >
                     <Edit2 size={18} />
                   </button>
                   <button 
                     onClick={() => handleDelete(school.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
+                    title="Delete School"
                   >
                     <Trash2 size={18} />
                   </button>
