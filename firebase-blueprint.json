@@ -25,6 +25,7 @@
         "email": { "type": "string", "format": "email" },
         "role": { "type": "string", "enum": ["SUPER_ADMIN", "SCHOOL_ADMIN", "TEACHER", "STUDENT"] },
         "schoolId": { "type": "string" },
+        "avatarUrl": { "type": "string" },
         "passwordHash": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -36,6 +37,8 @@
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "avatarUrl": { "type": "string" },
         "schoolId": { "type": "string" },
         "classId": { "type": "string" },
         "admissionNumber": { "type": "string" },
@@ -53,6 +56,8 @@
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "avatarUrl": { "type": "string" },
         "schoolId": { "type": "string" },
         "employeeId": { "type": "string" },
         "specialization": { "type": "string" },

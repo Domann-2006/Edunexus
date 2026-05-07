@@ -76,3 +76,17 @@ export const sessionService = {
 export const dashboardService = {
   getStats: () => api.get('/api/v1/dashboard-stats'),
 };
+
+export const fileService = {
+  upload: (file: File) => {
+    // In a real app, we'd use FormData and a storage service.
+    // Here we'll simulate it by converting to base64 or just returning a mock URL.
+    return new Promise<{ data: { url: string } }>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve({ data: { url: reader.result as string } });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+};

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { schoolService } from '../services/api';
 import { Plus, Edit2, Trash2, X, Loader2, School as SchoolIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import ProfileImage from '../components/ProfileImage';
 
 export default function Schools() {
   const [schools, setSchools] = useState<any[]>([]);
@@ -114,8 +115,12 @@ export default function Schools() {
               className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
             >
               <div className="flex justify-between items-start mb-6">
-                <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
-                  <SchoolIcon size={28} />
+                <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center overflow-hidden border border-indigo-100">
+                  {school.logoUrl ? (
+                    <img src={school.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <SchoolIcon size={28} />
+                  )}
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
@@ -175,6 +180,14 @@ export default function Schools() {
                 </header>
 
                 <form onSubmit={handleSubmit} className="space-y-8">
+                  <div className="flex justify-center mb-6">
+                    <ProfileImage 
+                      size="lg" 
+                      editable 
+                      url={formData.logoUrl} 
+                      onUpload={(url) => setFormData({...formData, logoUrl: url})} 
+                    />
+                  </div>
                   <div className="space-y-6">
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Entity Name</label>

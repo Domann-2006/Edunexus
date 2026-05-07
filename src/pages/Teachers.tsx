@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { teacherService } from '../services/api';
-import { Plus, Search, Edit2, Trash2, X, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import ProfileImage from '../components/ProfileImage';
 
 export default function Teachers() {
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -12,6 +13,7 @@ export default function Teachers() {
   
   const [formData, setFormData] = useState({
     name: '',
+    avatarUrl: '',
     email: '',
     employeeId: '',
     specialization: '',
@@ -63,13 +65,14 @@ export default function Teachers() {
       setEditingId(teacher.id);
       setFormData({
         name: teacher.name,
+        avatarUrl: teacher.avatarUrl || '',
         email: teacher.email || '',
         employeeId: teacher.employeeId,
         specialization: teacher.specialization,
       });
     } else {
       setEditingId(null);
-      setFormData({ name: '', email: '', employeeId: '', specialization: '' });
+      setFormData({ name: '', avatarUrl: '', email: '', employeeId: '', specialization: '' });
     }
     setIsModalOpen(true);
   };
@@ -111,7 +114,7 @@ export default function Teachers() {
           <table className="w-full text-left">
             <thead className="bg-gray-50/50 text-gray-400 text-xs font-bold tracking-widest border-b border-gray-50">
               <tr>
-                <th className="px-6 py-4">Name</th>
+                <th className="px-6 py-4">Teacher</th>
                 <th className="px-6 py-4">Employee ID</th>
                 <th className="px-6 py-4">Specialization</th>
                 <th className="px-6 py-4 text-right">Actions</th>
@@ -135,8 +138,13 @@ export default function Teachers() {
                 filtered.map((teacher) => (
                   <tr key={teacher.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-bold text-gray-900">{teacher.name}</div>
-                      <div className="text-[10px] text-gray-400 font-medium normal-case tracking-normal">{teacher.email}</div>
+                      <div className="flex items-center gap-3">
+                        <ProfileImage url={teacher.avatarUrl} size="sm" />
+                        <div>
+                          <div className="font-bold text-gray-900">{teacher.name}</div>
+                          <div className="text-[10px] text-gray-400 font-medium normal-case tracking-normal">{teacher.email}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-gray-500 font-mono text-xs">{teacher.employeeId}</td>
                     <td className="px-6 py-4">
@@ -193,6 +201,14 @@ export default function Teachers() {
                 </header>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="flex justify-center mb-6">
+                    <ProfileImage 
+                      size="xl" 
+                      editable 
+                      url={formData.avatarUrl} 
+                      onUpload={(url) => setFormData({...formData, avatarUrl: url})} 
+                    />
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Full Name</label>

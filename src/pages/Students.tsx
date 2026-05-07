@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { studentService, classService } from '../services/api';
-import { Plus, Search, MoreVertical, Edit2, Trash2, X, Check, Loader2 } from 'lucide-react';
+import { Plus, Search, MoreVertical, Edit2, Trash2, X, Check, Loader2, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import ProfileImage from '../components/ProfileImage';
 
 export default function Students() {
   const [students, setStudents] = useState<any[]>([]);
@@ -13,6 +14,7 @@ export default function Students() {
   
   const [formData, setFormData] = useState({
     name: '',
+    avatarUrl: '',
     admissionNumber: '',
     classId: '',
     guardianName: '',
@@ -51,7 +53,7 @@ export default function Students() {
       }
       setIsModalOpen(false);
       setEditingId(null);
-      setFormData({ name: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
+      setFormData({ name: '', avatarUrl: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
       fetchData();
     } catch (err) {
       alert('Operation failed');
@@ -73,6 +75,7 @@ export default function Students() {
       setEditingId(student.id);
       setFormData({
         name: student.name,
+        avatarUrl: student.avatarUrl || '',
         admissionNumber: student.admissionNumber,
         classId: student.classId,
         guardianName: student.guardianName,
@@ -82,7 +85,7 @@ export default function Students() {
       });
     } else {
       setEditingId(null);
-      setFormData({ name: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
+      setFormData({ name: '', avatarUrl: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
     }
     setIsModalOpen(true);
   };
@@ -124,8 +127,8 @@ export default function Students() {
           <table className="w-full text-left">
             <thead className="bg-gray-50/50 text-gray-400 text-xs font-bold tracking-widest border-b border-gray-50">
               <tr>
-                <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">Admission #</th>
+                <th className="px-6 py-4">Student</th>
+                <th className="px-6 py-4 text-gray-500 font-mono">Admission #</th>
                 <th className="px-6 py-4">Class</th>
                 <th className="px-6 py-4">Guardian</th>
                 <th className="px-6 py-4 text-right">Actions</th>
@@ -148,7 +151,12 @@ export default function Students() {
               ) : (
                 filteredStudents.map((student) => (
                   <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-gray-900">{student.name}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <ProfileImage url={student.avatarUrl} size="sm" />
+                        <span className="font-bold text-gray-900">{student.name}</span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-gray-500 font-mono">{student.admissionNumber}</td>
                     <td className="px-6 py-4">
                       <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full font-bold text-[10px]">
@@ -205,6 +213,14 @@ export default function Students() {
                 </header>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="flex justify-center mb-6">
+                    <ProfileImage 
+                      size="xl" 
+                      editable 
+                      url={formData.avatarUrl} 
+                      onUpload={(url) => setFormData({...formData, avatarUrl: url})} 
+                    />
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Full Name</label>
