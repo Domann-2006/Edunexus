@@ -16,6 +16,9 @@ export default function Schools() {
     phone: '',
     plan: 'BASIC',
     logoUrl: '',
+    adminName: '',
+    adminEmail: '',
+    adminPassword: '',
   });
 
   useEffect(() => {
@@ -74,7 +77,7 @@ export default function Schools() {
       });
     } else {
       setEditingId(null);
-      setFormData({ name: '', address: '', phone: '', plan: 'BASIC', logoUrl: '' });
+      setFormData({ name: '', address: '', phone: '', plan: 'BASIC', logoUrl: '', adminName: '', adminEmail: '', adminPassword: '' });
     }
     setIsModalOpen(true);
   };
@@ -233,6 +236,49 @@ export default function Schools() {
                           <option value="PREMIUM">PREMIUM (Unlimited)</option>
                         </select>
                     </div>
+
+                    {!editingId && (
+                      <>
+                        <div className="pt-6 border-t border-gray-50">
+                          <h3 className="text-sm font-black uppercase tracking-widest text-blue-600 mb-4 ml-1">Initial Administrator</h3>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Admin Full Name</label>
+                            <input
+                              type="text"
+                              required={!editingId}
+                              value={formData.adminName}
+                              onChange={(e) => setFormData({...formData, adminName: e.target.value})}
+                              className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
+                              placeholder="School Admin Name"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Admin Email</label>
+                            <input
+                              type="email"
+                              required={!editingId}
+                              value={formData.adminEmail}
+                              onChange={(e) => setFormData({...formData, adminEmail: e.target.value})}
+                              className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
+                              placeholder="admin@school.com"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Admin Password</label>
+                            <input
+                              type="password"
+                              required={!editingId}
+                              value={formData.adminPassword}
+                              onChange={(e) => setFormData({...formData, adminPassword: e.target.value})}
+                              className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
+                              placeholder="••••••••"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="pt-4 flex gap-4">

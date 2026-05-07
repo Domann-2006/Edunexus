@@ -33,6 +33,14 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1d' }
     );
 
+    let schoolName = null;
+    if (user.schoolId && user.schoolId !== 'SUPER') {
+      const schoolDoc = await db.collection('schools').doc(user.schoolId).get();
+      if (schoolDoc.exists) {
+        schoolName = schoolDoc.data().name;
+      }
+    }
+
     res.cookie('token', token, { 
       httpOnly: true, 
       secure: process.env.NODE_ENV === 'production',
@@ -47,7 +55,8 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        schoolId: user.schoolId
+        schoolId: user.schoolId,
+        schoolName: schoolName
       }
     });
   } catch (err) {

@@ -67,6 +67,9 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
           <ProfileImage url={user?.avatarUrl} size="sm" />
           <div className="min-w-0">
             <div className="font-bold text-sm text-gray-900 truncate tracking-tight">{user?.name || 'User'}</div>
+            {user?.schoolName && (
+              <div className="text-[9px] font-bold text-gray-400 truncate tracking-tight">{user.schoolName}</div>
+            )}
             <div className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-1 opacity-70">
               {user?.role?.replace('_', ' ') || 'GUEST'}
             </div>

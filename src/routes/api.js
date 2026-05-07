@@ -43,14 +43,45 @@ const createCRUD = (collectionName, roles, transform) => {
         createdAt: new Date().toISOString()
       };
       
+      // Override schoolId if Super Admin specifies one
       if (req.user?.role === 'SUPER_ADMIN' && req.body.schoolId) {
         data.schoolId = req.body.schoolId;
       }
 
+      // Special case: School Creation by Super Admin
+      if (collectionName === 'schools' && req.user?.role === 'SUPER_ADMIN') {
+        const { adminName, adminEmail, adminPassword, ...schoolData } = req.body;
+        
+        // Remove admin fields from school document
+        const cleanSchoolData = { ...schoolData, createdAt: new Date().toISOString(), active: true };
+        const schoolRef = await db.collection('schools').add(cleanSchoolData);
+        const schoolId = schoolRef.id;
+
+        // Create the SCHOOL_ADMIN user
+        if (adminEmail && adminPassword) {
+          const bcrypt = await import('bcryptjs');
+          const passwordHash = await bcrypt.default.hash(adminPassword, 10);
+          await db.collection('users').add({
+            name: adminName || schoolData.name,
+            email: adminEmail,
+            passwordHash,
+            role: 'SCHOOL_ADMIN',
+            schoolId: schoolId,
+            createdAt: new Date().toISOString()
+          });
+        }
+
+        return res.status(201).json({ id: schoolId, ...cleanSchoolData });
+      }
+
       if (transform) data = transform(data);
 
-      // Remove undefined values to prevent Firestore errors
-      Object.keys(data).forEach(key => data[key] === undefined && delete data[key]);
+      // Remove undefined values and administrative helper fields
+      Object.keys(data).forEach(key => {
+        if (data[key] === undefined || ['adminName', 'adminEmail', 'adminPassword'].includes(key)) {
+          delete data[key];
+        }
+      });
 
       const ref = await db.collection(collectionName).add(data);
       console.log(`Document created with ID: ${ref.id}`);
