@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { studentService, classService } from '../services/api';
+import { studentService, classService, schoolService } from '../services/api';
 import { Plus, Search, MoreVertical, Edit2, Trash2, X, Check, Loader2, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
-export default function Students() {
+export default function Students({ user }: { user: any }) {
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
+  const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -17,6 +18,7 @@ export default function Students() {
     avatarUrl: '',
     admissionNumber: '',
     classId: '',
+    schoolId: '',
     guardianName: '',
     guardianPhone: '',
     dateOfBirth: '',
@@ -30,14 +32,21 @@ export default function Students() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [studentsRes, classesRes] = await Promise.all([
+      const promises: Promise<any>[] = [
         studentService.list(),
         classService.list()
-      ]);
-      setStudents(studentsRes.data);
-      setClasses(classesRes.data);
+      ];
+
+      if (user?.role === 'SUPER_ADMIN') {
+        promises.push(schoolService.list());
+      }
+
+      const results = await Promise.all(promises);
+      setStudents(results[0].data);
+      setClasses(results[1].data);
+      if (results[2]) setSchools(results[2].data);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
     }
@@ -53,10 +62,12 @@ export default function Students() {
       }
       setIsModalOpen(false);
       setEditingId(null);
-      setFormData({ name: '', avatarUrl: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
+      setFormData({ name: '', avatarUrl: '', admissionNumber: '', classId: '', schoolId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
       fetchData();
-    } catch (err) {
-      alert('Operation failed');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Operation failed';
+      console.error('Submit error:', err);
+      alert(`Error: ${msg}`);
     }
   };
 
@@ -65,8 +76,9 @@ export default function Students() {
     try {
       await studentService.delete(id);
       fetchData();
-    } catch (err) {
-      alert('Delete failed');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Delete failed';
+      alert(`Error: ${msg}`);
     }
   };
 
@@ -78,6 +90,7 @@ export default function Students() {
         avatarUrl: student.avatarUrl || '',
         admissionNumber: student.admissionNumber,
         classId: student.classId,
+        schoolId: student.schoolId || '',
         guardianName: student.guardianName,
         guardianPhone: student.guardianPhone,
         dateOfBirth: student.dateOfBirth || '',
@@ -85,7 +98,17 @@ export default function Students() {
       });
     } else {
       setEditingId(null);
-      setFormData({ name: '', avatarUrl: '', admissionNumber: '', classId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
+      setFormData({ 
+        name: '', 
+        avatarUrl: '', 
+        admissionNumber: '', 
+        classId: '', 
+        schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || ''),
+        guardianName: '', 
+        guardianPhone: '', 
+        dateOfBirth: '', 
+        gender: 'MALE' 
+      });
     }
     setIsModalOpen(true);
   };
@@ -274,6 +297,20 @@ export default function Students() {
                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </div>
+                    {user?.role === 'SUPER_ADMIN' && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">School</label>
+                        <select
+                          required
+                          value={formData.schoolId}
+                          onChange={(e) => setFormData({...formData, schoolId: e.target.value})}
+                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none appearance-none"
+                        >
+                          <option value="">Select School</option>
+                          {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Guardian Name</label>
                       <input

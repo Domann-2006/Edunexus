@@ -3,14 +3,16 @@ import { subjectService } from '../services/api';
 import { Plus, Edit2, Trash2, X, Loader2, Book } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export default function Subjects() {
+export default function Subjects({ user }: { user: any }) {
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
+    schoolId: '',
   });
 
   useEffect(() => {
@@ -20,10 +22,15 @@ export default function Subjects() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await subjectService.list();
-      setSubjects(res.data);
+      const promises: Promise<any>[] = [subjectService.list()];
+      if (user?.role === 'SUPER_ADMIN') {
+        promises.push(schoolService.list());
+      }
+      const results = await Promise.all(promises);
+      setSubjects(results[0].data);
+      if (results[1]) setSchools(results[1].data);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
     }
@@ -39,8 +46,10 @@ export default function Subjects() {
       }
       setIsModalOpen(false);
       fetchData();
-    } catch (err) {
-      alert('Operation failed');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Operation failed';
+      console.error('Submit error:', err);
+      alert(`Error: ${msg}`);
     }
   };
 
@@ -49,18 +58,25 @@ export default function Subjects() {
     try {
       await subjectService.delete(id);
       fetchData();
-    } catch (err) {
-      alert('Delete failed');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Delete failed';
+      alert(`Error: ${msg}`);
     }
   };
 
   const openModal = (sub?: any) => {
     if (sub) {
       setEditingId(sub.id);
-      setFormData({ name: sub.name });
+      setFormData({ 
+        name: sub.name,
+        schoolId: sub.schoolId || '',
+      });
     } else {
       setEditingId(null);
-      setFormData({ name: '' });
+      setFormData({ 
+        name: '', 
+        schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || '') 
+      });
     }
     setIsModalOpen(true);
   };
@@ -132,11 +148,25 @@ export default function Subjects() {
                     type="text"
                     required
                     value={formData.name}
-                    onChange={(e) => setFormData({ name: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none font-bold"
                     placeholder="e.g. Mathematics"
                   />
                 </div>
+                {user?.role === 'SUPER_ADMIN' && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">School</label>
+                    <select
+                      required
+                      value={formData.schoolId}
+                      onChange={(e) => setFormData({ ...formData, schoolId: e.target.value })}
+                      className="w-full px-5 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none font-bold appearance-none"
+                    >
+                      <option value="">Select School</option>
+                      {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <button type="submit" className="w-full py-5 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all">
                   {editingId ? 'Update' : 'Create'}
                 </button>

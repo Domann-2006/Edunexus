@@ -3,7 +3,7 @@ import { resultService, studentService, classService, subjectService, sessionSer
 import { Save, Loader2, Trophy, AlertCircle, FileText, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export default function Results() {
+export default function Results({ user }: { user: any }) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -44,8 +44,8 @@ export default function Results() {
       
       const currentSess = sessRes.data.find((s: any) => s.isCurrent);
       if (currentSess) setFilters(f => ({ ...f, sessionId: currentSess.id }));
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Failed to load initial data:', err);
     } finally {
       setLoading(false);
     }
@@ -79,8 +79,8 @@ export default function Results() {
         };
       });
       setScores(initialScores);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Failed to load students and results:', err);
     } finally {
       setLoading(false);
     }
@@ -104,13 +104,18 @@ export default function Results() {
         const studentId = student.userId || student.id;
         const studentScores = scores[studentId];
         const existingResult = results.find(r => r.studentId === studentId);
+        
+        // Find the schoolId for this student to ensure it's saved correctly
+        const schoolId = student.schoolId || user?.schoolId || null;
+
         const data = {
           ...studentScores,
           studentId: studentId,
           classId: filters.classId,
           subjectId: filters.subjectId,
           sessionId: filters.sessionId,
-          term: filters.term
+          term: filters.term,
+          schoolId: schoolId,
         };
         
         if (existingResult) {
@@ -123,8 +128,10 @@ export default function Results() {
       await Promise.all(promises);
       alert('Scores saved successfully');
       loadStudentsAndResults();
-    } catch (err) {
-      alert('Failed to save scores');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to save scores';
+      console.error('Save error:', err);
+      alert(`Error: ${msg}`);
     } finally {
       setSaving(false);
     }

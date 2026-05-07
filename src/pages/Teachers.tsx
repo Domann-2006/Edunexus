@@ -4,8 +4,9 @@ import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon } from 'lucid
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
-export default function Teachers() {
+export default function Teachers({ user }: { user: any }) {
   const [teachers, setTeachers] = useState<any[]>([]);
+  const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -17,6 +18,7 @@ export default function Teachers() {
     email: '',
     employeeId: '',
     specialization: '',
+    schoolId: '',
   });
 
   useEffect(() => {
@@ -26,10 +28,15 @@ export default function Teachers() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await teacherService.list();
-      setTeachers(res.data);
+      const promises: Promise<any>[] = [teacherService.list()];
+      if (user?.role === 'SUPER_ADMIN') {
+        promises.push(schoolService.list());
+      }
+      const results = await Promise.all(promises);
+      setTeachers(results[0].data);
+      if (results[1]) setSchools(results[1].data);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
     }
@@ -45,8 +52,10 @@ export default function Teachers() {
       }
       setIsModalOpen(false);
       fetchData();
-    } catch (err) {
-      alert('Operation failed');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Operation failed';
+      console.error('Submit error:', err);
+      alert(`Error: ${msg}`);
     }
   };
 
@@ -55,8 +64,9 @@ export default function Teachers() {
     try {
       await teacherService.delete(id);
       fetchData();
-    } catch (err) {
-      alert('Delete failed');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Delete failed';
+      alert(`Error: ${msg}`);
     }
   };
 
@@ -69,10 +79,18 @@ export default function Teachers() {
         email: teacher.email || '',
         employeeId: teacher.employeeId,
         specialization: teacher.specialization,
+        schoolId: teacher.schoolId || '',
       });
     } else {
       setEditingId(null);
-      setFormData({ name: '', avatarUrl: '', email: '', employeeId: '', specialization: '' });
+      setFormData({ 
+        name: '', 
+        avatarUrl: '', 
+        email: '', 
+        employeeId: '', 
+        specialization: '',
+        schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || '')
+      });
     }
     setIsModalOpen(true);
   };
@@ -249,6 +267,20 @@ export default function Teachers() {
                         placeholder="e.g. Mathematics, Physics"
                       />
                     </div>
+                    {user?.role === 'SUPER_ADMIN' && (
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">School</label>
+                        <select
+                          required
+                          value={formData.schoolId}
+                          onChange={(e) => setFormData({...formData, schoolId: e.target.value})}
+                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none appearance-none"
+                        >
+                          <option value="">Select School</option>
+                          {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-4 flex gap-3">

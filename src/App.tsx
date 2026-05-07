@@ -71,7 +71,7 @@ export default function App() {
         <Route path="/students" element={
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
-              <Students />
+              <Students user={user} />
             </Layout>
           </ProtectedRoute>
         } />
@@ -79,7 +79,7 @@ export default function App() {
         <Route path="/teachers" element={
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
-              <Teachers />
+              <Teachers user={user} />
             </Layout>
           </ProtectedRoute>
         } />
@@ -87,7 +87,7 @@ export default function App() {
         <Route path="/classes" element={
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
-              <Classes />
+              <Classes user={user} />
             </Layout>
           </ProtectedRoute>
         } />
@@ -95,7 +95,7 @@ export default function App() {
         <Route path="/subjects" element={
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
-              <Subjects />
+              <Subjects user={user} />
             </Layout>
           </ProtectedRoute>
         } />
@@ -103,7 +103,7 @@ export default function App() {
         <Route path="/results" element={
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
-              <Results />
+              <Results user={user} />
             </Layout>
           </ProtectedRoute>
         } />

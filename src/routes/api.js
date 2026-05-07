@@ -35,9 +35,11 @@ const createCRUD = (collectionName, roles, transform) => {
 
   crudRouter.post('/', authenticate, authorize(roles), async (req, res) => {
     try {
+      console.log(`Creating document in ${collectionName}`, req.body);
+      
       let data = {
         ...req.body,
-        schoolId: req.user?.schoolId,
+        schoolId: req.user?.schoolId || null,
         createdAt: new Date().toISOString()
       };
       
@@ -47,10 +49,15 @@ const createCRUD = (collectionName, roles, transform) => {
 
       if (transform) data = transform(data);
 
+      // Remove undefined values to prevent Firestore errors
+      Object.keys(data).forEach(key => data[key] === undefined && delete data[key]);
+
       const ref = await db.collection(collectionName).add(data);
+      console.log(`Document created with ID: ${ref.id}`);
       res.status(201).json({ id: ref.id, ...data });
     } catch (err) {
-      res.status(500).json({ message: err.message });
+      console.error(`Error creating document in ${collectionName}:`, err);
+      res.status(500).json({ message: err.message || 'Error occurred during creation' });
     }
   });
 

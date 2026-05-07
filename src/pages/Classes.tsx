@@ -3,9 +3,10 @@ import { classService, teacherService } from '../services/api';
 import { Plus, Edit2, Trash2, X, Loader2, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export default function Classes() {
+export default function Classes({ user }: { user: any }) {
   const [classes, setClasses] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -13,6 +14,7 @@ export default function Classes() {
   const [formData, setFormData] = useState({
     name: '',
     teacherId: '',
+    schoolId: '',
   });
 
   useEffect(() => {
@@ -22,14 +24,21 @@ export default function Classes() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [classesRes, teachersRes] = await Promise.all([
+      const promises: Promise<any>[] = [
         classService.list(),
         teacherService.list()
-      ]);
-      setClasses(classesRes.data);
-      setTeachers(teachersRes.data);
+      ];
+
+      if (user?.role === 'SUPER_ADMIN') {
+        promises.push(schoolService.list());
+      }
+
+      const results = await Promise.all(promises);
+      setClasses(results[0].data);
+      setTeachers(results[1].data);
+      if (results[2]) setSchools(results[2].data);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
     }
@@ -45,8 +54,10 @@ export default function Classes() {
       }
       setIsModalOpen(false);
       fetchData();
-    } catch (err) {
-      alert('Operation failed');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Operation failed';
+      console.error('Submit error:', err);
+      alert(`Error: ${msg}`);
     }
   };
 
@@ -55,8 +66,9 @@ export default function Classes() {
     try {
       await classService.delete(id);
       fetchData();
-    } catch (err) {
-      alert('Delete failed');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Delete failed';
+      alert(`Error: ${msg}`);
     }
   };
 
@@ -66,10 +78,15 @@ export default function Classes() {
       setFormData({
         name: cls.name,
         teacherId: cls.teacherId || '',
+        schoolId: cls.schoolId || '',
       });
     } else {
       setEditingId(null);
-      setFormData({ name: '', teacherId: '' });
+      setFormData({ 
+        name: '', 
+        teacherId: '', 
+        schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || '') 
+      });
     }
     setIsModalOpen(true);
   };
@@ -188,6 +205,20 @@ export default function Classes() {
                       {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                   </div>
+                  {user?.role === 'SUPER_ADMIN' && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">School</label>
+                      <select
+                        required
+                        value={formData.schoolId}
+                        onChange={(e) => setFormData({...formData, schoolId: e.target.value})}
+                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-sm font-bold appearance-none"
+                      >
+                        <option value="">Select School</option>
+                        {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="pt-4 flex gap-3">
                     <button
