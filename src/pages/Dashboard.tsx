@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { dashboardService } from '../services/api';
+import { dashboardService, schoolService } from '../services/api';
 import { 
   Users, 
   UserPlus, 
@@ -30,13 +30,22 @@ import {
 export default function Dashboard({ user }: { user: any }) {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [schools, setSchools] = useState<any[]>([]);
+  const [selectedSchoolId, setSelectedSchoolId] = useState('');
 
   useEffect(() => {
-    dashboardService.getStats()
+    if (user?.role === 'SUPER_ADMIN') {
+      schoolService.list().then(res => setSchools(res.data));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    setLoading(true);
+    dashboardService.getStats({ schoolId: selectedSchoolId })
       .then(res => setStats(res.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedSchoolId]);
 
   const statCards = [
     { name: 'Students', value: stats?.students || 0, icon: Users, color: 'blue', link: '/students' },
@@ -64,7 +73,17 @@ export default function Dashboard({ user }: { user: any }) {
           <h1 className="text-4xl font-black text-gray-900 tracking-tighter">Overview</h1>
           <p className="text-gray-500 font-medium mt-1 uppercase tracking-widest text-[10px]">Academic Year 2025/2026 • First Term</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          {user?.role === 'SUPER_ADMIN' && (
+            <select
+              value={selectedSchoolId}
+              onChange={(e) => setSelectedSchoolId(e.target.value)}
+              className="px-5 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
+            >
+              <option value="">All Schools</option>
+              {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
           <div className="bg-white px-5 py-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
             <Calendar size={18} className="text-blue-600" />
             <span className="text-sm font-bold text-gray-700 tracking-tight">May 4, 2026</span>

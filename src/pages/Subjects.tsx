@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 export default function Subjects({ user }: { user: any }) {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
+  const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -17,12 +18,12 @@ export default function Subjects({ user }: { user: any }) {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedSchoolId]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const promises: Promise<any>[] = [subjectService.list()];
+      const promises: Promise<any>[] = [subjectService.list({ schoolId: selectedSchoolId })];
       if (user?.role === 'SUPER_ADMIN') {
         promises.push(schoolService.list());
       }
@@ -83,18 +84,30 @@ export default function Subjects({ user }: { user: any }) {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight font-sans">Subjects</h1>
           <p className="text-gray-500">Academic curriculum management.</p>
         </div>
-        <button 
-          onClick={() => openModal()}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold uppercase tracking-widest text-[10px] rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
-        >
-          <Plus size={18} />
-          <span>New Subject</span>
-        </button>
+        <div className="flex flex-col md:flex-row gap-4">
+          {user?.role === 'SUPER_ADMIN' && (
+            <select
+              value={selectedSchoolId}
+              onChange={(e) => setSelectedSchoolId(e.target.value)}
+              className="px-6 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-[10px] font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none uppercase tracking-widest"
+            >
+              <option value="">All Schools</option>
+              {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+          <button 
+            onClick={() => openModal()}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold uppercase tracking-widest text-[10px] rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+          >
+            <Plus size={18} />
+            <span>New Subject</span>
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

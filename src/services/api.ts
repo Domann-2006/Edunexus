@@ -1,6 +1,4 @@
 import axios from 'axios';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { storage } from '../lib/firebase';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -27,35 +25,35 @@ export const authService = {
 };
 
 export const schoolService = {
-  list: () => api.get('/api/v1/schools'),
+  list: (params?: any) => api.get('/api/v1/schools', { params }),
   create: (data: any) => api.post('/api/v1/schools', data),
   update: (id: string, data: any) => api.put(`/api/v1/schools/${id}`, data),
   delete: (id: string) => api.delete(`/api/v1/schools/${id}`),
 };
 
 export const studentService = {
-  list: () => api.get('/api/v1/students'),
+  list: (params?: any) => api.get('/api/v1/students', { params }),
   create: (data: any) => api.post('/api/v1/students', data),
   update: (id: string, data: any) => api.put(`/api/v1/students/${id}`, data),
   delete: (id: string) => api.delete(`/api/v1/students/${id}`),
 };
 
 export const teacherService = {
-  list: () => api.get('/api/v1/teachers'),
+  list: (params?: any) => api.get('/api/v1/teachers', { params }),
   create: (data: any) => api.post('/api/v1/teachers', data),
   update: (id: string, data: any) => api.put(`/api/v1/teachers/${id}`, data),
   delete: (id: string) => api.delete(`/api/v1/teachers/${id}`),
 };
 
 export const classService = {
-  list: () => api.get('/api/v1/classes'),
+  list: (params?: any) => api.get('/api/v1/classes', { params }),
   create: (data: any) => api.post('/api/v1/classes', data),
   update: (id: string, data: any) => api.put(`/api/v1/classes/${id}`, data),
   delete: (id: string) => api.delete(`/api/v1/classes/${id}`),
 };
 
 export const subjectService = {
-  list: () => api.get('/api/v1/subjects'),
+  list: (params?: any) => api.get('/api/v1/subjects', { params }),
   create: (data: any) => api.post('/api/v1/subjects', data),
   update: (id: string, data: any) => api.put(`/api/v1/subjects/${id}`, data),
   delete: (id: string) => api.delete(`/api/v1/subjects/${id}`),
@@ -69,44 +67,32 @@ export const resultService = {
 };
 
 export const sessionService = {
-  list: () => api.get('/api/v1/sessions'),
+  list: (params?: any) => api.get('/api/v1/sessions', { params }),
   create: (data: any) => api.post('/api/v1/sessions', data),
   update: (id: string, data: any) => api.put(`/api/v1/sessions/${id}`, data),
   delete: (id: string) => api.delete(`/api/v1/sessions/${id}`),
 };
 
 export const dashboardService = {
-  getStats: () => api.get('/api/v1/dashboard-stats'),
+  getStats: (params?: any) => api.get('/api/v1/dashboard-stats', { params }),
 };
 
 export const fileService = {
   upload: (file: File, folder: string = 'uploads', onProgress?: (p: number) => void) => {
-    return new Promise<{ data: { url: string } }>((resolve, reject) => {
-      // Validate file size (max 2MB)
-      if (file.size > 2 * 1024 * 1024) {
-        return reject(new Error('File size exceeds 2MB limit.'));
-      }
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
 
-      // Generate unique filename
-      const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-      const storageRef = ref(storage, `${folder}/${filename}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          if (onProgress) onProgress(progress);
-        },
-        (error) => {
-          console.error('Firebase Storage Error:', error);
-          reject(error);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve({ data: { url: downloadURL } });
+    return api.post('/api/v1/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(progress);
         }
-      );
+      },
     });
   }
 };

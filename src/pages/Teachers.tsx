@@ -7,6 +7,7 @@ import ProfileImage from '../components/ProfileImage';
 export default function Teachers({ user }: { user: any }) {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
+  const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,12 +24,12 @@ export default function Teachers({ user }: { user: any }) {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedSchoolId]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const promises: Promise<any>[] = [teacherService.list()];
+      const promises: Promise<any>[] = [teacherService.list({ schoolId: selectedSchoolId })];
       if (user?.role === 'SUPER_ADMIN') {
         promises.push(schoolService.list());
       }
@@ -107,13 +108,25 @@ export default function Teachers({ user }: { user: any }) {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Teachers</h1>
           <p className="text-gray-500">Manage faculty and academic staff.</p>
         </div>
-        <button 
-          onClick={() => openModal()}
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all font-bold uppercase tracking-widest text-xs"
-        >
-          <Plus size={18} />
-          <span>Add Teacher</span>
-        </button>
+        <div className="flex flex-col md:flex-row gap-4">
+          {user?.role === 'SUPER_ADMIN' && (
+            <select
+              value={selectedSchoolId}
+              onChange={(e) => setSelectedSchoolId(e.target.value)}
+              className="px-6 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
+            >
+              <option value="">All Schools</option>
+              {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+          <button 
+            onClick={() => openModal()}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all font-bold uppercase tracking-widest text-xs"
+          >
+            <Plus size={18} />
+            <span>Add Teacher</span>
+          </button>
+        </div>
       </header>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden text-sm uppercase">

@@ -7,6 +7,7 @@ export default function Classes({ user }: { user: any }) {
   const [classes, setClasses] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
+  const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -19,14 +20,14 @@ export default function Classes({ user }: { user: any }) {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedSchoolId]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const promises: Promise<any>[] = [
-        classService.list(),
-        teacherService.list()
+        classService.list({ schoolId: selectedSchoolId }),
+        teacherService.list({ schoolId: selectedSchoolId })
       ];
 
       if (user?.role === 'SUPER_ADMIN') {
@@ -93,18 +94,30 @@ export default function Classes({ user }: { user: any }) {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Classes</h1>
           <p className="text-gray-500">Manage school grades and groups.</p>
         </div>
-        <button 
-          onClick={() => openModal()}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
-        >
-          <Plus size={18} />
-          <span>New Class</span>
-        </button>
+        <div className="flex flex-col md:flex-row gap-4">
+          {user?.role === 'SUPER_ADMIN' && (
+            <select
+              value={selectedSchoolId}
+              onChange={(e) => setSelectedSchoolId(e.target.value)}
+              className="px-6 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
+            >
+              <option value="">All Schools</option>
+              {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+          <button 
+            onClick={() => openModal()}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+          >
+            <Plus size={18} />
+            <span>New Class</span>
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
