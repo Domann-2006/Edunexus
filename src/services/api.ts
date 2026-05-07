@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from '../lib/firebase';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -78,15 +80,33 @@ export const dashboardService = {
 };
 
 export const fileService = {
-  upload: (file: File) => {
-    // In a real app, we'd use FormData and a storage service.
-    // Here we'll simulate it by converting to base64 or just returning a mock URL.
-    return new Promise<{ data: { url: string } }>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        resolve({ data: { url: reader.result as string } });
-      };
-      reader.readAsDataURL(file);
+  upload: (file: File, folder: string = 'uploads', onProgress?: (p: number) => void) => {
+    return new Promise<{ data: { url: string } }>((resolve, reject) => {
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        return reject(new Error('File size exceeds 2MB limit.'));
+      }
+
+      // Generate unique filename
+      const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const storageRef = ref(storage, `${folder}/${filename}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          if (onProgress) onProgress(progress);
+        },
+        (error) => {
+          console.error('Firebase Storage Error:', error);
+          reject(error);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve({ data: { url: downloadURL } });
+        }
+      );
     });
   }
 };

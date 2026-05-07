@@ -186,6 +186,7 @@ export default function Schools() {
                       editable 
                       url={formData.logoUrl} 
                       onUpload={(url) => setFormData({...formData, logoUrl: url})} 
+                      folder="schools"
                     />
                   </div>
                   <div className="space-y-6">

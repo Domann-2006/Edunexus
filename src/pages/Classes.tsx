@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { classService, teacherService } from '../services/api';
+import { classService, teacherService, schoolService } from '../services/api';
 import { Plus, Edit2, Trash2, X, Loader2, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 

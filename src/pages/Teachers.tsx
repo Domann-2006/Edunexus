@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { teacherService } from '../services/api';
+import { teacherService, schoolService } from '../services/api';
 import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
@@ -225,6 +225,7 @@ export default function Teachers({ user }: { user: any }) {
                       editable 
                       url={formData.avatarUrl} 
                       onUpload={(url) => setFormData({...formData, avatarUrl: url})} 
+                      folder="teachers"
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

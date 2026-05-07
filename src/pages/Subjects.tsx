@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { subjectService } from '../services/api';
+import { subjectService, schoolService } from '../services/api';
 import { Plus, Edit2, Trash2, X, Loader2, Book } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
