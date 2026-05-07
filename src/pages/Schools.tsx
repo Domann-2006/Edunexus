@@ -84,7 +84,7 @@ export default function Schools() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Schools</h1>
           <p className="text-gray-500">Manage multi-tenant school entities.</p>

@@ -103,7 +103,7 @@ export default function Teachers({ user }: { user: any }) {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Teachers</h1>
           <p className="text-gray-500">Manage faculty and academic staff.</p>

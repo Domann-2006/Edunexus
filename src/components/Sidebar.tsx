@@ -8,16 +8,19 @@ import {
   LogOut,
   LayoutDashboard,
   Book,
-  FileSpreadsheet
+  FileSpreadsheet,
+  X
 } from 'lucide-react';
 import ProfileImage from './ProfileImage';
 
 interface SidebarProps {
   user: any;
   onLogout: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export default function Sidebar({ user, onLogout }: SidebarProps) {
+export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProps) {
   const menuItems = [
     { name: 'Overview', path: '/', icon: LayoutDashboard },
     { name: 'Students', path: '/students', icon: Users },
@@ -32,12 +35,32 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
   }
 
   return (
-    <div className="w-64 bg-white border-r border-gray-100 flex flex-col h-screen fixed left-0 top-0 z-40">
-      <div className="p-8 flex items-center gap-3">
-        <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-100 transform rotate-3">
-          <BookOpen size={20} />
+    <>
+      {/* Overlay - visible on mobile when sidebar is open */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <div className={`
+        w-64 bg-white border-r border-gray-100 flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform duration-300
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+      <div className="p-8 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-100 transform rotate-3">
+            <BookOpen size={20} />
+          </div>
+          <span className="font-black text-2xl tracking-tighter text-gray-900 italic">EduNexus</span>
         </div>
-        <span className="font-black text-2xl tracking-tighter text-gray-900 italic">EduNexus</span>
+        <button 
+          onClick={onClose}
+          className="lg:hidden p-2 text-gray-400 hover:bg-gray-50 rounded-xl"
+        >
+          <X size={20} />
+        </button>
       </div>
 
       <nav className="flex-1 px-4 space-y-1 mt-4">
@@ -48,6 +71,7 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
           <NavLink
             key={item.path}
             to={item.path}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group ${
                 isActive 
@@ -84,5 +108,6 @@ export default function Sidebar({ user, onLogout }: SidebarProps) {
         </button>
       </div>
     </div>
+    </>
   );
 }
