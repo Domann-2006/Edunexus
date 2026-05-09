@@ -78,21 +78,46 @@ export const dashboardService = {
 };
 
 export const fileService = {
-  upload: (file: File, folder: string = 'uploads', onProgress?: (p: number) => void) => {
+  upload: async (file: File, folder: string = 'uploads', onProgress?: (p: number) => void) => {
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+    // Temporary debugging logs as requested
+    console.log('Cloudinary Config:', { cloudName, uploadPreset });
+
+    if (!cloudName || !uploadPreset) {
+      throw new Error('Cloudinary configuration is missing. Please check VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET.');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('folder', folder);
+    formData.append('upload_preset', uploadPreset);
+    formData.append('folder', `edunexus/${folder}`);
 
-    return api.post('/api/v1/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: (progressEvent) => {
-        if (onProgress && progressEvent.total) {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          onProgress(progress);
+    try {
+      // Note: native fetch doesn't support onUploadProgress easily without XHR.
+      // We'll use axios for progress support or just skip progress if fetch is strictly required.
+      // The user snippet uses fetch, but they also want progress indicators.
+      // I'll use axios to the Cloudinary URL to keep progress working perfectly.
+      
+      const response = await axios.post(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            if (onProgress && progressEvent.total) {
+              const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              onProgress(progress);
+            }
+          },
         }
-      },
-    });
+      );
+
+      return { data: { url: response.data.secure_url } };
+    } catch (err: any) {
+      console.error('Cloudinary Upload Error:', err.response?.data || err.message);
+      throw new Error(err.response?.data?.error?.message || 'Upload to Cloudinary failed');
+    }
   }
 };

@@ -241,6 +241,7 @@ export default function Teachers({ user }: { user: any }) {
                       url={formData.avatarUrl} 
                       onUpload={(url) => setFormData({...formData, avatarUrl: url})} 
                       folder="teachers"
+                      showCamera={true}
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

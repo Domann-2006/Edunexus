@@ -4,49 +4,6 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { calculateGrade } from '../lib/grading.js';
 
 const router = express.Router();
-import multer from 'multer';
-import { v2 as cloudinary } from 'cloudinary';
-import { Readable } from 'stream';
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
-const upload = multer();
-
-router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const folder = req.body.folder || 'edunexus';
-    
-    // Upload to Cloudinary using a stream
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: `edunexus/${folder}`,
-        resource_type: 'auto',
-      },
-      (error, result) => {
-        if (error) {
-          console.error('Cloudinary Upload Error:', error);
-          return res.status(500).json({ error: 'Upload failed' });
-        }
-        res.json({ data: { url: result.secure_url } });
-      }
-    );
-
-    const stream = Readable.from(req.file.buffer);
-    stream.pipe(uploadStream);
-  } catch (err) {
-    console.error('Upload handler error:', err);
-    res.status(500).json({ error: 'Server error during upload' });
-  }
-});
 
 // SaaS Limits
 const PLAN_LIMITS = {
