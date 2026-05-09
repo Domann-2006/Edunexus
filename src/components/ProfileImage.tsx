@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
-import { Camera, Loader2, User as UserIcon } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Camera, Loader2, User as UserIcon, Image as ImageIcon, X } from 'lucide-react';
 import { fileService } from '../services/api';
+import imageCompression from 'browser-image-compression';
 
 interface ProfileImageProps {
   url?: string;
@@ -22,7 +23,9 @@ export default function ProfileImage({
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showOptions, setShowOptions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const sizeClasses = {
     sm: 'w-10 h-10',
@@ -31,8 +34,16 @@ export default function ProfileImage({
     xl: 'w-32 h-32'
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Cleanup object URLs to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const handleUpload = async (file: File) => {
     if (!file) return;
 
     // Type validation
@@ -41,19 +52,37 @@ export default function ProfileImage({
       return;
     }
 
-    // Size validation (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File is too large. Max 5MB.');
-      return;
-    }
-
     setUploading(true);
     setProgress(0);
     setError(null);
 
+    // Create a preview immediately for better UX
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
     try {
-      const res = await fileService.upload(file, folder, (p) => setProgress(p));
+      // Compression options
+      const options = {
+        maxSizeMB: 0.8, // Target size under 1MB
+        maxWidthOrHeight: 1200,
+        useWebWorker: true,
+        initialQuality: 0.7,
+      };
+
+      console.log('Original size:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      
+      let fileToUpload = file;
+      try {
+        const compressedFile = await imageCompression(file, options);
+        fileToUpload = compressedFile;
+        console.log('Compressed size:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
+      } catch (compressionErr) {
+        console.warn('Compression failed, uploading original', compressionErr);
+      }
+
+      const res = await fileService.upload(fileToUpload, folder, (p) => setProgress(p));
       onUpload?.(res.data.url);
+      setShowOptions(false);
     } catch (err: any) {
       console.error('Upload failed', err);
       setError(err.message || 'Upload failed');
@@ -63,18 +92,34 @@ export default function ProfileImage({
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleUpload(file);
+    }
+    // Reset input value so same file can be selected again
+    e.target.value = '';
+  };
+
+  const currentImageUrl = previewUrl || url;
+
   return (
     <div className="flex flex-col items-center gap-2">
       <div className={`relative group ${sizeClasses[size]}`}>
         <div className="w-full h-full rounded-2xl overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center shadow-sm relative">
-          {url ? (
-            <img src={url} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          {currentImageUrl ? (
+            <img 
+              src={currentImageUrl} 
+              alt="Profile" 
+              className="w-full h-full object-cover" 
+              referrerPolicy="no-referrer" 
+            />
           ) : (
             <UserIcon className="text-gray-300" size={size === 'xl' ? 48 : 24} />
           )}
           
           {uploading && (
-            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-[2px]">
+            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white backdrop-blur-[2px] z-10">
               <Loader2 className="animate-spin mb-1 text-blue-400" size={size === 'xl' ? 32 : 20} />
               <div className="w-4/5 bg-white/20 h-1 rounded-full overflow-hidden mt-2">
                 <div 
@@ -87,33 +132,88 @@ export default function ProfileImage({
           )}
         </div>
 
-        {editable && (
+        {editable && !uploading && (
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => showCamera ? setShowOptions(true) : fileInputRef.current?.click()}
             className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"
-            disabled={uploading}
           >
-            {uploading ? (
-              <Loader2 className="animate-spin" size={20} />
-            ) : (
-              <Camera size={20} />
-            )}
+            <Camera size={20} />
           </button>
         )}
 
-        {editable && (
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept="image/*"
-            capture={showCamera ? 'environment' : undefined}
-            onChange={handleFileChange}
-          />
-        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*"
+          onChange={handleFileChange}
+        />
       </div>
+
       {error && <span className="text-[10px] text-red-500 font-bold text-center px-2">{error}</span>}
+
+      {/* Mobile-friendly Options Modal */}
+      {showOptions && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+            onClick={() => setShowOptions(false)}
+          />
+          <div className="relative w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">Select Image</h3>
+                <button 
+                  onClick={() => setShowOptions(false)}
+                  className="p-2 text-gray-400 hover:bg-gray-50 rounded-full"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.capture = 'environment';
+                    input.onchange = (e: any) => handleUpload(e.target.files[0]);
+                    input.click();
+                  }}
+                  className="flex flex-col items-center justify-center gap-3 p-6 bg-blue-50 border border-blue-100 rounded-2xl text-blue-600 hover:bg-blue-100 transition-all font-bold group"
+                >
+                  <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center group-active:scale-95 transition-transform">
+                    <Camera size={24} />
+                  </div>
+                  <span className="text-xs uppercase tracking-tighter">Take Photo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center gap-3 p-6 bg-purple-50 border border-purple-100 rounded-2xl text-purple-600 hover:bg-purple-100 transition-all font-bold group"
+                >
+                  <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center group-active:scale-95 transition-transform">
+                    <ImageIcon size={24} />
+                  </div>
+                  <span className="text-xs uppercase tracking-tighter">Gallery</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowOptions(false)}
+                className="w-full mt-4 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-50 rounded-2xl transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
