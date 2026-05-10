@@ -24,8 +24,10 @@ async function setupSchoolCurriculum(schoolId) {
 
     // Create Classes and Subjects
     for (const level of Object.keys(LEVEL_CLASSES)) {
-      // Create Classes for this level
+      // Create Classes and Subjects for this level
       const classNames = LEVEL_CLASSES[level];
+      const streamSubjects = DEFAULT_SUBJECTS[level];
+
       for (const className of classNames) {
         const classRef = db.collection('classes').doc();
         batch.set(classRef, {
@@ -34,21 +36,21 @@ async function setupSchoolCurriculum(schoolId) {
           schoolId: schoolId,
           createdAt: new Date().toISOString()
         });
-      }
 
-      // Create Subjects for this level
-      const streamSubjects = DEFAULT_SUBJECTS[level];
-      for (const stream of Object.keys(streamSubjects)) {
-        const subjects = streamSubjects[stream];
-        for (const subjectName of subjects) {
-          const subjectRef = db.collection('subjects').doc();
-          batch.set(subjectRef, {
-            name: subjectName,
-            level: level,
-            stream: stream,
-            schoolId: schoolId,
-            createdAt: new Date().toISOString()
-          });
+        // Create Subjects for each class in this level
+        for (const stream of Object.keys(streamSubjects)) {
+          const subjects = streamSubjects[stream];
+          for (const subjectName of subjects) {
+            const subjectRef = db.collection('subjects').doc();
+            batch.set(subjectRef, {
+              name: subjectName,
+              level: level,
+              class: className,
+              stream: stream,
+              schoolId: schoolId,
+              createdAt: new Date().toISOString()
+            });
+          }
         }
       }
     }
@@ -76,11 +78,22 @@ const createCRUD = (collectionName, roles, transform) => {
   crudRouter.get('/', authenticate, async (req, res) => {
     try {
       let query = db.collection(collectionName);
+      
+      // Mandatory school filtering
       if (req.user?.role !== 'SUPER_ADMIN') {
         query = query.where('schoolId', '==', req.user?.schoolId);
       } else if (req.query.schoolId) {
         query = query.where('schoolId', '==', req.query.schoolId);
       }
+
+      // Dynamic filters from query params
+      const skipParams = ['schoolId', 'limit', 'offset', 'sort'];
+      Object.keys(req.query).forEach(key => {
+        if (!skipParams.includes(key) && req.query[key]) {
+          query = query.where(key, '==', req.query[key]);
+        }
+      });
+
       const snapshot = await query.get();
       const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       res.json(docs);

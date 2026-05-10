@@ -80,14 +80,25 @@ export default function Subjects({ user }: { user: any }) {
 
     try {
       setLoading(true);
+      // Fetch latest list to be sure
+      const currentRes = await subjectService.list({ 
+        schoolId: selectedSchoolId || user?.schoolId,
+        level,
+        class: className,
+        stream: level === 'SSS' ? stream : 'GENERAL'
+      });
+      const existingNames = new Set(currentRes.data.map((s: any) => s.name.toLowerCase()));
+
       for (const name of defaults) {
-        await subjectService.create({
-          name,
-          schoolId: selectedSchoolId || user?.schoolId,
-          level,
-          class: className,
-          stream: level === 'SSS' ? stream : 'GENERAL'
-        });
+        if (!existingNames.has(name.toLowerCase())) {
+          await subjectService.create({
+            name,
+            schoolId: selectedSchoolId || user?.schoolId,
+            level,
+            class: className,
+            stream: level === 'SSS' ? stream : 'GENERAL'
+          });
+        }
       }
       fetchData();
     } catch (err: any) {
@@ -295,18 +306,20 @@ export default function Subjects({ user }: { user: any }) {
                         </div>
                         <span className="text-sm font-bold text-gray-700">{sub.name}</span>
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-2 transition-opacity">
                         <button 
                           onClick={() => openModal(sub)} 
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                          className="p-2 text-blue-600 hover:bg-blue-50 bg-white shadow-sm rounded-lg border border-gray-100 transition-all active:scale-90"
+                          title="Edit Subject"
                         >
-                          <Edit2 size={12} />
+                          <Edit2 size={14} />
                         </button>
                         <button 
                           onClick={() => handleDelete(sub.id)} 
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          className="p-2 text-red-600 hover:bg-red-50 bg-white shadow-sm rounded-lg border border-gray-100 transition-all active:scale-90"
+                          title="Delete Subject"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </motion.div>
