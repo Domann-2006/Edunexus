@@ -343,7 +343,7 @@ export default function Teachers({ user }: { user: any }) {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Email Address</label>
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Gmail Address</label>
                         <input
                           type="email"
                           required={!editingId}
@@ -362,6 +362,19 @@ export default function Teachers({ user }: { user: any }) {
                           className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
                         />
                       </div>
+                      {!editingId && (
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Password</label>
+                          <input
+                            type="password"
+                            required
+                            value={formData.password}
+                            onChange={(e) => setFormData({...formData, password: e.target.value})}
+                            placeholder="Set a secure password"
+                            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                          />
+                        </div>
+                      )}
                       
                       <div className="space-y-2 md:col-span-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Classes</label>

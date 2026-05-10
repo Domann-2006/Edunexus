@@ -88,19 +88,37 @@ const createCRUD = (collectionName, roles, transform) => {
 
       // Teacher-based filtering for students and classes
       if (req.user?.role === 'TEACHER') {
-        // Find teacher profile to get assigned classes
         const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
         if (!teacherSnap.empty) {
           const teacherData = teacherSnap.docs[0].data();
-          const assignedClassIds = teacherData.assignedClassIds || [];
+          // The admin now inputs names like "Primary 1", which are stored in assignedClassIds
+          const assignedClassNames = teacherData.assignedClassIds || [];
           
           if (collectionName === 'students' || collectionName === 'classes' || collectionName === 'results' || collectionName === 'attendance') {
-            if (assignedClassIds.length > 0) {
-              // Firestore 'in' limit is 10, but let's assume classes per teacher is low or use another strategy if many.
-              // For now, simple 'in' filter.
-              query = query.where('classId', 'in', assignedClassIds.slice(0, 10));
+            if (assignedClassNames.length > 0) {
+              // 1. Resolve names to IDs for data that uses IDs
+              const classesSnap = await db.collection('classes')
+                .where('schoolId', '==', req.user.schoolId)
+                .where('name', 'in', assignedClassNames.slice(0, 10))
+                .get();
+              
+              const resolvedClassIds = classesSnap.docs.map(d => d.id);
+              
+              if (collectionName === 'classes') {
+                if (resolvedClassIds.length > 0) {
+                  query = query.where('__name__', 'in', resolvedClassIds.slice(0, 10));
+                } else {
+                  // Fallback: search by name if they are names
+                  query = query.where('name', 'in', assignedClassNames.slice(0, 10));
+                }
+              } else {
+                if (resolvedClassIds.length > 0) {
+                  query = query.where('classId', 'in', resolvedClassIds.slice(0, 10));
+                } else {
+                  return res.json([]);
+                }
+              }
             } else {
-              // Return empty if no assigned classes
               return res.json([]);
             }
           }
@@ -127,6 +145,20 @@ const createCRUD = (collectionName, roles, transform) => {
     try {
       console.log(`Creating document in ${collectionName}`, req.body);
       
+      // Teacher validation: Can only create in assigned classes
+      if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
+        const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+        if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
+        
+        const teacherData = teacherSnap.docs[0].data();
+        const assignedClassIds = teacherData.assignedClassIds || [];
+        const targetClassId = req.body.classId;
+        
+        if (!assignedClassIds.includes(targetClassId)) {
+          return res.status(403).json({ message: 'You can only manage data for your assigned classes' });
+        }
+      }
+
       let data = {
         ...req.body,
         schoolId: req.user?.schoolId || null,
@@ -178,6 +210,20 @@ const createCRUD = (collectionName, roles, transform) => {
 
       const ref = await db.collection(collectionName).add(data);
       console.log(`Document created with ID: ${ref.id}`);
+
+      // Log Activity for teachers
+      if (req.user?.role === 'TEACHER') {
+        await db.collection('activity-logs').add({
+          userId: req.user.id,
+          userName: req.user.name,
+          role: req.user.role,
+          action: `CREATE_${collectionName.toUpperCase().slice(0, -1)}`,
+          details: `Teacher recorded new ${collectionName.slice(0, -1)}: ${JSON.stringify(req.body).slice(0, 200)}`,
+          schoolId: req.user.schoolId,
+          createdAt: new Date().toISOString()
+        });
+      }
+
       res.status(201).json({ id: ref.id, ...data });
     } catch (err) {
       console.error(`Error creating document in ${collectionName}:`, err);
@@ -205,9 +251,24 @@ const createCRUD = (collectionName, roles, transform) => {
       const doc = await docRef.get();
       if (!doc.exists) return res.status(404).json({ message: 'Not found' });
       const existingData = doc.data();
+      
       if (req.user?.role !== 'SUPER_ADMIN' && existingData?.schoolId !== req.user?.schoolId) {
         return res.status(403).json({ message: 'Forbidden' });
       }
+
+      // Teacher validation: Can only update if in assigned class
+      if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
+        const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+        if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
+        
+        const teacherData = teacherSnap.docs[0].data();
+        const assignedClassIds = teacherData.assignedClassIds || [];
+        
+        if (!assignedClassIds.includes(existingData.classId)) {
+          return res.status(403).json({ message: 'You can only update data for your assigned classes' });
+        }
+      }
+
       let updateData = { ...req.body, updatedAt: new Date().toISOString() };
       if (transform) updateData = transform(updateData);
       await docRef.update(updateData);
