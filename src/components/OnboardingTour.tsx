@@ -32,6 +32,15 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
           <p className="text-gray-600 font-medium leading-relaxed">
             Let's take a quick 1-minute tour to help you get the most out of your school management dashboard.
           </p>
+          <button 
+            onClick={() => {
+              setRun(false);
+              localStorage.setItem(`${TOUR_STORAGE_KEY}_${user?.id}`, 'true');
+            }}
+            className="mt-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-red-500 transition-colors"
+          >
+            Skip Onboarding
+          </button>
         </div>
       ),
       disableBeacon: true,
@@ -107,6 +116,12 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
         showProgress: true,
         showSkipButton: true,
         callback: handleJoyrideCallback,
+        locale: {
+          skip: 'Skip Onboarding',
+          next: 'Next',
+          back: 'Back',
+          last: 'Finish'
+        },
         styles: {
           options: {
             primaryColor: '#2563eb', // blue-600
@@ -134,9 +149,12 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
             color: '#94a3b8', // gray-400
           },
           buttonSkip: {
-            fontSize: '12px',
-            fontWeight: '700',
+            fontSize: '11px',
+            fontWeight: '900',
             color: '#94a3b8',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            padding: '0 10px',
           }
         }
       } as any)}
