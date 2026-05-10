@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { classService, teacherService, schoolService } from '../services/api';
-import { Plus, Edit2, Trash2, X, Loader2, BookOpen } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Loader2, BookOpen, GraduationCap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { EDUCATION_LEVELS } from '../constants';
 
 export default function Classes({ user }: { user: any }) {
   const [classes, setClasses] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
-  const [selectedSchoolId, setSelectedSchoolId] = useState('');
+  const [selectedSchoolId, setSelectedSchoolId] = useState(user?.schoolId || '');
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
+    level: '',
     teacherId: '',
-    schoolId: '',
+    schoolId: user?.schoolId || '',
   });
 
   useEffect(() => {
@@ -57,7 +59,6 @@ export default function Classes({ user }: { user: any }) {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Operation failed';
-      console.error('Submit error:', err);
       alert(`Error: ${msg}`);
     }
   };
@@ -78,6 +79,7 @@ export default function Classes({ user }: { user: any }) {
       setEditingId(cls.id);
       setFormData({
         name: cls.name,
+        level: cls.level || '',
         teacherId: cls.teacherId || '',
         schoolId: cls.schoolId || '',
       });
@@ -85,6 +87,7 @@ export default function Classes({ user }: { user: any }) {
       setEditingId(null);
       setFormData({ 
         name: '', 
+        level: '',
         teacherId: '', 
         schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || '') 
       });
@@ -140,8 +143,11 @@ export default function Classes({ user }: { user: any }) {
               className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
             >
               <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-                  <BookOpen size={24} />
+                <div className="flex flex-col gap-1">
+                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                    <BookOpen size={24} />
+                  </div>
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">{cls.level || 'UNSET'}</span>
                 </div>
                 <div className="flex gap-1">
                   <button 
@@ -165,8 +171,8 @@ export default function Classes({ user }: { user: any }) {
                 {teachers.find(t => t.id === cls.teacherId)?.name || 'No Class Teacher'}
               </p>
               <div className="pt-4 border-t border-gray-50 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-gray-400">
-                <span>Assigned Room</span>
-                <span className="text-gray-900">Room {Math.floor(Math.random() * 50) + 1}</span>
+                <span>Education Level</span>
+                <span className="text-gray-900">{EDUCATION_LEVELS.find(l => l.id === cls.level)?.name || 'Not Set'}</span>
               </div>
             </motion.div>
           ))
@@ -206,8 +212,22 @@ export default function Classes({ user }: { user: any }) {
                       value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                       className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-sm font-bold"
-                      placeholder="e.g. Grade 10-A"
+                      placeholder="e.g. Nursery 1-A"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Education Level</label>
+                    <select
+                      required
+                      value={formData.level}
+                      onChange={(e) => setFormData({...formData, level: e.target.value})}
+                      className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-sm font-bold appearance-none"
+                    >
+                      <option value="">Select Level</option>
+                      {EDUCATION_LEVELS.map(l => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Class Teacher</label>

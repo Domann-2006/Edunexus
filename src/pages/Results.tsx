@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { resultService, studentService, classService, subjectService, sessionService } from '../services/api';
-import { Save, Loader2, Trophy, AlertCircle, FileText, Download } from 'lucide-react';
+import { Save, Loader2, Trophy, AlertCircle, FileText, Download, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function Results({ user }: { user: any }) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
   
@@ -27,20 +28,23 @@ export default function Results({ user }: { user: any }) {
 
   useEffect(() => {
     if (filters.classId && filters.sessionId && filters.subjectId) {
-      loadStudentsAndResults();
+      loadResults();
     }
-  }, [filters]);
+  }, [filters.sessionId, filters.classId, filters.subjectId, filters.term]);
 
   const loadInitialData = async () => {
+    setLoading(true);
     try {
-      const [sessRes, classRes, subRes] = await Promise.all([
+      const [sessRes, classRes, subRes, studRes] = await Promise.all([
         sessionService.list(),
         classService.list(),
-        subjectService.list()
+        subjectService.list(),
+        studentService.list()
       ]);
       setSessions(sessRes.data);
       setClasses(classRes.data);
       setSubjects(subRes.data);
+      setAllStudents(studRes.data);
       
       const currentSess = sessRes.data.find((s: any) => s.isCurrent);
       if (currentSess) setFilters(f => ({ ...f, sessionId: currentSess.id }));
@@ -51,20 +55,27 @@ export default function Results({ user }: { user: any }) {
     }
   };
 
-  const loadStudentsAndResults = async () => {
+  const loadResults = async () => {
     setLoading(true);
     try {
-      const [studRes, resRes] = await Promise.all([
-        studentService.list(),
-        resultService.list({ 
-          classId: filters.classId, 
-          sessionId: filters.sessionId, 
-          subjectId: filters.subjectId,
-          term: filters.term
-        })
-      ]);
+      const selectedClass = classes.find(c => c.id === filters.classId);
+      const selectedSubject = subjects.find(s => s.id === filters.subjectId);
       
-      const classStudents = studRes.data.filter((s: any) => s.classId === filters.classId);
+      const resRes = await resultService.list({ 
+        classId: filters.classId, 
+        sessionId: filters.sessionId, 
+        subjectId: filters.subjectId,
+        term: filters.term
+      });
+      
+      // Filter students who should take this subject
+      let classStudents = allStudents.filter((s: any) => s.classId === filters.classId);
+      
+      // If SSS, filter by stream compatibility
+      if (selectedClass?.level === 'SSS' && selectedSubject?.stream !== 'GENERAL') {
+        classStudents = classStudents.filter(s => s.stream === selectedSubject.stream);
+      }
+
       setStudents(classStudents);
       setResults(resRes.data);
 
@@ -80,7 +91,7 @@ export default function Results({ user }: { user: any }) {
       });
       setScores(initialScores);
     } catch (err: any) {
-      console.error('Failed to load students and results:', err);
+      console.error('Failed to load results:', err);
     } finally {
       setLoading(false);
     }
@@ -105,7 +116,6 @@ export default function Results({ user }: { user: any }) {
         const studentScores = scores[studentId];
         const existingResult = results.find(r => r.studentId === studentId);
         
-        // Find the schoolId for this student to ensure it's saved correctly
         const schoolId = student.schoolId || user?.schoolId || null;
 
         const data = {
@@ -127,10 +137,9 @@ export default function Results({ user }: { user: any }) {
       
       await Promise.all(promises);
       alert('Scores saved successfully');
-      loadStudentsAndResults();
+      loadResults();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Failed to save scores';
-      console.error('Save error:', err);
       alert(`Error: ${msg}`);
     } finally {
       setSaving(false);
@@ -144,8 +153,6 @@ export default function Results({ user }: { user: any }) {
       const studentId = student.userId || student.id;
       const s = scores[studentId];
       const total = s.ca1 + s.ca2 + s.exam;
-      // In a real app we'd get these from the server calculated result, but for export we can re-calc
-      // Or better, use the results array
       const res = results.find(r => r.studentId === studentId);
       return [
         student.name,
@@ -171,12 +178,18 @@ export default function Results({ user }: { user: any }) {
     link.click();
   };
 
+  const selectedClass = classes.find(c => c.id === filters.classId);
+  const filteredSubjects = subjects.filter(s => {
+    if (!selectedClass) return true;
+    return s.level === selectedClass.level;
+  });
+
   return (
     <div className="space-y-8 pb-20">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Academic Results</h1>
-          <p className="text-gray-500 mt-1">Record scores and generate termly performance reports.</p>
+          <p className="text-gray-500 mt-1">Record scores following the new academic hierarchy.</p>
         </div>
         <div className="flex gap-3">
           <button 
@@ -204,7 +217,7 @@ export default function Results({ user }: { user: any }) {
           <select 
             value={filters.sessionId}
             onChange={(e) => setFilters(f => ({ ...f, sessionId: e.target.value }))}
-            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold"
+            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none"
           >
             <option value="">Select Session</option>
             {sessions.map(s => <option key={s.id} value={s.id}>{s.name} {s.isCurrent ? '(Current)' : ''}</option>)}
@@ -215,7 +228,7 @@ export default function Results({ user }: { user: any }) {
           <select 
             value={filters.term}
             onChange={(e) => setFilters(f => ({ ...f, term: e.target.value }))}
-            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold"
+            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none"
           >
             <option value="1st">1st Term</option>
             <option value="2nd">2nd Term</option>
@@ -226,22 +239,23 @@ export default function Results({ user }: { user: any }) {
           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Class</label>
           <select 
             value={filters.classId}
-            onChange={(e) => setFilters(f => ({ ...f, classId: e.target.value }))}
-            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold"
+            onChange={(e) => setFilters(f => ({ ...f, classId: e.target.value, subjectId: '' }))}
+            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none"
           >
             <option value="">Select Class</option>
-            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {classes.map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
           </select>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Subject</label>
           <select 
             value={filters.subjectId}
+            disabled={!filters.classId}
             onChange={(e) => setFilters(f => ({ ...f, subjectId: e.target.value }))}
-            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold"
+            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none disabled:opacity-50"
           >
             <option value="">Select Subject</option>
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.stream})</option>)}
           </select>
         </div>
       </div>
@@ -249,12 +263,16 @@ export default function Results({ user }: { user: any }) {
       {!filters.classId || !filters.subjectId || !filters.sessionId ? (
         <div className="flex flex-col items-center justify-center py-20 bg-gray-50 rounded-[3rem] border border-dashed border-gray-200">
           <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-gray-300 mb-4 shadow-sm">
-            <FileText size={32} />
+            <Filter size={32} />
           </div>
           <p className="text-gray-400 font-medium">Select class, session, and subject to begin recording scores.</p>
         </div>
       ) : (
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-4 bg-blue-50/50 border-b border-blue-50 flex items-center gap-2 text-blue-700">
+             <Trophy size={16} />
+             <span className="text-[10px] font-black uppercase tracking-widest">Recording for: {subjects.find(s => s.id === filters.subjectId)?.name}</span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gray-50/80 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50">
@@ -280,7 +298,7 @@ export default function Results({ user }: { user: any }) {
                   <tr>
                     <td colSpan={7} className="px-8 py-20 text-center">
                       <AlertCircle className="inline text-amber-400 mb-2" size={32} />
-                      <div className="text-sm font-medium text-gray-400 uppercase tracking-widest">No students assigned to this class.</div>
+                      <div className="text-sm font-medium text-gray-400 uppercase tracking-widest">No students assigned to this class/stream for this subject.</div>
                     </td>
                   </tr>
                 ) : (
@@ -293,7 +311,12 @@ export default function Results({ user }: { user: any }) {
                     return (
                       <tr key={student.id} className="hover:bg-gray-50/30 transition-colors">
                         <td className="px-8 py-6">
-                          <div className="font-bold text-gray-900">{student.name}</div>
+                          <div>
+                            <div className="font-bold text-gray-900">{student.name}</div>
+                            {student.stream !== 'GENERAL' && (
+                              <div className="text-[9px] text-blue-500 font-black tracking-widest">{student.stream}</div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-8 py-6 text-xs font-mono text-gray-400">{student.admissionNumber}</td>
                         <td className="px-8 py-6 text-center">

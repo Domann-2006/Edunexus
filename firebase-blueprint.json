@@ -41,6 +41,7 @@
         "avatarUrl": { "type": "string" },
         "schoolId": { "type": "string" },
         "classId": { "type": "string" },
+        "stream": { "type": "string", "enum": ["GENERAL", "SCIENCE", "COMMERCIAL", "ARTS"] },
         "admissionNumber": { "type": "string" },
         "guardianName": { "type": "string" },
         "guardianPhone": { "type": "string" },
@@ -73,11 +74,12 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
+        "level": { "type": "string", "enum": ["CRECHE", "KINDERGARTEN", "NURSERY", "PRIMARY", "JSS", "SSS"] },
         "schoolId": { "type": "string" },
         "teacherId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "schoolId"]
+      "required": ["name", "level", "schoolId"]
     },
     "Subject": {
       "title": "Subject",
@@ -86,9 +88,12 @@
       "properties": {
         "name": { "type": "string" },
         "schoolId": { "type": "string" },
+        "level": { "type": "string", "enum": ["CRECHE", "KINDERGARTEN", "NURSERY", "PRIMARY", "JSS", "SSS"] },
+        "class": { "type": "string" },
+        "stream": { "type": "string", "enum": ["GENERAL", "SCIENCE", "COMMERCIAL", "ARTS"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "schoolId"]
+      "required": ["name", "schoolId", "level", "class"]
     },
     "Result": {
       "title": "Result",

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { studentService, classService, schoolService } from '../services/api';
-import { Plus, Search, MoreVertical, Edit2, Trash2, X, Check, Loader2, User as UserIcon } from 'lucide-react';
+import { Plus, Search, MoreVertical, Edit2, Trash2, X, Check, Loader2, User as UserIcon, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
+import { SSS_STREAMS } from '../constants';
 
 export default function Students({ user }: { user: any }) {
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
-  const [selectedSchoolId, setSelectedSchoolId] = useState('');
+  const [selectedSchoolId, setSelectedSchoolId] = useState(user?.schoolId || '');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,7 +20,8 @@ export default function Students({ user }: { user: any }) {
     avatarUrl: '',
     admissionNumber: '',
     classId: '',
-    schoolId: '',
+    stream: 'GENERAL',
+    schoolId: user?.schoolId || '',
     guardianName: '',
     guardianPhone: '',
     dateOfBirth: '',
@@ -63,11 +65,10 @@ export default function Students({ user }: { user: any }) {
       }
       setIsModalOpen(false);
       setEditingId(null);
-      setFormData({ name: '', avatarUrl: '', admissionNumber: '', classId: '', schoolId: '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
+      setFormData({ name: '', avatarUrl: '', admissionNumber: '', classId: '', stream: 'GENERAL', schoolId: user?.schoolId || '', guardianName: '', guardianPhone: '', dateOfBirth: '', gender: 'MALE' });
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Operation failed';
-      console.error('Submit error:', err);
       alert(`Error: ${msg}`);
     }
   };
@@ -91,6 +92,7 @@ export default function Students({ user }: { user: any }) {
         avatarUrl: student.avatarUrl || '',
         admissionNumber: student.admissionNumber,
         classId: student.classId,
+        stream: student.stream || 'GENERAL',
         schoolId: student.schoolId || '',
         guardianName: student.guardianName,
         guardianPhone: student.guardianPhone,
@@ -104,6 +106,7 @@ export default function Students({ user }: { user: any }) {
         avatarUrl: '', 
         admissionNumber: '', 
         classId: '', 
+        stream: 'GENERAL',
         schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || ''),
         guardianName: '', 
         guardianPhone: '', 
@@ -118,6 +121,9 @@ export default function Students({ user }: { user: any }) {
     s.name?.toLowerCase().includes(search.toLowerCase()) || 
     s.admissionNumber?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const selectedClassInfo = classes.find(c => c.id === formData.classId);
+  const showStream = selectedClassInfo?.level === 'SSS';
 
   return (
     <div className="space-y-6">
@@ -165,7 +171,7 @@ export default function Students({ user }: { user: any }) {
               <tr>
                 <th className="px-6 py-4">Student</th>
                 <th className="px-6 py-4 text-gray-500 font-mono">Admission #</th>
-                <th className="px-6 py-4">Class</th>
+                <th className="px-6 py-4">Class & Level</th>
                 <th className="px-6 py-4">Guardian</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -185,41 +191,52 @@ export default function Students({ user }: { user: any }) {
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <ProfileImage url={student.avatarUrl} size="sm" />
-                        <span className="font-bold text-gray-900">{student.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 font-mono">{student.admissionNumber}</td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full font-bold text-[10px]">
-                        {classes.find(c => c.id === student.classId)?.name || 'Unassigned'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-500">{student.guardianName}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 text-xs">
-                        <button 
-                          onClick={() => openModal(student)}
-                          className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
-                          title="Edit Student"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(student.id)}
-                          className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
-                          title="Delete Student"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredStudents.map((student) => {
+                  const studentClass = classes.find(c => c.id === student.classId);
+                  return (
+                    <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <ProfileImage url={student.avatarUrl} size="sm" />
+                          <div>
+                            <div className="font-bold text-gray-900">{student.name}</div>
+                            {student.stream !== 'GENERAL' && (
+                              <div className="text-[9px] text-blue-500 font-black tracking-widest">{student.stream}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 font-mono">{student.admissionNumber}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full font-bold text-[10px] w-fit">
+                            {studentClass?.name || 'Unassigned'}
+                          </span>
+                          <span className="text-[9px] text-gray-400 font-bold ml-1">{studentClass?.level || '-'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500">{student.guardianName}</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2 text-xs">
+                          <button 
+                            onClick={() => openModal(student)}
+                            className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
+                            title="Edit Student"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(student.id)}
+                            className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
+                            title="Delete Student"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -307,13 +324,28 @@ export default function Students({ user }: { user: any }) {
                       <select
                         required
                         value={formData.classId}
-                        onChange={(e) => setFormData({...formData, classId: e.target.value})}
+                        onChange={(e) => setFormData({...formData, classId: e.target.value, stream: 'GENERAL'})}
                         className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none appearance-none"
                       >
                         <option value="">Select Class</option>
-                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {classes.map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
                       </select>
                     </div>
+
+                    {showStream && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">SSS Stream</label>
+                        <select
+                          required
+                          value={formData.stream}
+                          onChange={(e) => setFormData({...formData, stream: e.target.value})}
+                          className="w-full px-4 py-3 bg-blue-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none appearance-none font-bold text-blue-600"
+                        >
+                          {SSS_STREAMS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      </div>
+                    )}
+
                     {user?.role === 'SUPER_ADMIN' && (
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">School</label>
