@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { classService, teacherService, schoolService } from '../services/api';
-import { Plus, Edit2, Trash2, X, Loader2, BookOpen, GraduationCap } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Loader2, BookOpen, GraduationCap, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { EDUCATION_LEVELS } from '../constants';
+import { EDUCATION_LEVELS, LEVEL_CLASSES } from '../constants';
 
 export default function Classes({ user }: { user: any }) {
   const [classes, setClasses] = useState<any[]>([]);
@@ -44,6 +44,32 @@ export default function Classes({ user }: { user: any }) {
       console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBulkAddClasses = async (level: string) => {
+    const classNames = LEVEL_CLASSES[level] || [];
+    if (classNames.length === 0) return;
+    
+    if (!confirm(`Create ${classNames.length} standard classes for ${level}?`)) return;
+
+    try {
+      setLoading(true);
+      for (const name of classNames) {
+        // Only add if it doesn't exist
+        const exists = classes.some(c => c.name === name && c.level === level);
+        if (!exists) {
+          await classService.create({
+            name,
+            level,
+            schoolId: selectedSchoolId || user?.schoolId,
+          });
+        }
+      }
+      fetchData();
+    } catch (err: any) {
+      alert('Error during bulk operation');
+      fetchData();
     }
   };
 
@@ -122,6 +148,20 @@ export default function Classes({ user }: { user: any }) {
           </button>
         </div>
       </header>
+
+      {/* Quick Setup Bar */}
+      <div className="bg-white p-4 rounded-[1.5rem] border border-gray-100 shadow-sm flex flex-wrap items-center gap-3">
+        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Quick Setup:</span>
+        {EDUCATION_LEVELS.map(l => (
+          <button
+            key={l.id}
+            onClick={() => handleBulkAddClasses(l.id)}
+            className="px-4 py-2 bg-gray-50 text-[10px] font-bold text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all border border-transparent hover:border-blue-100"
+          >
+            + {l.name}
+          </button>
+        ))}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (

@@ -2,8 +2,64 @@ import express from 'express';
 import { db } from '../lib/firebase-admin.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { calculateGrade } from '../lib/grading.js';
+import { LEVEL_CLASSES, DEFAULT_SUBJECTS } from '../lib/curriculum.js';
 
 const router = express.Router();
+
+// Helper to setup curriculum
+async function setupSchoolCurriculum(schoolId) {
+  try {
+    const batch = db.batch();
+    
+    // Create Default Sessions
+    const currentYear = new Date().getFullYear();
+    const sessionData = {
+      name: `${currentYear}/${currentYear + 1}`,
+      isCurrent: true,
+      schoolId: schoolId,
+      createdAt: new Date().toISOString()
+    };
+    const sessionRef = db.collection('sessions').doc();
+    batch.set(sessionRef, sessionData);
+
+    // Create Classes and Subjects
+    for (const level of Object.keys(LEVEL_CLASSES)) {
+      // Create Classes for this level
+      const classNames = LEVEL_CLASSES[level];
+      for (const className of classNames) {
+        const classRef = db.collection('classes').doc();
+        batch.set(classRef, {
+          name: className,
+          level: level,
+          schoolId: schoolId,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      // Create Subjects for this level
+      const streamSubjects = DEFAULT_SUBJECTS[level];
+      for (const stream of Object.keys(streamSubjects)) {
+        const subjects = streamSubjects[stream];
+        for (const subjectName of subjects) {
+          const subjectRef = db.collection('subjects').doc();
+          batch.set(subjectRef, {
+            name: subjectName,
+            level: level,
+            stream: stream,
+            schoolId: schoolId,
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+    }
+
+    await batch.commit();
+    console.log(`Curriculum preloaded for school: ${schoolId}`);
+  } catch (err) {
+    console.error('Failed to preload curriculum:', err);
+    // Don't throw, we want the school creation to succeed even if preloading fails
+  }
+}
 
 // SaaS Limits
 const PLAN_LIMITS = {
@@ -70,6 +126,9 @@ const createCRUD = (collectionName, roles, transform) => {
             createdAt: new Date().toISOString()
           });
         }
+
+        // Automatically setup Nigerian Curriculum
+        await setupSchoolCurriculum(schoolId);
 
         return res.status(201).json({ id: schoolId, ...cleanSchoolData });
       }

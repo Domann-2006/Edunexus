@@ -8,7 +8,7 @@ export const EDUCATION_LEVELS = [
   { id: 'SSS', name: 'Senior Secondary School (SSS)' },
 ];
 
-export const LEVEL_CLASSES: Record<string, string[]> = {
+export const LEVEL_CLASSES = {
   CRECHE: ['Creche'],
   KINDERGARTEN: ['Kindergarten 1', 'Kindergarten 2'],
   NURSERY: ['Nursery 1', 'Nursery 2'],
@@ -24,7 +24,7 @@ export const SSS_STREAMS = [
   { id: 'ARTS', name: 'Arts' },
 ];
 
-export const DEFAULT_SUBJECTS: Record<string, Record<string, string[]>> = {
+export const DEFAULT_SUBJECTS = {
   CRECHE: {
     DEFAULT: ['Sensory Play', 'Motor Skills', 'Basic Communication', 'Nursery Rhymes']
   },
