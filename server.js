@@ -2,11 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Routes
 import authRoutes from './src/routes/auth.js';
@@ -67,26 +62,34 @@ async function startServer() {
 
   app.use('/api', apiRouter);
 
-  // Vite integration for local development preview in AI Studio
-  if (process.env.NODE_ENV !== 'production') {
-    const { createServer: createViteServer } = await import('vite');
-    console.log('Starting in development mode with Vite middleware');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
+  // Health check at root level for Render compatibility or simplified monitoring
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Root route metadata
+  app.get('/', (req, res) => {
+    res.json({
+      name: 'EduNexus API Server',
+      version: '1.0.0',
+      status: 'online',
+      endpoints: {
+        health: '/api/health',
+        auth: '/api/auth'
+      }
     });
-    app.use(vite.middlewares);
-  } else {
-    // In production (Render), we specifically DO NOT serve the frontend static files.
-    // The frontend is hosted on Vercel.
-    console.log('Production mode: API only server.');
-    app.get('/', (req, res) => {
-      res.json({ message: 'EduNexus API Server (Production)', health: '/api/health' });
+  });
+
+  // Specialized 404 for any other non-API routes on the backend domain
+  app.use((req, res) => {
+    res.status(404).json({
+      error: 'Not Found',
+      message: 'This is an API-only server. For the web interface, please visit the official frontend domain.'
     });
-  }
+  });
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`EduNexus unified server running on port ${PORT}`);
+    console.log(`EduNexus API server running on port ${PORT}`);
   });
 }
 
