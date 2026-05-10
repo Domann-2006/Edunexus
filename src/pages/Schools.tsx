@@ -74,6 +74,9 @@ export default function Schools() {
         phone: school.phone || '',
         plan: school.plan || 'BASIC',
         logoUrl: school.logoUrl || '',
+        adminName: '',
+        adminEmail: '',
+        adminPassword: '',
       });
     } else {
       setEditingId(null);

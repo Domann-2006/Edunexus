@@ -63,7 +63,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
         </button>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1 mt-4">
+      <nav id="sidebar-nav" className="flex-1 px-4 space-y-1 mt-4">
         <div className="px-4 mb-4">
           <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Management</span>
         </div>
@@ -86,7 +86,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
         ))}
       </nav>
 
-      <div className="p-6">
+      <div id="profile-section" className="p-6">
         <div className="bg-gray-50/80 rounded-3xl p-5 mb-4 border border-gray-100 flex items-center gap-3">
           <ProfileImage url={user?.avatarUrl} size="sm" />
           <div className="min-w-0">
@@ -97,6 +97,17 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
             <div className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-1 opacity-70">
               {user?.role?.replace('_', ' ') || 'GUEST'}
             </div>
+            {user?.role === 'SCHOOL_ADMIN' && (
+              <button 
+                onClick={() => {
+                  localStorage.removeItem(`edunexus_onboarding_completed_${user?.id}`);
+                  window.location.reload();
+                }}
+                className="text-[9px] font-bold text-gray-400 mt-2 hover:text-blue-600 transition-colors uppercase tracking-widest"
+              >
+                Restart Tour
+              </button>
+            )}
           </div>
         </div>
         <button

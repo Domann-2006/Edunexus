@@ -68,7 +68,7 @@ export default function Dashboard({ user }: { user: any }) {
 
   return (
     <div className="space-y-12 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <header id="overview-header" className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tighter">Overview</h1>
           <p className="text-gray-500 font-medium mt-1 uppercase tracking-widest text-[10px]">Academic Year 2025/2026 • First Term</p>
@@ -76,6 +76,7 @@ export default function Dashboard({ user }: { user: any }) {
         <div className="flex flex-col md:flex-row gap-4">
           {user?.role === 'SUPER_ADMIN' && (
             <select
+              id="school-selector"
               value={selectedSchoolId}
               onChange={(e) => setSelectedSchoolId(e.target.value)}
               className="px-5 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
@@ -96,7 +97,7 @@ export default function Dashboard({ user }: { user: any }) {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div id="stat-cards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {loading ? (
           Array(4).fill(0).map((_, i) => (
             <div key={i} className="h-40 bg-gray-100 animate-pulse rounded-[2.5rem]" />
@@ -157,7 +158,7 @@ export default function Dashboard({ user }: { user: any }) {
           </div>
         </div>
 
-        <div className="bg-gray-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl">
+        <div id="quick-actions" className="bg-gray-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/20 rounded-full -mr-16 -mt-16 blur-2xl" />
           <div className="relative z-10 flex flex-col h-full">
             <h2 className="text-2xl font-black tracking-tight leading-tight mb-4">Quick Actions</h2>
