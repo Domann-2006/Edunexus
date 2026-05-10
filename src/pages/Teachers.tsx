@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { teacherService, schoolService } from '../services/api';
-import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin } from 'lucide-react';
+import { teacherService, schoolService, classService, subjectService } from '../services/api';
+import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
@@ -17,12 +17,20 @@ export default function Teachers({ user }: { user: any }) {
     name: '',
     avatarUrl: '',
     email: '',
+    username: '',
+    password: '',
     employeeId: '',
     specialization: '',
     phone: '',
     address: '',
     schoolId: '',
+    assignedClassIds: [] as string[],
+    assignedSubjectIds: [] as string[],
   });
+
+  const [classes, setClasses] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [generatedCreds, setGeneratedCreds] = useState<any>(null);
 
   useEffect(() => {
     fetchData();
@@ -31,13 +39,19 @@ export default function Teachers({ user }: { user: any }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const promises: Promise<any>[] = [teacherService.list({ schoolId: selectedSchoolId })];
+      const promises: Promise<any>[] = [
+        teacherService.list({ schoolId: selectedSchoolId }),
+        classService.list({ schoolId: selectedSchoolId || user?.schoolId }),
+        subjectService.list({ schoolId: selectedSchoolId || user?.schoolId })
+      ];
       if (user?.role === 'SUPER_ADMIN') {
         promises.push(schoolService.list());
       }
-      const results = await Promise.all(promises);
-      setTeachers(results[0].data);
-      if (results[1]) setSchools(results[1].data);
+      const [teacherRes, classRes, subjectRes, schoolRes] = await Promise.all(promises);
+      setTeachers(teacherRes.data);
+      setClasses(classRes.data);
+      setSubjects(subjectRes.data);
+      if (schoolRes) setSchools(schoolRes.data);
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally {
@@ -50,10 +64,15 @@ export default function Teachers({ user }: { user: any }) {
     try {
       if (editingId) {
         await teacherService.update(editingId, formData);
+        setIsModalOpen(false);
       } else {
-        await teacherService.create(formData);
+        const res = await teacherService.create(formData);
+        if (res.data.credentials) {
+          setGeneratedCreds(res.data.credentials);
+        } else {
+          setIsModalOpen(false);
+        }
       }
-      setIsModalOpen(false);
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Operation failed';
@@ -74,17 +93,22 @@ export default function Teachers({ user }: { user: any }) {
   };
 
   const openModal = (teacher?: any) => {
+    setGeneratedCreds(null);
     if (teacher) {
       setEditingId(teacher.id);
       setFormData({
         name: teacher.name,
         avatarUrl: teacher.avatarUrl || '',
         email: teacher.email || '',
+        username: teacher.username || '',
+        password: '',
         employeeId: teacher.employeeId,
         specialization: teacher.specialization,
         phone: teacher.phone || '',
         address: teacher.address || '',
         schoolId: teacher.schoolId || '',
+        assignedClassIds: teacher.assignedClassIds || [],
+        assignedSubjectIds: teacher.assignedSubjectIds || [],
       });
     } else {
       setEditingId(null);
@@ -92,11 +116,15 @@ export default function Teachers({ user }: { user: any }) {
         name: '', 
         avatarUrl: '', 
         email: '', 
+        username: '',
+        password: '',
         employeeId: '', 
         specialization: '',
         phone: '',
         address: '',
-        schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || '')
+        schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || ''),
+        assignedClassIds: [],
+        assignedSubjectIds: [],
       });
     }
     setIsModalOpen(true);
@@ -247,7 +275,7 @@ export default function Teachers({ user }: { user: any }) {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
             >
               <div className="p-8">
                 <header className="flex justify-between items-center mb-8 text-sm font-bold uppercase tracking-widest text-gray-900">
@@ -257,109 +285,190 @@ export default function Teachers({ user }: { user: any }) {
                   </button>
                 </header>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="flex justify-center mb-6">
-                    <ProfileImage 
-                      size="xl" 
-                      editable 
-                      url={formData.avatarUrl} 
-                      onUpload={(url) => setFormData({...formData, avatarUrl: url})} 
-                      folder="teachers"
-                      showCamera={true}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Full Name</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
-                      />
+                {generatedCreds ? (
+                  <div className="space-y-6 text-center">
+                    <div className="p-6 bg-green-50 rounded-2xl border border-green-100">
+                      <div className="text-green-600 font-bold mb-2">Teacher Account Created!</div>
+                      <p className="text-sm text-green-700">Please provide these credentials to the teacher:</p>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Employee ID</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.employeeId}
-                        onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
-                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Email Address</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Specialization</label>
-                       <input
-                        type="text"
-                        value={formData.specialization}
-                        onChange={(e) => setFormData({...formData, specialization: e.target.value})}
-                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
-                        placeholder="e.g. Mathematics, Physics"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone Number</label>
-                      <input
-                        type="text"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
-                        placeholder="+234 ..."
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Home Address</label>
-                      <textarea
-                        value={formData.address}
-                        onChange={(e) => setFormData({...formData, address: e.target.value})}
-                        rows={2}
-                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none resize-none"
-                        placeholder="Residential address"
-                      />
-                    </div>
-                    {user?.role === 'SUPER_ADMIN' && (
-                      <div className="space-y-2 md:col-span-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">School</label>
-                        <select
-                          required
-                          value={formData.schoolId}
-                          onChange={(e) => setFormData({...formData, schoolId: e.target.value})}
-                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none appearance-none"
-                        >
-                          <option value="">Select School</option>
-                          {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
+                    <div className="grid grid-cols-1 gap-4 text-left">
+                      <div className="p-4 bg-gray-50 rounded-2xl">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase">Email Address</label>
+                        <div className="font-mono text-blue-600 font-bold">{generatedCreds.email}</div>
                       </div>
-                    )}
-                  </div>
-
-                  <div className="pt-4 flex gap-3">
+                      <div className="p-4 bg-gray-50 rounded-2xl">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase">Temporary Password</label>
+                        <div className="font-mono text-red-600 font-bold">{generatedCreds.password}</div>
+                      </div>
+                    </div>
                     <button
-                      type="button"
                       onClick={() => setIsModalOpen(false)}
-                      className="flex-1 py-4 text-gray-500 font-bold uppercase tracking-widest text-xs hover:bg-gray-50 rounded-2xl transition-all"
+                      className="w-full py-4 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl hover:bg-blue-700 transition-all"
                     >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-4 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
-                    >
-                      {editingId ? 'Save Changes' : 'Add Teacher'}
+                      Got it, close
                     </button>
                   </div>
-                </form>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="flex justify-center mb-6">
+                      <ProfileImage 
+                        size="xl" 
+                        editable 
+                        url={formData.avatarUrl} 
+                        onUpload={(url) => setFormData({...formData, avatarUrl: url})} 
+                        folder="teachers"
+                        showCamera={true}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Full Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.name}
+                          onChange={(e) => setFormData({...formData, name: e.target.value})}
+                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Employee ID</label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.employeeId}
+                          onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
+                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Email Address</label>
+                        <input
+                          type="email"
+                          required={!editingId}
+                          value={formData.email}
+                          onChange={(e) => setFormData({...formData, email: e.target.value})}
+                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Username</label>
+                        <input
+                          type="text"
+                          value={formData.username}
+                          onChange={(e) => setFormData({...formData, username: e.target.value})}
+                          placeholder="Leave blank to use email"
+                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Classes</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {classes.map(c => (
+                            <label key={c.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-all">
+                              <input 
+                                type="checkbox"
+                                checked={formData.assignedClassIds.includes(c.id)}
+                                onChange={(e) => {
+                                  const ids = e.target.checked 
+                                    ? [...formData.assignedClassIds, c.id]
+                                    : formData.assignedClassIds.filter(id => id !== c.id);
+                                  setFormData({...formData, assignedClassIds: ids});
+                                }}
+                                className="w-4 h-4 text-blue-600 rounded"
+                              />
+                              <span className="text-[10px] font-bold text-gray-700">{c.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Subjects</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {subjects.map(s => (
+                            <label key={s.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-all">
+                              <input 
+                                type="checkbox"
+                                checked={formData.assignedSubjectIds.includes(s.id)}
+                                onChange={(e) => {
+                                  const ids = e.target.checked 
+                                    ? [...formData.assignedSubjectIds, s.id]
+                                    : formData.assignedSubjectIds.filter(id => id !== s.id);
+                                  setFormData({...formData, assignedSubjectIds: ids});
+                                }}
+                                className="w-4 h-4 text-blue-600 rounded"
+                              />
+                              <span className="text-[10px] font-bold text-gray-700">{s.name} ({s.class})</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Specialization</label>
+                         <input
+                          type="text"
+                          value={formData.specialization}
+                          onChange={(e) => setFormData({...formData, specialization: e.target.value})}
+                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                          placeholder="e.g. Mathematics, Physics"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone Number</label>
+                        <input
+                          type="text"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                          placeholder="+234 ..."
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Home Address</label>
+                        <textarea
+                          value={formData.address}
+                          onChange={(e) => setFormData({...formData, address: e.target.value})}
+                          rows={2}
+                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none resize-none"
+                          placeholder="Residential address"
+                        />
+                      </div>
+                      {user?.role === 'SUPER_ADMIN' && (
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">School</label>
+                          <select
+                            required
+                            value={formData.schoolId}
+                            onChange={(e) => setFormData({...formData, schoolId: e.target.value})}
+                            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none appearance-none"
+                          >
+                            <option value="">Select School</option>
+                            {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-4 flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsModalOpen(false)}
+                        className="flex-1 py-4 text-gray-500 font-bold uppercase tracking-widest text-xs hover:bg-gray-50 rounded-2xl transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 py-4 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+                      >
+                        {editingId ? 'Save Changes' : 'Add Teacher'}
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             </motion.div>
           </div>

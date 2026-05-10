@@ -12,6 +12,7 @@ export default function Students({ user }: { user: any }) {
   const [selectedSchoolId, setSelectedSchoolId] = useState(user?.schoolId || '');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedClassIdFilter, setSelectedClassIdFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -117,10 +118,12 @@ export default function Students({ user }: { user: any }) {
     setIsModalOpen(true);
   };
 
-  const filteredStudents = students.filter(s => 
-    s.name?.toLowerCase().includes(search.toLowerCase()) || 
-    s.admissionNumber?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = s.name?.toLowerCase().includes(search.toLowerCase()) || 
+                          s.admissionNumber?.toLowerCase().includes(search.toLowerCase());
+    const matchesClass = selectedClassIdFilter ? s.classId === selectedClassIdFilter : true;
+    return matchesSearch && matchesClass;
+  });
 
   const selectedClassInfo = classes.find(c => c.id === formData.classId);
   const showStream = selectedClassInfo?.level === 'SSS';
@@ -154,15 +157,25 @@ export default function Students({ user }: { user: any }) {
       </header>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden text-sm uppercase">
-        <div className="p-4 border-b border-gray-50 flex items-center gap-3">
-          <Search className="text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Search students..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 border-0 focus:ring-0 outline-none p-2"
-          />
+        <div className="p-4 border-b border-gray-50 flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search students..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+            />
+          </div>
+          <select
+            value={selectedClassIdFilter}
+            onChange={(e) => setSelectedClassIdFilter(e.target.value)}
+            className="w-full sm:w-auto px-6 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-[10px] font-black tracking-widest uppercase appearance-none"
+          >
+            <option value="">All Classes</option>
+            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
         </div>
 
         <div className="overflow-x-auto">

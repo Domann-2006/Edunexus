@@ -9,7 +9,9 @@ import {
   LayoutDashboard,
   Book,
   FileSpreadsheet,
-  X
+  X,
+  CheckSquare,
+  ShieldCheck
 } from 'lucide-react';
 import ProfileImage from './ProfileImage';
 
@@ -24,14 +26,25 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
   const menuItems = [
     { name: 'Overview', path: '/', icon: LayoutDashboard },
     { name: 'Students', path: '/students', icon: Users },
-    { name: 'Teachers', path: '/teachers', icon: UserPlus },
+  ];
+
+  if (user?.role !== 'TEACHER') {
+    menuItems.push({ name: 'Teachers', path: '/teachers', icon: UserPlus });
+  }
+
+  menuItems.push(
     { name: 'Classes', path: '/classes', icon: BookOpen },
     { name: 'Subjects', path: '/subjects', icon: Book },
+    { name: 'Attendance', path: '/attendance', icon: CheckSquare },
     { name: 'Results', path: '/results', icon: FileSpreadsheet },
-  ];
+  );
 
   if (user?.role === 'SUPER_ADMIN') {
     menuItems.push({ name: 'Schools', path: '/schools', icon: School });
+  }
+
+  if (user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN') {
+    menuItems.push({ name: 'Audit Logs', path: '/activity-logs', icon: ShieldCheck });
   }
 
   return (

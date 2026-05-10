@@ -8,6 +8,8 @@ import Classes from './pages/Classes';
 import Subjects from './pages/Subjects';
 import Results from './pages/Results';
 import Schools from './pages/Schools';
+import Attendance from './pages/Attendance';
+import ActivityLogs from './pages/ActivityLogs';
 import Layout from './components/Layout';
 import InstallPWA from './components/InstallPWA';
 
@@ -130,6 +132,22 @@ export default function App() {
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
               <Results user={user} />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/attendance" element={
+          <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <Attendance user={user} />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/activity-logs" element={
+          <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <ActivityLogs user={user} />
             </Layout>
           </ProtectedRoute>
         } />

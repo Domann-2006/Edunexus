@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { dashboardService, schoolService } from '../services/api';
+import api, { dashboardService, schoolService, classService } from '../services/api';
 import { 
   Users, 
   UserPlus, 
@@ -11,7 +11,8 @@ import {
   Calendar,
   FileSpreadsheet,
   Zap,
-  MoreVertical
+  MoreVertical,
+  CheckSquare
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -32,10 +33,31 @@ export default function Dashboard({ user }: { user: any }) {
   const [loading, setLoading] = useState(true);
   const [schools, setSchools] = useState<any[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
+  const [teacherProfile, setTeacherProfile] = useState<any>(null);
+  const [assignedClasses, setAssignedClasses] = useState<any[]>([]);
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') {
       schoolService.list().then(res => setSchools(res.data));
+    }
+    if (user?.role === 'TEACHER') {
+      // Get teacher profile and assigned classes
+      const fetchTeacherData = async () => {
+        try {
+          const profileRes = await api.get('/v1/teachers', { params: { userId: user.id } });
+          if (profileRes.data.length > 0) {
+            const profile = profileRes.data[0];
+            setTeacherProfile(profile);
+            if (profile.assignedClassIds?.length > 0) {
+              const classesRes = await classService.list({ ids: profile.assignedClassIds });
+              setAssignedClasses(classesRes.data);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch teacher profile:', err);
+        }
+      };
+      fetchTeacherData();
     }
   }, [user]);
 
@@ -47,12 +69,19 @@ export default function Dashboard({ user }: { user: any }) {
       .finally(() => setLoading(false));
   }, [selectedSchoolId]);
 
-  const statCards = [
-    { name: 'Students', value: stats?.students || 0, icon: Users, color: 'blue', link: '/students' },
-    { name: 'Teachers', value: stats?.teachers || 0, icon: UserPlus, color: 'indigo', link: '/teachers' },
-    { name: 'Classes', value: stats?.classes || 0, icon: BookOpen, color: 'emerald', link: '/classes' },
-    { name: 'Subjects', value: stats?.subjects || 0, icon: Book, color: 'amber', link: '/subjects' },
-  ];
+  const statCards = user?.role === 'TEACHER' 
+    ? [
+        { name: 'My Students', value: stats?.students || 0, icon: Users, color: 'blue', link: '/students' },
+        { name: 'My Classes', value: teacherProfile?.assignedClassIds?.length || 0, icon: BookOpen, color: 'emerald', link: '/classes' },
+        { name: 'My Subjects', value: teacherProfile?.assignedSubjectIds?.length || 0, icon: Book, color: 'amber', link: '/subjects' },
+        { name: 'Attendance Stats', value: 'Live', icon: CheckSquare, color: 'indigo', link: '/attendance' },
+      ]
+    : [
+        { name: 'Students', value: stats?.students || 0, icon: Users, color: 'blue', link: '/students' },
+        { name: 'Teachers', value: stats?.teachers || 0, icon: UserPlus, color: 'indigo', link: '/teachers' },
+        { name: 'Classes', value: stats?.classes || 0, icon: BookOpen, color: 'emerald', link: '/classes' },
+        { name: 'Subjects', value: stats?.subjects || 0, icon: Book, color: 'amber', link: '/subjects' },
+      ];
 
   if (user?.role === 'SUPER_ADMIN') {
     statCards.push({ name: 'Schools', value: stats?.schools || 0, icon: School, color: 'rose', link: '/schools' });
@@ -133,29 +162,61 @@ export default function Dashboard({ user }: { user: any }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-white rounded-[3rem] p-10 border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between mb-10">
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Active Enrollment</h2>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+              {user?.role === 'TEACHER' ? 'My Assigned Classes' : 'Active Enrollment'}
+            </h2>
             <div className="flex gap-2">
-              <button className="px-4 py-2 bg-gray-50 text-[10px] font-black uppercase tracking-widest text-gray-500 rounded-xl">Last 6 Months</button>
+              <button className="px-4 py-2 bg-gray-50 text-[10px] font-black uppercase tracking-widest text-gray-500 rounded-xl">
+                {user?.role === 'TEACHER' ? 'Current Term' : 'Last 6 Months'}
+              </button>
               <button className="p-2 text-gray-400"><MoreVertical size={18} /></button>
             </div>
           </div>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} />
-                <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} />
-                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={4} fillOpacity={1} fill="url(#colorVal)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          
+          {user?.role === 'TEACHER' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {assignedClasses.length > 0 ? (
+                assignedClasses.map((c, i) => (
+                  <Link 
+                    to={`/students?classId=${c.id}`}
+                    key={c.id} 
+                    className="p-6 bg-gray-50 rounded-3xl border border-transparent hover:border-blue-200 hover:bg-blue-50/30 transition-all group"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
+                        <BookOpen size={20} />
+                      </div>
+                      <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active</div>
+                    </div>
+                    <div className="font-bold text-lg text-gray-900">{c.name}</div>
+                    <div className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-medium">{c.studentCount || 0} Students</div>
+                  </Link>
+                ))
+              ) : (
+                <div className="col-span-2 py-12 text-center text-gray-400 lowercase italic">
+                  No classes assigned yet.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} />
+                  <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} />
+                  <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={4} fillOpacity={1} fill="url(#colorVal)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         <div id="quick-actions" className="bg-gray-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl">
@@ -163,6 +224,13 @@ export default function Dashboard({ user }: { user: any }) {
           <div className="relative z-10 flex flex-col h-full">
             <h2 className="text-2xl font-black tracking-tight leading-tight mb-4">Quick Actions</h2>
             <div className="space-y-3 mt-4">
+              <Link to="/attendance" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                <div className="w-10 h-10 bg-indigo-500 rounded-2xl flex items-center justify-center">
+                  <CheckSquare size={18} />
+                </div>
+                <span className="text-sm font-bold">Mark Attendance</span>
+                <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+              </Link>
               <Link to="/results" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
                 <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center">
                   <FileSpreadsheet size={18} />
@@ -170,13 +238,15 @@ export default function Dashboard({ user }: { user: any }) {
                 <span className="text-sm font-bold">Record Results</span>
                 <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
               </Link>
-              <Link to="/students" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
-                <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center">
-                  <UserPlus size={18} />
-                </div>
-                <span className="text-sm font-bold">Admit Student</span>
-                <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
-              </Link>
+              {user?.role !== 'TEACHER' && (
+                <Link to="/students" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                  <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center">
+                    <UserPlus size={18} />
+                  </div>
+                  <span className="text-sm font-bold">Admit Student</span>
+                  <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+                </Link>
+              )}
             </div>
 
             <div className="mt-auto pt-10">

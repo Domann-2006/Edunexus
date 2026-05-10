@@ -86,6 +86,27 @@ const createCRUD = (collectionName, roles, transform) => {
         query = query.where('schoolId', '==', req.query.schoolId);
       }
 
+      // Teacher-based filtering for students and classes
+      if (req.user?.role === 'TEACHER') {
+        // Find teacher profile to get assigned classes
+        const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+        if (!teacherSnap.empty) {
+          const teacherData = teacherSnap.docs[0].data();
+          const assignedClassIds = teacherData.assignedClassIds || [];
+          
+          if (collectionName === 'students' || collectionName === 'classes' || collectionName === 'results' || collectionName === 'attendance') {
+            if (assignedClassIds.length > 0) {
+              // Firestore 'in' limit is 10, but let's assume classes per teacher is low or use another strategy if many.
+              // For now, simple 'in' filter.
+              query = query.where('classId', 'in', assignedClassIds.slice(0, 10));
+            } else {
+              // Return empty if no assigned classes
+              return res.json([]);
+            }
+          }
+        }
+      }
+
       // Dynamic filters from query params
       const skipParams = ['schoolId', 'limit', 'offset', 'sort'];
       Object.keys(req.query).forEach(key => {
@@ -227,12 +248,86 @@ const resultTransform = (data) => {
 
 // Mount CRUD routes
 router.use('/schools', createCRUD('schools', ['SUPER_ADMIN']));
-router.use('/students', createCRUD('students', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
-router.use('/teachers', createCRUD('teachers', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
+router.use('/students', createCRUD('students', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']));
+
+// Customized Teachers Creation to handle User account and Login Credentials
+const teacherRouter = createCRUD('teachers', ['SUPER_ADMIN', 'SCHOOL_ADMIN']);
+
+// Override POST for teachers to create user account
+teacherRouter.post('/', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN']), async (req, res) => {
+  try {
+    const { name, email, username, password, assignedClassIds, assignedSubjectIds, ...teacherFields } = req.body;
+    const schoolId = req.user?.role === 'SUPER_ADMIN' ? (req.body.schoolId || req.user.schoolId) : req.user.schoolId;
+
+    // Check if user already exists
+    const userSnapshot = await db.collection('users').where('email', '==', email).get();
+    if (!userSnapshot.empty) {
+      return res.status(400).json({ message: 'User with this email already exists' });
+    }
+
+    // Hash password (use provided or auto-generate)
+    const bcrypt = await import('bcryptjs');
+    const actualPassword = password || Math.random().toString(36).slice(-8);
+    const passwordHash = await bcrypt.default.hash(actualPassword, 10);
+
+    // 1. Create User Document
+    const userRef = await db.collection('users').add({
+      name,
+      email,
+      username: username || email.split('@')[0],
+      passwordHash,
+      role: 'TEACHER',
+      schoolId: schoolId,
+      createdAt: new Date().toISOString()
+    });
+
+    // 2. Create Teacher Document
+    const teacherData = {
+      ...teacherFields,
+      userId: userRef.id,
+      name,
+      email,
+      username: username || email.split('@')[0],
+      schoolId,
+      assignedClassIds: assignedClassIds || [],
+      assignedSubjectIds: assignedSubjectIds || [],
+      createdAt: new Date().toISOString()
+    };
+    
+    const teacherRef = await db.collection('teachers').add(teacherData);
+
+    // Log Activity
+    await db.collection('activity-logs').add({
+      userId: req.user.id,
+      userName: req.user.name,
+      role: req.user.role,
+      action: 'CREATE_TEACHER',
+      details: `Created teacher ${name} (${email}). Credentials generated.`,
+      schoolId: schoolId,
+      createdAt: new Date().toISOString()
+    });
+
+    res.status(201).json({
+      id: teacherRef.id,
+      ...teacherData,
+      credentials: {
+        email,
+        password: actualPassword
+      }
+    });
+  } catch (err) {
+    console.error('Teacher creation failed:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.use('/teachers', teacherRouter);
 router.use('/classes', createCRUD('classes', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 router.use('/subjects', createCRUD('subjects', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 router.use('/results', createCRUD('results', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'], resultTransform));
 router.use('/sessions', createCRUD('sessions', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
+router.use('/attendance', createCRUD('attendance', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']));
+router.use('/activity-logs', createCRUD('activity-logs', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 
 // Dashboard Stats
 router.get('/dashboard-stats', authenticate, async (req, res) => {

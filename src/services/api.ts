@@ -95,6 +95,18 @@ export const sessionService = {
   delete: (id: string) => api.delete(`/v1/sessions/${id}`),
 };
 
+export const attendanceService = {
+  list: (params?: any) => api.get('/v1/attendance', { params }),
+  create: (data: any) => api.post('/v1/attendance', data),
+  bulkCreate: (records: any[]) => Promise.all(records.map(r => api.post('/v1/attendance', r))),
+  update: (id: string, data: any) => api.put(`/v1/attendance/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/attendance/${id}`),
+};
+
+export const activityService = {
+  list: (params?: any) => api.get('/v1/activity-logs', { params }),
+};
+
 export const dashboardService = {
   getStats: (params?: any) => api.get('/v1/dashboard-stats', { params }),
 };

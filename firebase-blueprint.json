@@ -64,9 +64,43 @@
         "specialization": { "type": "string" },
         "phone": { "type": "string" },
         "address": { "type": "string" },
+        "assignedClassIds": { "type": "array", "items": { "type": "string" } },
+        "assignedSubjectIds": { "type": "array", "items": { "type": "string" } },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "schoolId"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily student attendance record.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "classId": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["PRESENT", "ABSENT", "LATE", "EXCUSED"] },
+        "recordedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "classId", "schoolId", "date", "status", "recordedBy"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Audit log for system actions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "role": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "schoolId"]
     },
     "Class": {
       "title": "Class",
