@@ -7,7 +7,25 @@
 }
 
 @layer base {
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Fix for iOS momentum scrolling */
+    -webkit-overflow-scrolling: touch;
+  }
+
   body {
-    @apply font-sans text-gray-900 antialiased;
+    @apply font-sans text-gray-900 antialiased bg-gray-50;
+    /* Fix for iOS 100vh issue */
+    min-height: 100dvh;
+  }
+
+  #root {
+    min-height: 100%;
   }
 }

@@ -45,7 +45,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
       )}
 
       <div className={`
-        w-64 bg-white border-r border-gray-100 flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform duration-300
+        w-64 bg-white border-r border-gray-100 flex flex-col h-[100dvh] fixed left-0 top-0 z-40 transition-transform duration-300
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
       <div className="p-8 flex items-center justify-between">

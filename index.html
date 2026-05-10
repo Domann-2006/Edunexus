@@ -2,15 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>EduNexus | Learning Management System</title>
     <meta name="description" content="Modern educational management and collaboration platform." />
     <meta name="theme-color" content="#2563eb" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="EduNexus" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
+    <script>
+      // Global error logging for production debugging (especially iOS)
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        const errorMsg = 'Error: ' + msg + '\nURL: ' + url + '\nLine: ' + lineNo + '\nColumn: ' + columnNo + '\nStack: ' + (error ? error.stack : 'N/A');
+        console.error(errorMsg);
+        // If we are in a crash state, show a visible error after a delay if the app didn't mount
+        setTimeout(() => {
+          if (!document.querySelector('#root').hasChildNodes()) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;padding:20px;z-index:9999;font-family:sans-serif;color:#ef4444;overflow:auto;';
+            errorDiv.innerHTML = '<h2>Application Startup Failed</h2><p>Please try refreshing. If the problem persists, share this error with support:</p><pre style="background:#f8fafc;padding:15px;border-radius:8px;font-size:12px;white-space:pre-wrap;">' + errorMsg + '</pre>';
+            document.body.appendChild(errorDiv);
+          }
+        }, 3000);
+        return false;
+      };
+      window.onunhandledrejection = function(event) {
+        console.error('Unhandled Promise Rejection:', event.reason);
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

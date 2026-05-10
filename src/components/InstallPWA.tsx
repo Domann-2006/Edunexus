@@ -4,9 +4,13 @@ import { Download, X } from 'lucide-react';
 export default function InstallPWA() {
   const [supportsPWA, setSupportsPWA] = useState(false);
   const [promptInstall, setPromptInstall] = useState<any>(null);
+  const [isIOS, setIsIOS] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(isIOSDevice);
+
     const handler = (e: any) => {
       e.preventDefault();
       setSupportsPWA(true);
@@ -14,11 +18,20 @@ export default function InstallPWA() {
     };
     window.addEventListener('beforeinstallprompt', handler);
 
+    // If it's iOS and not already in standalone mode, we can show instructions
+    if (isIOSDevice && !(window.navigator as any).standalone) {
+      setSupportsPWA(true);
+    }
+
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   const onClick = (evt: any) => {
     evt.preventDefault();
+    if (isIOS) {
+      alert('To install EduNexus on your iPhone: Tap the Share button in Safari (square with up arrow) and select "Add to Home Screen".');
+      return;
+    }
     if (!promptInstall) return;
     promptInstall.prompt();
   };

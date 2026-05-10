@@ -15,31 +15,55 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const safeLocalStorage = {
+    getItem: (key: string) => {
+      try {
+        return localStorage.getItem(key);
+      } catch (e) {
+        return null;
+      }
+    },
+    setItem: (key: string, value: string) => {
+      try {
+        localStorage.setItem(key, value);
+      } catch (e) {
+        console.warn('Storage failed:', e);
+      }
+    },
+    removeItem: (key: string) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
   useEffect(() => {
     try {
-      const savedUser = localStorage.getItem('user');
+      const savedUser = safeLocalStorage.getItem('user');
       if (savedUser) {
         setUser(JSON.parse(savedUser));
       }
     } catch (err) {
       console.error('Failed to parse saved user:', err);
-      localStorage.removeItem('user');
+      safeLocalStorage.removeItem('user');
     } finally {
       setLoading(false);
     }
   }, []);
 
   const handleLogin = (userData: any) => {
-    const userToSave = userData.user || userData; // Handle both nested and flat responses
+    const userToSave = userData.user || userData; 
     setUser(userToSave);
-    localStorage.setItem('user', JSON.stringify(userToSave));
-    localStorage.setItem('token', userData.token);
+    safeLocalStorage.setItem('user', JSON.stringify(userToSave));
+    safeLocalStorage.setItem('token', userData.token);
   };
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    safeLocalStorage.removeItem('user');
+    safeLocalStorage.removeItem('token');
   };
 
   const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?: string[] }) => {
