@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { teacherService, schoolService } from '../services/api';
-import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
@@ -19,6 +19,8 @@ export default function Teachers({ user }: { user: any }) {
     email: '',
     employeeId: '',
     specialization: '',
+    phone: '',
+    address: '',
     schoolId: '',
   });
 
@@ -80,6 +82,8 @@ export default function Teachers({ user }: { user: any }) {
         email: teacher.email || '',
         employeeId: teacher.employeeId,
         specialization: teacher.specialization,
+        phone: teacher.phone || '',
+        address: teacher.address || '',
         schoolId: teacher.schoolId || '',
       });
     } else {
@@ -90,6 +94,8 @@ export default function Teachers({ user }: { user: any }) {
         email: '', 
         employeeId: '', 
         specialization: '',
+        phone: '',
+        address: '',
         schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || '')
       });
     }
@@ -173,11 +179,29 @@ export default function Teachers({ user }: { user: any }) {
                         <ProfileImage url={teacher.avatarUrl} size="sm" />
                         <div>
                           <div className="font-bold text-gray-900">{teacher.name}</div>
-                          <div className="text-[10px] text-gray-400 font-medium normal-case tracking-normal">{teacher.email}</div>
+                          <div className="flex flex-col gap-0.5 mt-1">
+                            <div className="text-[10px] text-gray-400 font-medium normal-case tracking-normal">{teacher.email}</div>
+                            {teacher.phone && (
+                              <div className="flex items-center gap-1 text-[9px] text-gray-500 normal-case">
+                                <Phone size={10} className="text-blue-400" />
+                                {teacher.phone}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-500 font-mono text-xs">{teacher.employeeId}</td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-1">
+                        <div className="text-gray-500 font-mono text-xs">{teacher.employeeId}</div>
+                        {teacher.address && (
+                          <div className="flex items-center gap-1 text-[9px] text-gray-400 font-medium normal-case tracking-tight max-w-[150px] truncate" title={teacher.address}>
+                            <MapPin size={10} className="text-gray-300 shrink-0" />
+                            {teacher.address}
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
                       <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full font-bold text-[10px]">
                         {teacher.specialization}
@@ -274,14 +298,34 @@ export default function Teachers({ user }: { user: any }) {
                         className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
                       />
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Specialization</label>
-                      <input
+                    <div className="space-y-2">
+                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Specialization</label>
+                       <input
                         type="text"
                         value={formData.specialization}
                         onChange={(e) => setFormData({...formData, specialization: e.target.value})}
                         className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
                         placeholder="e.g. Mathematics, Physics"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone Number</label>
+                      <input
+                        type="text"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                        placeholder="+234 ..."
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Home Address</label>
+                      <textarea
+                        value={formData.address}
+                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                        rows={2}
+                        className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none resize-none"
+                        placeholder="Residential address"
                       />
                     </div>
                     {user?.role === 'SUPER_ADMIN' && (
