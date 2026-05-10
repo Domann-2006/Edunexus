@@ -20,6 +20,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Response interceptor to catch "Login Page instead of JSON" issues
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && typeof error.response.data === 'string' && error.response.data.includes('<!DOCTYPE html>')) {
+      console.error('API Error: Received HTML instead of JSON. This usually indicates a routing mismatch or fall-through to SPA catch-all.');
+      return Promise.reject(new Error('Server configuration error: Received HTML instead of JSON.'));
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
 
 export const authService = {

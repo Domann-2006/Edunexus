@@ -25,16 +25,26 @@ async function startServer() {
   app.use(cookieParser());
 
   // API Routes
-  app.get('/api/health', (req, res) => {
+  const apiRouter = express.Router();
+
+  apiRouter.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'EduNexus API is running' });
   });
 
-  app.get('/api/test', (req, res) => {
+  apiRouter.get('/test', (req, res) => {
     res.json({ status: "ok", message: "API is working" });
   });
 
-  app.use('/api/auth', authRoutes);
-  app.use('/api/v1', apiRoutes);
+  apiRouter.use('/auth', authRoutes);
+  apiRouter.use('/v1', apiRoutes);
+
+  // Specialized API 404 handler - prevents /api/* requests from falling through to SPA index.html
+  apiRouter.use((req, res) => {
+    console.warn(`API Route not found: ${req.originalUrl}`);
+    res.status(404).json({ error: 'Not Found', message: `API route ${req.originalUrl} does not exist.` });
+  });
+
+  app.use('/api', apiRouter);
 
   // Vite integration for development and production
   if (process.env.NODE_ENV !== 'production') {
