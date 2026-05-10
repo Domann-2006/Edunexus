@@ -9,6 +9,7 @@ import Subjects from './pages/Subjects';
 import Results from './pages/Results';
 import Schools from './pages/Schools';
 import Layout from './components/Layout';
+import InstallPWA from './components/InstallPWA';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -57,6 +58,7 @@ export default function App() {
 
   return (
     <Router>
+      <InstallPWA />
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />} />
         
