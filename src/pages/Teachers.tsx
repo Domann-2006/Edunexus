@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { teacherService, schoolService, classService, subjectService } from '../services/api';
-import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin, CheckCircle } from 'lucide-react';
+import { teacherService, schoolService } from '../services/api';
+import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin, CheckCircle, BookOpen, Book } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
@@ -24,12 +24,10 @@ export default function Teachers({ user }: { user: any }) {
     phone: '',
     address: '',
     schoolId: '',
-    assignedClassIds: [] as string[],
-    assignedSubjectIds: [] as string[],
+    assignedClasses: '',
+    assignedSubjects: '',
   });
 
-  const [classes, setClasses] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
   const [generatedCreds, setGeneratedCreds] = useState<any>(null);
 
   useEffect(() => {
@@ -41,16 +39,12 @@ export default function Teachers({ user }: { user: any }) {
     try {
       const promises: Promise<any>[] = [
         teacherService.list({ schoolId: selectedSchoolId }),
-        classService.list({ schoolId: selectedSchoolId || user?.schoolId }),
-        subjectService.list({ schoolId: selectedSchoolId || user?.schoolId })
       ];
       if (user?.role === 'SUPER_ADMIN') {
         promises.push(schoolService.list());
       }
-      const [teacherRes, classRes, subjectRes, schoolRes] = await Promise.all(promises);
+      const [teacherRes, schoolRes] = await Promise.all(promises);
       setTeachers(teacherRes.data);
-      setClasses(classRes.data);
-      setSubjects(subjectRes.data);
       if (schoolRes) setSchools(schoolRes.data);
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -62,11 +56,18 @@ export default function Teachers({ user }: { user: any }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Split the comma-separated strings into arrays for the backend
+      const submitData = {
+        ...formData,
+        assignedClassIds: formData.assignedClasses.split(',').map(s => s.trim()).filter(Boolean),
+        assignedSubjectIds: formData.assignedSubjects.split(',').map(s => s.trim()).filter(Boolean),
+      };
+
       if (editingId) {
-        await teacherService.update(editingId, formData);
+        await teacherService.update(editingId, submitData);
         setIsModalOpen(false);
       } else {
-        const res = await teacherService.create(formData);
+        const res = await teacherService.create(submitData);
         if (res.data.credentials) {
           setGeneratedCreds(res.data.credentials);
         } else {
@@ -107,8 +108,8 @@ export default function Teachers({ user }: { user: any }) {
         phone: teacher.phone || '',
         address: teacher.address || '',
         schoolId: teacher.schoolId || '',
-        assignedClassIds: teacher.assignedClassIds || [],
-        assignedSubjectIds: teacher.assignedSubjectIds || [],
+        assignedClasses: (teacher.assignedClassIds || []).join(', '),
+        assignedSubjects: (teacher.assignedSubjectIds || []).join(', '),
       });
     } else {
       setEditingId(null);
@@ -123,8 +124,8 @@ export default function Teachers({ user }: { user: any }) {
         phone: '',
         address: '',
         schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || ''),
-        assignedClassIds: [],
-        assignedSubjectIds: [],
+        assignedClasses: '',
+        assignedSubjects: '',
       });
     }
     setIsModalOpen(true);
@@ -364,46 +365,32 @@ export default function Teachers({ user }: { user: any }) {
                       
                       <div className="space-y-2 md:col-span-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Classes</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {classes.map(c => (
-                            <label key={c.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-all">
-                              <input 
-                                type="checkbox"
-                                checked={formData.assignedClassIds.includes(c.id)}
-                                onChange={(e) => {
-                                  const ids = e.target.checked 
-                                    ? [...formData.assignedClassIds, c.id]
-                                    : formData.assignedClassIds.filter(id => id !== c.id);
-                                  setFormData({...formData, assignedClassIds: ids});
-                                }}
-                                className="w-4 h-4 text-blue-600 rounded"
-                              />
-                              <span className="text-[10px] font-bold text-gray-700">{c.name}</span>
-                            </label>
-                          ))}
+                        <div className="relative">
+                          <BookOpen className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                          <input
+                            type="text"
+                            value={formData.assignedClasses}
+                            onChange={(e) => setFormData({...formData, assignedClasses: e.target.value})}
+                            placeholder="e.g. Primary 1, JSS 3, SSS 1"
+                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                          />
                         </div>
+                        <p className="text-[9px] text-gray-400 font-medium px-2 italic">Separate multiple classes with commas.</p>
                       </div>
 
                       <div className="space-y-2 md:col-span-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Subjects</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {subjects.map(s => (
-                            <label key={s.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-all">
-                              <input 
-                                type="checkbox"
-                                checked={formData.assignedSubjectIds.includes(s.id)}
-                                onChange={(e) => {
-                                  const ids = e.target.checked 
-                                    ? [...formData.assignedSubjectIds, s.id]
-                                    : formData.assignedSubjectIds.filter(id => id !== s.id);
-                                  setFormData({...formData, assignedSubjectIds: ids});
-                                }}
-                                className="w-4 h-4 text-blue-600 rounded"
-                              />
-                              <span className="text-[10px] font-bold text-gray-700">{s.name} ({s.class})</span>
-                            </label>
-                          ))}
+                        <div className="relative">
+                          <Book className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                          <input
+                            type="text"
+                            value={formData.assignedSubjects}
+                            onChange={(e) => setFormData({...formData, assignedSubjects: e.target.value})}
+                            placeholder="e.g. Mathematics, English Language, Physics"
+                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                          />
                         </div>
+                        <p className="text-[9px] text-gray-400 font-medium px-2 italic">Separate multiple subjects with commas.</p>
                       </div>
 
                       <div className="space-y-2">
