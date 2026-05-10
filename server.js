@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -17,8 +16,30 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Allow multiple origins in production, or just use origin: true to reflect request origin
+  // If the user provides VITE_FRONTEND_URL, we should prioritize it.
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ].filter(Boolean);
+
   app.use(cors({
-    origin: true,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // In development, allow all origins for ease of use
+      if (process.env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   }));
   app.use(express.json());
@@ -46,8 +67,9 @@ async function startServer() {
 
   app.use('/api', apiRouter);
 
-  // Vite integration for development and production
+  // Vite integration for local development preview in AI Studio
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     console.log('Starting in development mode with Vite middleware');
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -55,11 +77,11 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    console.log('Starting in production mode (serving dist)');
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    // In production (Render), we specifically DO NOT serve the frontend static files.
+    // The frontend is hosted on Vercel.
+    console.log('Production mode: API only server.');
+    app.get('/', (req, res) => {
+      res.json({ message: 'EduNexus API Server (Production)', health: '/api/health' });
     });
   }
 

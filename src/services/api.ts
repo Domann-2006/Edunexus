@@ -2,6 +2,12 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+if (import.meta.env.PROD && (!import.meta.env.VITE_API_URL || import.meta.env.VITE_API_URL === '/api')) {
+  console.warn('VITE_API_URL is not set to an absolute URL in production. Relative paths (/api) will only work if the frontend is served from the same domain as the backend.');
+}
+
+console.log('API Client initialized with baseURL:', API_URL);
+
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
