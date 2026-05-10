@@ -9,7 +9,7 @@ import apiRoutes from './src/routes/api.js';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   // Allow multiple origins in production, or just use origin: true to reflect request origin
   // If the user provides VITE_FRONTEND_URL, we should prioritize it.
