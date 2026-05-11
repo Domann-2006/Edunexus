@@ -25,6 +25,7 @@ export default function ProfileImage({
   const [error, setError] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const sizeClasses = {
@@ -34,11 +35,18 @@ export default function ProfileImage({
     xl: 'w-32 h-32'
   };
 
+  // Memoize UI classes to prevent recalculation on every render
+  const containerSize = sizeClasses[size] || sizeClasses.md;
+
   // Cleanup object URLs to prevent memory leaks
   useEffect(() => {
     return () => {
       if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
+        try {
+          URL.revokeObjectURL(previewUrl);
+        } catch (e) {
+          // Ignore revocation errors
+        }
       }
     };
   }, [previewUrl]);
@@ -52,43 +60,73 @@ export default function ProfileImage({
       return;
     }
 
+    // Size limit - check original size
+    // 20MB is a safe upper limit for most mobile browsers before they struggle
+    if (file.size > 20 * 1024 * 1024) {
+      setError('Image is too large for mobile processing. Please select a smaller one.');
+      return;
+    }
+
     setUploading(true);
     setProgress(0);
     setError(null);
 
-    // Create a preview immediately for better UX
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
+    // Create a local scope for URLs to ensure they are cleaned up
+    let primaryObjectUrl: string | null = null;
+    let compressedObjectUrl: string | null = null;
 
     try {
-      // Compression options
+      // Create a preview immediately for better UX
+      primaryObjectUrl = URL.createObjectURL(file);
+      setPreviewUrl(primaryObjectUrl);
+
+      // Give the UI a chance to update before heavy compression starts
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Compression options - optimized for low-memory environments
       const options = {
-        maxSizeMB: 0.8, // Target size under 1MB
-        maxWidthOrHeight: 1200,
+        maxSizeMB: 0.5, // Target 500KB
+        maxWidthOrHeight: 1024,
         useWebWorker: true,
-        initialQuality: 0.7,
+        initialQuality: 0.6,
+        alwaysKeepResolution: false,
       };
 
-      console.log('Original size:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      console.log('Processing image:', (file.size / 1024 / 1024).toFixed(2), 'MB');
       
       let fileToUpload = file;
       try {
         const compressedFile = await imageCompression(file, options);
         fileToUpload = compressedFile;
-        console.log('Compressed size:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
+        console.log('Compressed to:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
+        
+        // Show compressed version and revoke old preview
+        compressedObjectUrl = URL.createObjectURL(compressedFile);
+        setPreviewUrl(compressedObjectUrl);
+        
+        if (primaryObjectUrl) {
+          URL.revokeObjectURL(primaryObjectUrl);
+          primaryObjectUrl = null;
+        }
       } catch (compressionErr) {
-        console.warn('Compression failed, uploading original', compressionErr);
+        console.warn('Compression failed or skipped, uploading original', compressionErr);
       }
 
+      // Upload to server
       const res = await fileService.upload(fileToUpload, folder, (p) => setProgress(p));
       onUpload?.(res.data.url);
       setShowOptions(false);
     } catch (err: any) {
-      console.error('Upload failed', err);
-      setError(err.message || 'Upload failed');
+      console.error('Task failed:', err);
+      setError(err.message || 'Processing failed. Device may be low on memory.');
     } finally {
-      setUploading(false);
-      setProgress(0);
+      // Small delay before clearing upload state for smoother transition
+      setTimeout(() => {
+        setUploading(false);
+        setProgress(0);
+      }, 500);
+      
+      // We keep the last previewUrl (compressedObjectUrl) until component unmounts or next upload
     }
   };
 
@@ -105,7 +143,7 @@ export default function ProfileImage({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className={`relative group ${sizeClasses[size]}`}>
+      <div className={`relative group ${containerSize}`}>
         <div className="w-full h-full rounded-2xl overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center shadow-sm relative">
           {currentImageUrl ? (
             <img 
@@ -149,6 +187,14 @@ export default function ProfileImage({
           accept="image/*"
           onChange={handleFileChange}
         />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileChange}
+        />
       </div>
 
       {error && <span className="text-[10px] text-red-500 font-bold text-center px-2">{error}</span>}
@@ -175,14 +221,7 @@ export default function ProfileImage({
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.capture = 'environment';
-                    input.onchange = (e: any) => handleUpload(e.target.files[0]);
-                    input.click();
-                  }}
+                  onClick={() => cameraInputRef.current?.click()}
                   className="flex flex-col items-center justify-center gap-3 p-6 bg-blue-50 border border-blue-100 rounded-2xl text-blue-600 hover:bg-blue-100 transition-all font-bold group"
                 >
                   <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center group-active:scale-95 transition-transform">
