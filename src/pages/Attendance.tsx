@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { attendanceService, studentService, classService } from '../services/api';
+import { attendanceService, studentService, classService, teacherService } from '../services/api';
 import { CheckCircle, XCircle, Clock, AlertCircle, Calendar, Users, Loader2, Save, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
@@ -27,9 +27,24 @@ export default function Attendance({ user }: { user: any }) {
   const fetchClasses = async () => {
     try {
       const res = await classService.list({ schoolId: user?.schoolId });
-      setClasses(res.data);
-      if (res.data.length > 0) {
-        setSelectedClassId(res.data[0].id);
+      let fetchedClasses = res.data;
+
+      if (user?.role === 'TEACHER') {
+        const profileRes = await teacherService.list({ userId: user.id });
+        if (profileRes.data.length > 0) {
+          const profile = profileRes.data[0];
+          if (profile.assignedClassIds?.length > 0) {
+            fetchedClasses = fetchedClasses.filter((c: any) => 
+              profile.assignedClassIds.includes(c.id) || 
+              profile.assignedClassIds.includes(c.name)
+            );
+          }
+        }
+      }
+
+      setClasses(fetchedClasses);
+      if (fetchedClasses.length > 0) {
+        setSelectedClassId(fetchedClasses[0].id);
       }
     } catch (err) {
       console.error('Failed to fetch classes:', err);

@@ -17,16 +17,20 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    console.log(`Login attempt for: ${email}`);
     const user = await findUserByEmail(email);
     if (!user) {
+      console.warn(`Login failed: User not found for email ${email}`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      console.warn(`Login failed: Password mismatch for email ${email}`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    console.log(`Login successful for: ${email}, role: ${user.role}`);
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, schoolId: user.schoolId },
       JWT_SECRET,

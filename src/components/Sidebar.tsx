@@ -11,7 +11,8 @@ import {
   FileSpreadsheet,
   X,
   CheckSquare,
-  ShieldCheck
+  ShieldCheck,
+  User as UserIcon
 } from 'lucide-react';
 import ProfileImage from './ProfileImage';
 
@@ -25,6 +26,7 @@ interface SidebarProps {
 export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProps) {
   const menuItems = [
     { name: 'Overview', path: '/', icon: LayoutDashboard },
+    { name: 'My Profile', path: '/profile', icon: UserIcon },
     { name: 'Students', path: '/students', icon: Users },
   ];
 

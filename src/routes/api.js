@@ -1,4 +1,5 @@
 import express from 'express';
+import bcrypt from 'bcryptjs';
 import { db } from '../lib/firebase-admin.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { calculateGrade } from '../lib/grading.js';
@@ -181,8 +182,7 @@ const createCRUD = (collectionName, roles, transform) => {
 
         // Create the SCHOOL_ADMIN user
         if (adminEmail && adminPassword) {
-          const bcrypt = await import('bcryptjs');
-          const passwordHash = await bcrypt.default.hash(adminPassword, 10);
+          const passwordHash = await bcrypt.hash(adminPassword, 10);
           await db.collection('users').add({
             name: adminName || schoolData.name,
             email: adminEmail,
@@ -327,9 +327,8 @@ teacherRouter.post('/', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN'])
     }
 
     // Hash password (use provided or auto-generate)
-    const bcrypt = await import('bcryptjs');
     const actualPassword = password || Math.random().toString(36).slice(-8);
-    const passwordHash = await bcrypt.default.hash(actualPassword, 10);
+    const passwordHash = await bcrypt.hash(actualPassword, 10);
 
     // 1. Create User Document
     const userRef = await db.collection('users').add({

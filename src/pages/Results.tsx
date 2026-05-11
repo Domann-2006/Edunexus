@@ -56,10 +56,16 @@ export default function Results({ user }: { user: any }) {
           setTeacherProfile(profile);
           
           if (profile.assignedClassIds?.length > 0) {
-            fetchedClasses = fetchedClasses.filter((c: any) => profile.assignedClassIds.includes(c.id));
+            fetchedClasses = fetchedClasses.filter((c: any) => 
+              profile.assignedClassIds.includes(c.id) || 
+              profile.assignedClassIds.includes(c.name)
+            );
           }
           if (profile.assignedSubjectIds?.length > 0) {
-            fetchedSubjects = fetchedSubjects.filter((s: any) => profile.assignedSubjectIds.includes(s.id));
+            fetchedSubjects = fetchedSubjects.filter((s: any) => 
+              profile.assignedSubjectIds.includes(s.id) || 
+              profile.assignedSubjectIds.includes(s.name)
+            );
           }
         }
       }

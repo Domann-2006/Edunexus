@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { studentService, classService, schoolService } from '../services/api';
+import { useSearchParams } from 'react-router-dom';
+import { studentService, classService, schoolService, teacherService } from '../services/api';
 import { Plus, Search, MoreVertical, Edit2, Trash2, X, Check, Loader2, User as UserIcon, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
@@ -17,6 +18,8 @@ export default function Students({ user }: { user: any }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
   
+  const [searchParams] = useSearchParams();
+  
   const [formData, setFormData] = useState({
     name: '',
     avatarUrl: '',
@@ -31,8 +34,12 @@ export default function Students({ user }: { user: any }) {
   });
 
   useEffect(() => {
+    const classIdFromUrl = searchParams.get('classId');
+    if (classIdFromUrl) {
+      setSelectedClassIdFilter(classIdFromUrl);
+    }
     fetchData();
-  }, [selectedSchoolId]);
+  }, [selectedSchoolId, searchParams]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -47,8 +54,24 @@ export default function Students({ user }: { user: any }) {
       }
 
       const results = await Promise.all(promises);
-      setStudents(results[0].data);
-      setClasses(results[1].data);
+      let fetchedStudents = results[0].data;
+      let fetchedClasses = results[1].data;
+
+      if (user?.role === 'TEACHER') {
+        const profileRes = await teacherService.list({ userId: user.id });
+        if (profileRes.data.length > 0) {
+          const profile = profileRes.data[0];
+          if (profile.assignedClassIds?.length > 0) {
+            fetchedClasses = fetchedClasses.filter((c: any) => 
+              profile.assignedClassIds.includes(c.id) || 
+              profile.assignedClassIds.includes(c.name)
+            );
+          }
+        }
+      }
+
+      setStudents(fetchedStudents);
+      setClasses(fetchedClasses);
       if (results[2]) setSchools(results[2].data);
     } catch (err) {
       console.error('Failed to fetch data:', err);
