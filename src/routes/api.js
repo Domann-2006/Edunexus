@@ -82,7 +82,11 @@ const createCRUD = (collectionName, roles, transform) => {
       
       // Mandatory school filtering
       if (req.user?.role !== 'SUPER_ADMIN') {
-        query = query.where('schoolId', '==', req.user?.schoolId);
+        if (collectionName === 'schools') {
+          query = query.where('__name__', '==', req.user?.schoolId);
+        } else {
+          query = query.where('schoolId', '==', req.user?.schoolId);
+        }
       } else if (req.query.schoolId) {
         query = query.where('schoolId', '==', req.query.schoolId);
       }
@@ -145,6 +149,11 @@ const createCRUD = (collectionName, roles, transform) => {
   crudRouter.post('/', authenticate, authorize(roles), async (req, res) => {
     try {
       console.log(`Creating document in ${collectionName}`, req.body);
+
+      // Only Super Admins can create schools
+      if (collectionName === 'schools' && req.user?.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ message: 'Only Super Admins can create schools' });
+      }
       
       // Teacher validation: Can only create in assigned classes
       if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
@@ -252,7 +261,9 @@ const createCRUD = (collectionName, roles, transform) => {
       if (!doc.exists) return res.status(404).json({ message: 'Not found' });
       const existingData = doc.data();
       
-      if (req.user?.role !== 'SUPER_ADMIN' && existingData?.schoolId !== req.user?.schoolId) {
+      const isOwnSchool = collectionName === 'schools' && req.params.id === req.user?.schoolId;
+      
+      if (req.user?.role !== 'SUPER_ADMIN' && !isOwnSchool && existingData?.schoolId !== req.user?.schoolId) {
         return res.status(403).json({ message: 'Forbidden' });
       }
 
@@ -284,6 +295,12 @@ const createCRUD = (collectionName, roles, transform) => {
       const doc = await docRef.get();
       if (!doc.exists) return res.status(404).json({ message: 'Not found' });
       const existingData = doc.data();
+
+      // Only Super Admins can delete schools
+      if (collectionName === 'schools' && req.user?.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ message: 'Only Super Admins can delete schools' });
+      }
+
       if (req.user?.role !== 'SUPER_ADMIN' && existingData?.schoolId !== req.user?.schoolId) {
         return res.status(403).json({ message: 'Forbidden' });
       }
@@ -308,7 +325,7 @@ const resultTransform = (data) => {
 };
 
 // Mount CRUD routes
-router.use('/schools', createCRUD('schools', ['SUPER_ADMIN']));
+router.use('/schools', createCRUD('schools', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 router.use('/students', createCRUD('students', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']));
 
 // Customized Teachers Creation to handle User account and Login Credentials

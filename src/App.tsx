@@ -11,6 +11,7 @@ import Schools from './pages/Schools';
 import Attendance from './pages/Attendance';
 import ActivityLogs from './pages/ActivityLogs';
 import Profile from './pages/Profile';
+import SchoolSettings from './pages/SchoolSettings';
 import Layout from './components/Layout';
 import InstallPWA from './components/InstallPWA';
 
@@ -165,6 +166,14 @@ export default function App() {
           <ProtectedRoute roles={['SUPER_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
               <Schools />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/settings/school" element={
+          <ProtectedRoute roles={['SCHOOL_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <SchoolSettings user={user} />
             </Layout>
           </ProtectedRoute>
         } />

@@ -12,7 +12,8 @@ import {
   X,
   CheckSquare,
   ShieldCheck,
-  User as UserIcon
+  User as UserIcon,
+  Settings
 } from 'lucide-react';
 import ProfileImage from './ProfileImage';
 
@@ -43,6 +44,10 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
 
   if (user?.role === 'SUPER_ADMIN') {
     menuItems.push({ name: 'Schools', path: '/schools', icon: School });
+  }
+
+  if (user?.role === 'SCHOOL_ADMIN') {
+    menuItems.push({ name: 'School Settings', path: '/settings/school', icon: Settings });
   }
 
   if (user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN') {

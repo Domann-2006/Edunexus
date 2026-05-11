@@ -100,7 +100,9 @@ export default function Dashboard({ user }: { user: any }) {
       <header id="overview-header" className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tighter">Overview</h1>
-          <p className="text-gray-500 font-medium mt-1 uppercase tracking-widest text-[10px]">Academic Year 2025/2026 • First Term</p>
+          <p className="text-gray-500 font-medium mt-1 uppercase tracking-widest text-[10px]">
+            Academic Year {new Date().getMonth() >= 8 ? `${new Date().getFullYear()}/${new Date().getFullYear() + 1}` : `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`} • {new Date().getMonth() < 3 ? 'Second Term' : new Date().getMonth() < 7 ? 'Third Term' : 'First Term'}
+          </p>
         </div>
         <div className="flex flex-col md:flex-row gap-4">
           {user?.role === 'SUPER_ADMIN' && (
@@ -116,7 +118,9 @@ export default function Dashboard({ user }: { user: any }) {
           )}
           <div className="bg-white px-5 py-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
             <Calendar size={18} className="text-blue-600" />
-            <span className="text-sm font-bold text-gray-700 tracking-tight">May 4, 2026</span>
+            <span className="text-sm font-bold text-gray-700 tracking-tight">
+              {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </span>
           </div>
           {user?.role === 'SCHOOL_ADMIN' && (
             <button className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-100">

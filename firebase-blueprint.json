@@ -152,7 +152,7 @@
     },
     "Session": {
        "title": "Session",
-       "description": "Academic year (e.g. 2023/2024).",
+       "description": "Academic year (e.g. 2025/2026).",
        "type": "object",
        "properties": {
          "name": { "type": "string" },

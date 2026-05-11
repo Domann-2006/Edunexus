@@ -196,7 +196,7 @@ export default function Login({ onLogin }: LoginProps) {
         )}
 
         <p className="text-center text-gray-400 text-[10px] font-bold uppercase tracking-[0.3em] mt-16">
-          © 2024 EduNexus Systems. Lagos, Nigeria.
+          © {new Date().getFullYear()} EduNexus Systems. Lagos, Nigeria.
         </p>
       </div>
     </div>
