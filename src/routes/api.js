@@ -72,8 +72,9 @@ const PLAN_LIMITS = {
 };
 
 // Generic CRUD helper
-const createCRUD = (collectionName, roles, transform) => {
+const createCRUD = (collectionName, roles, transform, options = {}) => {
   const crudRouter = express.Router();
+  const { skipPost = false, skipPut = false, skipDelete = false } = options;
 
   // Create
   crudRouter.get('/', authenticate, async (req, res) => {
@@ -146,99 +147,101 @@ const createCRUD = (collectionName, roles, transform) => {
     }
   });
 
-  crudRouter.post('/', authenticate, authorize(roles), async (req, res) => {
-    try {
-      console.log(`Creating document in ${collectionName}`, req.body);
+  if (!skipPost) {
+    crudRouter.post('/', authenticate, authorize(roles), async (req, res) => {
+      try {
+        console.log(`Creating document in ${collectionName}`, req.body);
 
-      // Only Super Admins can create schools
-      if (collectionName === 'schools' && req.user?.role !== 'SUPER_ADMIN') {
-        return res.status(403).json({ message: 'Only Super Admins can create schools' });
-      }
-      
-      // Teacher validation: Can only create in assigned classes
-      if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
-        const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-        if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
-        
-        const teacherData = teacherSnap.docs[0].data();
-        const assignedClassIds = teacherData.assignedClassIds || [];
-        const targetClassId = req.body.classId;
-        
-        if (!assignedClassIds.includes(targetClassId)) {
-          return res.status(403).json({ message: 'You can only manage data for your assigned classes' });
+        // Only Super Admins can create schools
+        if (collectionName === 'schools' && req.user?.role !== 'SUPER_ADMIN') {
+          return res.status(403).json({ message: 'Only Super Admins can create schools' });
         }
-      }
-
-      let data = {
-        ...req.body,
-        schoolId: req.user?.schoolId || null,
-        createdAt: new Date().toISOString()
-      };
-      
-      // Override schoolId if Super Admin specifies one
-      if (req.user?.role === 'SUPER_ADMIN' && req.body.schoolId) {
-        data.schoolId = req.body.schoolId;
-      }
-
-      // Special case: School Creation by Super Admin
-      if (collectionName === 'schools' && req.user?.role === 'SUPER_ADMIN') {
-        const { adminName, adminEmail, adminPassword, ...schoolData } = req.body;
         
-        // Remove admin fields from school document
-        const cleanSchoolData = { ...schoolData, createdAt: new Date().toISOString(), active: true };
-        const schoolRef = await db.collection('schools').add(cleanSchoolData);
-        const schoolId = schoolRef.id;
+        // Teacher validation: Can only create in assigned classes
+        if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
+          const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+          if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
+          
+          const teacherData = teacherSnap.docs[0].data();
+          const assignedClassIds = teacherData.assignedClassIds || [];
+          const targetClassId = req.body.classId;
+          
+          if (!assignedClassIds.includes(targetClassId)) {
+            return res.status(403).json({ message: 'You can only manage data for your assigned classes' });
+          }
+        }
 
-        // Create the SCHOOL_ADMIN user
-        if (adminEmail && adminPassword) {
-          const passwordHash = await bcrypt.hash(adminPassword, 10);
-          await db.collection('users').add({
-            name: adminName || schoolData.name,
-            email: adminEmail,
-            passwordHash,
-            role: 'SCHOOL_ADMIN',
-            schoolId: schoolId,
+        let data = {
+          ...req.body,
+          schoolId: req.user?.schoolId || null,
+          createdAt: new Date().toISOString()
+        };
+        
+        // Override schoolId if Super Admin specifies one
+        if (req.user?.role === 'SUPER_ADMIN' && req.body.schoolId) {
+          data.schoolId = req.body.schoolId;
+        }
+
+        // Special case: School Creation by Super Admin
+        if (collectionName === 'schools' && req.user?.role === 'SUPER_ADMIN') {
+          const { adminName, adminEmail, adminPassword, ...schoolData } = req.body;
+          
+          // Remove admin fields from school document
+          const cleanSchoolData = { ...schoolData, createdAt: new Date().toISOString(), active: true };
+          const schoolRef = await db.collection('schools').add(cleanSchoolData);
+          const schoolId = schoolRef.id;
+
+          // Create the SCHOOL_ADMIN user
+          if (adminEmail && adminPassword) {
+            const passwordHash = await bcrypt.hash(adminPassword, 10);
+            await db.collection('users').add({
+              name: adminName || schoolData.name,
+              email: adminEmail,
+              passwordHash,
+              role: 'SCHOOL_ADMIN',
+              schoolId: schoolId,
+              createdAt: new Date().toISOString()
+            });
+          }
+
+          // Automatically setup Nigerian Curriculum
+          await setupSchoolCurriculum(schoolId);
+
+          return res.status(201).json({ id: schoolId, ...cleanSchoolData });
+        }
+
+        if (transform) data = transform(data);
+
+        // Remove undefined values and administrative helper fields
+        Object.keys(data).forEach(key => {
+          if (data[key] === undefined || ['adminName', 'adminEmail', 'adminPassword'].includes(key)) {
+            delete data[key];
+          }
+        });
+
+        const ref = await db.collection(collectionName).add(data);
+        console.log(`Document created with ID: ${ref.id}`);
+
+        // Log Activity for teachers
+        if (req.user?.role === 'TEACHER') {
+          await db.collection('activity-logs').add({
+            userId: req.user.id,
+            userName: req.user.name,
+            role: req.user.role,
+            action: `CREATE_${collectionName.toUpperCase().slice(0, -1)}`,
+            details: `Teacher recorded new ${collectionName.slice(0, -1)}: ${JSON.stringify(req.body).slice(0, 200)}`,
+            schoolId: req.user.schoolId,
             createdAt: new Date().toISOString()
           });
         }
 
-        // Automatically setup Nigerian Curriculum
-        await setupSchoolCurriculum(schoolId);
-
-        return res.status(201).json({ id: schoolId, ...cleanSchoolData });
+        res.status(201).json({ id: ref.id, ...data });
+      } catch (err) {
+        console.error(`Error creating document in ${collectionName}:`, err);
+        res.status(500).json({ message: err.message || 'Error occurred during creation' });
       }
-
-      if (transform) data = transform(data);
-
-      // Remove undefined values and administrative helper fields
-      Object.keys(data).forEach(key => {
-        if (data[key] === undefined || ['adminName', 'adminEmail', 'adminPassword'].includes(key)) {
-          delete data[key];
-        }
-      });
-
-      const ref = await db.collection(collectionName).add(data);
-      console.log(`Document created with ID: ${ref.id}`);
-
-      // Log Activity for teachers
-      if (req.user?.role === 'TEACHER') {
-        await db.collection('activity-logs').add({
-          userId: req.user.id,
-          userName: req.user.name,
-          role: req.user.role,
-          action: `CREATE_${collectionName.toUpperCase().slice(0, -1)}`,
-          details: `Teacher recorded new ${collectionName.slice(0, -1)}: ${JSON.stringify(req.body).slice(0, 200)}`,
-          schoolId: req.user.schoolId,
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      res.status(201).json({ id: ref.id, ...data });
-    } catch (err) {
-      console.error(`Error creating document in ${collectionName}:`, err);
-      res.status(500).json({ message: err.message || 'Error occurred during creation' });
-    }
-  });
+    });
+  }
 
   crudRouter.get('/:id', authenticate, async (req, res) => {
     try {
@@ -254,90 +257,94 @@ const createCRUD = (collectionName, roles, transform) => {
     }
   });
 
-  crudRouter.put('/:id', authenticate, authorize(roles), async (req, res) => {
-    try {
-      const docRef = db.collection(collectionName).doc(req.params.id);
-      const doc = await docRef.get();
-      if (!doc.exists) return res.status(404).json({ message: 'Not found' });
-      const existingData = doc.data();
-      
-      const isOwnSchool = collectionName === 'schools' && req.params.id === req.user?.schoolId;
-      
-      if (req.user?.role !== 'SUPER_ADMIN' && !isOwnSchool && existingData?.schoolId !== req.user?.schoolId) {
-        return res.status(403).json({ message: 'Forbidden' });
-      }
-
-      // Teacher validation: Can only update if in assigned class
-      if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
-        const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-        if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
+  if (!skipPut) {
+    crudRouter.put('/:id', authenticate, authorize(roles), async (req, res) => {
+      try {
+        const docRef = db.collection(collectionName).doc(req.params.id);
+        const doc = await docRef.get();
+        if (!doc.exists) return res.status(404).json({ message: 'Not found' });
+        const existingData = doc.data();
         
-        const teacherData = teacherSnap.docs[0].data();
-        const assignedClassIds = teacherData.assignedClassIds || [];
+        const isOwnSchool = collectionName === 'schools' && req.params.id === req.user?.schoolId;
         
-        if (!assignedClassIds.includes(existingData.classId)) {
-          return res.status(403).json({ message: 'You can only update data for your assigned classes' });
+        if (req.user?.role !== 'SUPER_ADMIN' && !isOwnSchool && existingData?.schoolId !== req.user?.schoolId) {
+          return res.status(403).json({ message: 'Forbidden' });
         }
+
+        // Teacher validation: Can only update if in assigned class
+        if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
+          const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+          if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
+          
+          const teacherData = teacherSnap.docs[0].data();
+          const assignedClassIds = teacherData.assignedClassIds || [];
+          
+          if (!assignedClassIds.includes(existingData.classId)) {
+            return res.status(403).json({ message: 'You can only update data for your assigned classes' });
+          }
+        }
+
+        let updateData = { ...req.body, updatedAt: new Date().toISOString() };
+        if (transform) updateData = transform(updateData);
+        await docRef.update(updateData);
+
+        // Log Activity for teachers and admins
+        if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
+          await db.collection('activity-logs').add({
+            userId: req.user.id,
+            userName: req.user.name,
+            role: req.user.role,
+            action: `UPDATE_${collectionName.toUpperCase().replace(/S$/, '')}`,
+            details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} updated ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
+            schoolId: req.user.schoolId,
+            createdAt: new Date().toISOString()
+          });
+        }
+
+        res.json({ message: 'Updated successfully' });
+      } catch (err) {
+        res.status(500).json({ message: err.message });
       }
+    });
+  }
 
-      let updateData = { ...req.body, updatedAt: new Date().toISOString() };
-      if (transform) updateData = transform(updateData);
-      await docRef.update(updateData);
+  if (!skipDelete) {
+    crudRouter.delete('/:id', authenticate, authorize(roles), async (req, res) => {
+      try {
+        const docRef = db.collection(collectionName).doc(req.params.id);
+        const doc = await docRef.get();
+        if (!doc.exists) return res.status(404).json({ message: 'Not found' });
+        const existingData = doc.data();
 
-      // Log Activity for teachers and admins
-      if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
-        await db.collection('activity-logs').add({
-          userId: req.user.id,
-          userName: req.user.name,
-          role: req.user.role,
-          action: `UPDATE_${collectionName.toUpperCase().replace(/S$/, '')}`,
-          details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} updated ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
-          schoolId: req.user.schoolId,
-          createdAt: new Date().toISOString()
-        });
+        // Only Super Admins can delete schools
+        if (collectionName === 'schools' && req.user?.role !== 'SUPER_ADMIN') {
+          return res.status(403).json({ message: 'Only Super Admins can delete schools' });
+        }
+
+        if (req.user?.role !== 'SUPER_ADMIN' && existingData?.schoolId !== req.user?.schoolId) {
+          return res.status(403).json({ message: 'Forbidden' });
+        }
+        await docRef.delete();
+
+        // Log Activity for teachers and admins
+        if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
+          await db.collection('activity-logs').add({
+            userId: req.user.id,
+            userName: req.user.name,
+            role: req.user.role,
+            action: `DELETE_${collectionName.toUpperCase().replace(/S$/, '')}`,
+            details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} deleted ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
+            schoolId: req.user.schoolId,
+            createdAt: new Date().toISOString()
+          });
+        }
+
+        res.json({ message: 'Deleted successfully' });
+      } catch (err) {
+        res.status(500).json({ message: err.message });
       }
-
-      res.json({ message: 'Updated successfully' });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  crudRouter.delete('/:id', authenticate, authorize(roles), async (req, res) => {
-    try {
-      const docRef = db.collection(collectionName).doc(req.params.id);
-      const doc = await docRef.get();
-      if (!doc.exists) return res.status(404).json({ message: 'Not found' });
-      const existingData = doc.data();
-
-      // Only Super Admins can delete schools
-      if (collectionName === 'schools' && req.user?.role !== 'SUPER_ADMIN') {
-        return res.status(403).json({ message: 'Only Super Admins can delete schools' });
-      }
-
-      if (req.user?.role !== 'SUPER_ADMIN' && existingData?.schoolId !== req.user?.schoolId) {
-        return res.status(403).json({ message: 'Forbidden' });
-      }
-      await docRef.delete();
-
-      // Log Activity for teachers and admins
-      if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
-        await db.collection('activity-logs').add({
-          userId: req.user.id,
-          userName: req.user.name,
-          role: req.user.role,
-          action: `DELETE_${collectionName.toUpperCase().replace(/S$/, '')}`,
-          details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} deleted ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
-          schoolId: req.user.schoolId,
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      res.json({ message: 'Deleted successfully' });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
+    });
+  }
 
   return crudRouter;
 };
@@ -357,7 +364,7 @@ router.use('/schools', createCRUD('schools', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 router.use('/students', createCRUD('students', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']));
 
 // Customized Teachers Creation to handle User account and Login Credentials
-const teacherRouter = createCRUD('teachers', ['SUPER_ADMIN', 'SCHOOL_ADMIN']);
+const teacherRouter = createCRUD('teachers', ['SUPER_ADMIN', 'SCHOOL_ADMIN'], null, { skipPost: true, skipPut: true, skipDelete: true });
 
 // Override POST for teachers to create user account
 teacherRouter.post('/', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN']), async (req, res) => {
@@ -422,6 +429,72 @@ teacherRouter.post('/', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN'])
     });
   } catch (err) {
     console.error('Teacher creation failed:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Sync Teacher updates with Users collection
+teacherRouter.put('/:id', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN']), async (req, res) => {
+  try {
+    const docRef = db.collection('teachers').doc(req.params.id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).json({ message: 'Teacher profile not found' });
+    const teacherData = doc.data();
+
+    // Verification
+    if (req.user?.role !== 'SUPER_ADMIN' && teacherData.schoolId !== req.user?.schoolId) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    const { password, ...updateData } = req.body;
+    const finalUpdate = { ...updateData, updatedAt: new Date().toISOString() };
+
+    // Update Teacher Profile
+    await docRef.update(finalUpdate);
+
+    // Update User Document
+    if (teacherData.userId) {
+      const userUpdate = {
+        name: finalUpdate.name || teacherData.name,
+        email: finalUpdate.email || teacherData.email,
+        username: finalUpdate.username || teacherData.username
+      };
+      
+      if (password) {
+        userUpdate.passwordHash = await bcrypt.hash(password, 10);
+      }
+
+      await db.collection('users').doc(teacherData.userId).update(userUpdate);
+    }
+
+    res.json({ message: 'Teacher updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Sync Teacher deletions with Users collection
+teacherRouter.delete('/:id', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN']), async (req, res) => {
+  try {
+    const docRef = db.collection('teachers').doc(req.params.id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).json({ message: 'Teacher profile not found' });
+    const teacherData = doc.data();
+
+    if (req.user?.role !== 'SUPER_ADMIN' && teacherData.schoolId !== req.user?.schoolId) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    // Delete Teacher Profile
+    await docRef.delete();
+
+    // Delete User Document
+    if (teacherData.userId) {
+      await db.collection('users').doc(teacherData.userId).delete();
+    }
+
+    res.json({ message: 'Teacher deleted successfully' });
+  } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
