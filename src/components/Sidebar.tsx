@@ -35,10 +35,13 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
     menuItems.push({ name: 'Teachers', path: '/teachers', icon: UserPlus });
   }
 
+  if (user?.role === 'TEACHER' || user?.role === 'SUPER_ADMIN') {
+    menuItems.push({ name: 'Attendance', path: '/attendance', icon: CheckSquare });
+  }
+
   menuItems.push(
     { name: 'Classes', path: '/classes', icon: BookOpen },
     { name: 'Subjects', path: '/subjects', icon: Book },
-    { name: 'Attendance', path: '/attendance', icon: CheckSquare },
     { name: 'Results', path: '/results', icon: FileSpreadsheet },
   );
 
@@ -51,7 +54,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
   }
 
   if (user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN') {
-    menuItems.push({ name: 'Audit Logs', path: '/activity-logs', icon: ShieldCheck });
+    menuItems.push({ name: 'Audit & Monitoring', path: '/activity-logs', icon: ShieldCheck });
   }
 
   return (

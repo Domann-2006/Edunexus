@@ -139,7 +139,7 @@ export default function App() {
         } />
 
         <Route path="/attendance" element={
-          <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']}>
+          <ProtectedRoute roles={['SUPER_ADMIN', 'TEACHER']}>
             <Layout user={user} onLogout={handleLogout}>
               <Attendance user={user} />
             </Layout>

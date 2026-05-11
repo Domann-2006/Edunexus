@@ -283,6 +283,20 @@ const createCRUD = (collectionName, roles, transform) => {
       let updateData = { ...req.body, updatedAt: new Date().toISOString() };
       if (transform) updateData = transform(updateData);
       await docRef.update(updateData);
+
+      // Log Activity for teachers and admins
+      if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
+        await db.collection('activity-logs').add({
+          userId: req.user.id,
+          userName: req.user.name,
+          role: req.user.role,
+          action: `UPDATE_${collectionName.toUpperCase().replace(/S$/, '')}`,
+          details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} updated ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
+          schoolId: req.user.schoolId,
+          createdAt: new Date().toISOString()
+        });
+      }
+
       res.json({ message: 'Updated successfully' });
     } catch (err) {
       res.status(500).json({ message: err.message });
@@ -305,6 +319,20 @@ const createCRUD = (collectionName, roles, transform) => {
         return res.status(403).json({ message: 'Forbidden' });
       }
       await docRef.delete();
+
+      // Log Activity for teachers and admins
+      if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
+        await db.collection('activity-logs').add({
+          userId: req.user.id,
+          userName: req.user.name,
+          role: req.user.role,
+          action: `DELETE_${collectionName.toUpperCase().replace(/S$/, '')}`,
+          details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} deleted ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
+          schoolId: req.user.schoolId,
+          createdAt: new Date().toISOString()
+        });
+      }
+
       res.json({ message: 'Deleted successfully' });
     } catch (err) {
       res.status(500).json({ message: err.message });

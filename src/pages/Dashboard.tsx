@@ -228,13 +228,15 @@ export default function Dashboard({ user }: { user: any }) {
           <div className="relative z-10 flex flex-col h-full">
             <h2 className="text-2xl font-black tracking-tight leading-tight mb-4">Quick Actions</h2>
             <div className="space-y-3 mt-4">
-              <Link to="/attendance" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
-                <div className="w-10 h-10 bg-indigo-500 rounded-2xl flex items-center justify-center">
-                  <CheckSquare size={18} />
-                </div>
-                <span className="text-sm font-bold">Mark Attendance</span>
-                <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
-              </Link>
+              {(user?.role === 'TEACHER' || user?.role === 'SUPER_ADMIN') && (
+                <Link to="/attendance" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                  <div className="w-10 h-10 bg-indigo-500 rounded-2xl flex items-center justify-center">
+                    <CheckSquare size={18} />
+                  </div>
+                  <span className="text-sm font-bold">Mark Attendance</span>
+                  <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+                </Link>
+              )}
               <Link to="/results" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
                 <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center">
                   <FileSpreadsheet size={18} />
