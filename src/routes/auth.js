@@ -14,14 +14,25 @@ const findUserByEmail = async (email) => {
 };
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, loginType } = req.body;
 
   try {
-    console.log(`Login attempt for: ${email}`);
+    console.log(`Login attempt for: ${email}, type: ${loginType}`);
     const user = await findUserByEmail(email);
     if (!user) {
       console.warn(`Login failed: User not found for email ${email}`);
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Role mismatch check
+    if (loginType === 'teacher' && user.role !== 'TEACHER') {
+      console.warn(`Login failed: Role mismatch. User ${email} (role: ${user.role}) tried to login as teacher.`);
+      return res.status(401).json({ message: 'This account is not a teacher account. Please use the Admin login.' });
+    }
+
+    if (loginType === 'admin' && !['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(user.role)) {
+      console.warn(`Login failed: Role mismatch. User ${email} (role: ${user.role}) tried to login as admin.`);
+      return res.status(401).json({ message: 'This account does not have admin privileges. Please use the Teacher login.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
