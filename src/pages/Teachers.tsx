@@ -93,8 +93,11 @@ export default function Teachers({ user }: { user: any }) {
     }
   };
 
+  const [isImageUploading, setIsImageUploading] = useState(false);
+
   const openModal = (teacher?: any) => {
     setGeneratedCreds(null);
+    setIsImageUploading(false);
     if (teacher) {
       setEditingId(teacher.id);
       setFormData({
@@ -317,6 +320,7 @@ export default function Teachers({ user }: { user: any }) {
                         editable 
                         url={formData.avatarUrl} 
                         onUpload={(url) => setFormData({...formData, avatarUrl: url})} 
+                        onUploadingChange={setIsImageUploading}
                         folder="teachers"
                         showCamera={true}
                       />
@@ -462,9 +466,10 @@ export default function Teachers({ user }: { user: any }) {
                       </button>
                       <button
                         type="submit"
-                        className="flex-1 py-4 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+                        disabled={isImageUploading}
+                        className={`flex-1 py-4 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 transition-all ${isImageUploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
                       >
-                        {editingId ? 'Save Changes' : 'Add Teacher'}
+                        {isImageUploading ? 'Uploading Image...' : (editingId ? 'Save Changes' : 'Add Teacher')}
                       </button>
                     </div>
                   </form>

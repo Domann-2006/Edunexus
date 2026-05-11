@@ -15,6 +15,7 @@ export default function Students({ user }: { user: any }) {
   const [selectedClassIdFilter, setSelectedClassIdFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isImageUploading, setIsImageUploading] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -102,6 +103,7 @@ export default function Students({ user }: { user: any }) {
       });
     } else {
       setEditingId(null);
+      setIsImageUploading(false);
       setFormData({ 
         name: '', 
         avatarUrl: '', 
@@ -287,6 +289,7 @@ export default function Students({ user }: { user: any }) {
                       editable 
                       url={formData.avatarUrl} 
                       onUpload={(url) => setFormData({...formData, avatarUrl: url})} 
+                      onUploadingChange={setIsImageUploading}
                       folder="students"
                       showCamera={true}
                     />
@@ -403,9 +406,10 @@ export default function Students({ user }: { user: any }) {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 py-4 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+                      disabled={isImageUploading}
+                      className={`flex-1 py-4 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 transition-all ${isImageUploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
                     >
-                      {editingId ? 'Save Changes' : 'Create Student'}
+                      {isImageUploading ? 'Uploading Image...' : (editingId ? 'Save Changes' : 'Create Student')}
                     </button>
                   </div>
                 </form>

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, Loader2, User as UserIcon, Image as ImageIcon, X } from 'lucide-react';
 import { fileService } from '../services/api';
 import imageCompression from 'browser-image-compression';
@@ -6,6 +7,7 @@ import imageCompression from 'browser-image-compression';
 interface ProfileImageProps {
   url?: string;
   onUpload?: (url: string) => void;
+  onUploadingChange?: (uploading: boolean) => void;
   editable?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   folder?: 'students' | 'teachers' | 'schools' | 'profiles';
@@ -15,12 +17,18 @@ interface ProfileImageProps {
 export default function ProfileImage({ 
   url, 
   onUpload, 
+  onUploadingChange,
   editable = false, 
   size = 'md', 
   folder = 'profiles',
   showCamera = false
 }: ProfileImageProps) {
   const [uploading, setUploading] = useState(false);
+
+  // Sync internal uploading state to parent
+  useEffect(() => {
+    onUploadingChange?.(uploading);
+  }, [uploading, onUploadingChange]);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
@@ -61,9 +69,9 @@ export default function ProfileImage({
     }
 
     // Size limit - check original size
-    // 20MB is a safe upper limit for most mobile browsers before they struggle
-    if (file.size > 20 * 1024 * 1024) {
-      setError('Image is too large for mobile processing. Please select a smaller one.');
+    // 15MB is a more conservative limit for mobile stability
+    if (file.size > 15 * 1024 * 1024) {
+      setError('Image is too large. Please resize it before uploading or choose a smaller one.');
       return;
     }
 
@@ -76,17 +84,19 @@ export default function ProfileImage({
     let compressedObjectUrl: string | null = null;
 
     try {
-      // Create a preview immediately for better UX
-      primaryObjectUrl = URL.createObjectURL(file);
-      setPreviewUrl(primaryObjectUrl);
+      // For very large files, avoid setting a preview immediately as it might crash small devices
+      if (file.size < 5 * 1024 * 1024) {
+        primaryObjectUrl = URL.createObjectURL(file);
+        setPreviewUrl(primaryObjectUrl);
+      }
 
       // Give the UI a chance to update before heavy compression starts
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Compression options - optimized for low-memory environments
       const options = {
-        maxSizeMB: 0.5, // Target 500KB
-        maxWidthOrHeight: 1024,
+        maxSizeMB: 0.4, // Target 400KB
+        maxWidthOrHeight: 800, // Reduced resolution for stability
         useWebWorker: true,
         initialQuality: 0.6,
         alwaysKeepResolution: false,
@@ -110,6 +120,11 @@ export default function ProfileImage({
         }
       } catch (compressionErr) {
         console.warn('Compression failed or skipped, uploading original', compressionErr);
+        // Fallback preview if we didn't set one earlier
+        if (!primaryObjectUrl) {
+          primaryObjectUrl = URL.createObjectURL(file);
+          setPreviewUrl(primaryObjectUrl);
+        }
       }
 
       // Upload to server
@@ -131,6 +146,7 @@ export default function ProfileImage({
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
     const file = e.target.files?.[0];
     if (file) {
       handleUpload(file);
@@ -141,8 +157,33 @@ export default function ProfileImage({
 
   const currentImageUrl = previewUrl || url;
 
+  // Render hidden inputs in a portal at the end of body to avoid form interference
+  const renderHiddenInputs = () => {
+    return createPortal(
+      <div className="hidden" aria-hidden="true">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          onClick={(e) => e.stopPropagation()}
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileChange}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>,
+      document.body
+    );
+  };
+
   return (
     <div className="flex flex-col items-center gap-2">
+      {renderHiddenInputs()}
       <div className={`relative group ${containerSize}`}>
         <div className="w-full h-full rounded-2xl overflow-hidden bg-gray-100 border border-gray-100 flex items-center justify-center shadow-sm relative">
           {currentImageUrl ? (
@@ -173,45 +214,43 @@ export default function ProfileImage({
         {editable && !uploading && (
           <button
             type="button"
-            onClick={() => showCamera ? setShowOptions(true) : fileInputRef.current?.click()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              showCamera ? setShowOptions(true) : fileInputRef.current?.click();
+            }}
             className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"
           >
             <Camera size={20} />
           </button>
         )}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          accept="image/*"
-          onChange={handleFileChange}
-        />
-        <input
-          ref={cameraInputRef}
-          type="file"
-          className="hidden"
-          accept="image/*"
-          capture="environment"
-          onChange={handleFileChange}
-        />
       </div>
 
       {error && <span className="text-[10px] text-red-500 font-bold text-center px-2">{error}</span>}
+
 
       {/* Mobile-friendly Options Modal */}
       {showOptions && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
           <div 
             className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
-            onClick={() => setShowOptions(false)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowOptions(false);
+            }}
           />
           <div className="relative w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">Select Image</h3>
                 <button 
-                  onClick={() => setShowOptions(false)}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowOptions(false);
+                  }}
                   className="p-2 text-gray-400 hover:bg-gray-50 rounded-full"
                 >
                   <X size={20} />
@@ -221,7 +260,11 @@ export default function ProfileImage({
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
-                  onClick={() => cameraInputRef.current?.click()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cameraInputRef.current?.click();
+                  }}
                   className="flex flex-col items-center justify-center gap-3 p-6 bg-blue-50 border border-blue-100 rounded-2xl text-blue-600 hover:bg-blue-100 transition-all font-bold group"
                 >
                   <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center group-active:scale-95 transition-transform">
@@ -232,7 +275,11 @@ export default function ProfileImage({
 
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
                   className="flex flex-col items-center justify-center gap-3 p-6 bg-purple-50 border border-purple-100 rounded-2xl text-purple-600 hover:bg-purple-100 transition-all font-bold group"
                 >
                   <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center group-active:scale-95 transition-transform">
@@ -244,7 +291,11 @@ export default function ProfileImage({
 
               <button
                 type="button"
-                onClick={() => setShowOptions(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowOptions(false);
+                }}
                 className="w-full mt-4 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-50 rounded-2xl transition-colors"
               >
                 Cancel
