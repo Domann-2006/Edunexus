@@ -53,16 +53,39 @@ export default function SchoolSettings({ user }: { user: any }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    
     setSaving(true);
     setError('');
     setSuccess('');
     
     try {
-      await schoolService.update(user.schoolId, formData);
+      // Sanitize payload: strip any undefined or null values
+      const payload: any = {};
+      Object.keys(formData).forEach(key => {
+        const val = (formData as any)[key];
+        if (val !== undefined && val !== null && val !== '') {
+          payload[key] = val;
+        } else if (val === '') {
+          payload[key] = ''; // Keep empty strings if they are intentional resets
+        }
+      });
+
+      // Special handling for the Plan which is immutable for School Admins
+      if (user.role !== 'SUPER_ADMIN') {
+        delete payload.plan;
+      }
+
+      await schoolService.update(user.schoolId, payload);
       setSuccess('School settings updated successfully!');
-      setTimeout(() => setSuccess(''), 3000);
+      
+      // Refresh the local school detail state
+      fetchSchool();
+      
+      setTimeout(() => setSuccess(''), 5000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update settings');
+      console.error('Update failed:', err);
+      setError(err.response?.data?.message || 'Failed to update settings. Please check your connection.');
     } finally {
       setSaving(false);
     }

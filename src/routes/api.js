@@ -290,15 +290,22 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 
         // Log Activity for teachers and admins
         if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
-          await db.collection('activity-logs').add({
+          const logData = {
             userId: req.user.id,
-            userName: req.user.name,
+            userName: req.user.name || 'Unknown',
             role: req.user.role,
             action: `UPDATE_${collectionName.toUpperCase().replace(/S$/, '')}`,
             details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} updated ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
-            schoolId: req.user.schoolId,
+            schoolId: req.user.schoolId || 'SUPER',
             createdAt: new Date().toISOString()
+          };
+          
+          // Final sanitize
+          Object.keys(logData).forEach(key => {
+            if (logData[key] === undefined) delete logData[key];
           });
+
+          await db.collection('activity-logs').add(logData);
         }
 
         res.json({ message: 'Updated successfully' });
@@ -328,15 +335,22 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 
         // Log Activity for teachers and admins
         if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
-          await db.collection('activity-logs').add({
+          const logData = {
             userId: req.user.id,
-            userName: req.user.name,
+            userName: req.user.name || 'Unknown',
             role: req.user.role,
             action: `DELETE_${collectionName.toUpperCase().replace(/S$/, '')}`,
             details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} deleted ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
-            schoolId: req.user.schoolId,
+            schoolId: req.user.schoolId || 'SUPER',
             createdAt: new Date().toISOString()
+          };
+
+          // Final sanitize
+          Object.keys(logData).forEach(key => {
+            if (logData[key] === undefined) delete logData[key];
           });
+
+          await db.collection('activity-logs').add(logData);
         }
 
         res.json({ message: 'Deleted successfully' });
