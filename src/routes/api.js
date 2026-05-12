@@ -132,7 +132,7 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
       }
 
       // Dynamic filters from query params
-      const skipParams = ['schoolId', 'limit', 'offset', 'sort'];
+      const skipParams = ['schoolId', 'id', 'limit', 'offset', 'sort'];
       Object.keys(req.query).forEach(key => {
         if (!skipParams.includes(key) && req.query[key]) {
           query = query.where(key, '==', req.query[key]);
@@ -226,7 +226,7 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         if (req.user?.role === 'TEACHER') {
           await db.collection('activity-logs').add({
             userId: req.user.id,
-            userName: req.user.name,
+            userName: req.user.name || 'Unknown',
             role: req.user.role,
             action: `CREATE_${collectionName.toUpperCase().slice(0, -1)}`,
             details: `Teacher recorded new ${collectionName.slice(0, -1)}: ${JSON.stringify(req.body).slice(0, 200)}`,
@@ -431,7 +431,7 @@ teacherRouter.post('/', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN'])
     // Log Activity
     await db.collection('activity-logs').add({
       userId: req.user.id,
-      userName: req.user.name,
+      userName: req.user.name || 'Unknown',
       role: req.user.role,
       action: 'CREATE_TEACHER',
       details: `Created teacher ${name} (${email}). Credentials generated.`,

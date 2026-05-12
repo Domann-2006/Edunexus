@@ -34,10 +34,12 @@ export default function SchoolSettings({ user }: { user: any }) {
     setLoading(true);
     setError('');
     try {
-      const res = await schoolService.list({ id: user.schoolId });
-      // Find the specific school if list returns an array, or it might just be a direct fetch
-      // Based on schoolService.list implementation: api.get('/v1/schools', { params })
-      const schoolData = Array.isArray(res.data) ? res.data.find((s: any) => s.id === user.schoolId) : res.data;
+      const res = await schoolService.list();
+      // Since backend already filters by user's schoolId for non-Super Admins, 
+      // the result should contain our school.
+      const schoolData = Array.isArray(res.data) 
+        ? res.data.find((s: any) => s.id === user.schoolId) || res.data[0]
+        : res.data;
       
       if (schoolData) {
         setSchool(schoolData);
