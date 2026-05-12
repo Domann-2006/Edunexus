@@ -43,7 +43,13 @@ router.post('/login', async (req, res) => {
 
     console.log(`Login successful for: ${email}, role: ${user.role}`);
     const token = jwt.sign(
-      { id: user.id, name: user.name, email: user.email, role: user.role, schoolId: user.schoolId },
+      { 
+        id: user.id, 
+        name: user.name || user.username || user.email.split('@')[0], 
+        email: user.email, 
+        role: user.role, 
+        schoolId: user.schoolId 
+      },
       JWT_SECRET,
       { expiresIn: '1d' }
     );
@@ -83,6 +89,10 @@ router.post('/login', async (req, res) => {
 router.post('/logout', (req, res) => {
   res.clearCookie('token');
   res.json({ message: 'Logged out successfully' });
+});
+
+router.get('/me', authenticate, (req, res) => {
+  res.json({ user: req.user });
 });
 
 // Setup Initial User (Development tool)

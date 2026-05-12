@@ -14,6 +14,7 @@ import Profile from './pages/Profile';
 import SchoolSettings from './pages/SchoolSettings';
 import Layout from './components/Layout';
 import InstallPWA from './components/InstallPWA';
+import { authService } from './services/api';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -44,17 +45,30 @@ export default function App() {
   };
 
   useEffect(() => {
-    try {
-      const savedUser = safeLocalStorage.getItem('user');
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
+    const initAuth = async () => {
+      try {
+        const token = safeLocalStorage.getItem('token');
+        const savedUser = safeLocalStorage.getItem('user');
+        
+        if (token && savedUser) {
+          // Verify token with server
+          const { data } = await authService.getCurrentUser();
+          setUser(data.user);
+          safeLocalStorage.setItem('user', JSON.stringify(data.user));
+        } else {
+          // Clear if inconsistent
+          safeLocalStorage.removeItem('user');
+          safeLocalStorage.removeItem('token');
+        }
+      } catch (err) {
+        console.error('Session validation failed:', err);
+        handleLogout(); // Clear local storage on error
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Failed to parse saved user:', err);
-      safeLocalStorage.removeItem('user');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    initAuth();
   }, []);
 
   const handleLogin = (userData: any) => {

@@ -17,7 +17,7 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   try {
     const token = localStorage.getItem('token');
-    if (token) {
+    if (token && token !== 'undefined' && token !== 'null') {
       config.headers.Authorization = `Bearer ${token}`;
     }
   } catch (e) {
@@ -26,10 +26,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor to catch "Login Page instead of JSON" issues
+// Response interceptor to catch "Login Page instead of JSON" issues and Auth errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401) {
+      console.warn('Unauthorized access - potential expired or invalid token. Redirecting to login.');
+      // Remove local auth data
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      // Force page reload to trigger App.tsx internal states and redirect to /login
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    }
+    
     if (error.response && typeof error.response.data === 'string' && error.response.data.includes('<!DOCTYPE html>')) {
       console.error('API Error: Received HTML instead of JSON. This usually indicates a routing mismatch or fall-through to SPA catch-all.');
       return Promise.reject(new Error('Server configuration error: Received HTML instead of JSON.'));
@@ -43,6 +54,7 @@ export default api;
 export const authService = {
   login: (credentials: any) => api.post('/auth/login', credentials),
   logout: () => api.post('/auth/logout'),
+  getCurrentUser: () => api.get('/auth/me'),
   setupInitial: (data: any) => api.post('/auth/setup-initial', data),
 };
 
