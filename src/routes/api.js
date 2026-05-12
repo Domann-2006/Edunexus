@@ -286,6 +286,12 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 
         let updateData = { ...req.body, updatedAt: new Date().toISOString() };
         if (transform) updateData = transform(updateData);
+        
+        // Remove undefined values to prevent Firestore crashes
+        Object.keys(updateData).forEach(key => {
+          if (updateData[key] === undefined) delete updateData[key];
+        });
+
         await docRef.update(updateData);
 
         // Log Activity for teachers and admins

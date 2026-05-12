@@ -22,11 +22,17 @@ export default function SchoolSettings({ user }: { user: any }) {
   useEffect(() => {
     if (user?.schoolId) {
       fetchSchool();
+    } else if (user) {
+      // If user is loaded but schoolId is missing, stop loading and show error
+      setLoading(false);
+      setError('Your account is not linked to a school. Please contact support.');
     }
-  }, [user]);
+  }, [user]); // Use user object to detect change from null to loaded
 
   const fetchSchool = async () => {
+    // Only set loading if not already fetching (optional safety)
     setLoading(true);
+    setError('');
     try {
       const res = await schoolService.list({ id: user.schoolId });
       // Find the specific school if list returns an array, or it might just be a direct fetch
@@ -42,10 +48,12 @@ export default function SchoolSettings({ user }: { user: any }) {
           logoUrl: schoolData.logoUrl || '',
           plan: schoolData.plan || 'BASIC',
         });
+      } else {
+        setError('School details not found.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch school details:', err);
-      setError('Could not load school settings.');
+      setError(err.response?.data?.message || 'Could not load school settings. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -93,8 +101,28 @@ export default function SchoolSettings({ user }: { user: any }) {
 
   if (loading) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
+      <div className="min-h-[400px] flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-blue-600" size={32} />
+        <p className="text-sm font-medium text-gray-500 animate-pulse">Loading school profile...</p>
+      </div>
+    );
+  }
+
+  // If there's a fatal error (no school data and not just a validation error)
+  if (!school && error) {
+    return (
+      <div className="max-w-xl mx-auto mt-20 p-10 bg-white rounded-[2.5rem] border border-gray-100 shadow-xl text-center space-y-6">
+        <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">
+          <Info size={32} />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Initialization Failed</h2>
+        <p className="text-gray-500">{error}</p>
+        <button 
+          onClick={() => fetchSchool()}
+          className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-widest text-[10px] rounded-xl transition-all"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
@@ -122,9 +150,13 @@ export default function SchoolSettings({ user }: { user: any }) {
             <h2 className="text-xl font-bold text-gray-900 tracking-tight">{formData.name || 'School Name'}</h2>
             <div className="mt-4 flex flex-col items-center gap-2">
               <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                {formData.plan} Plan
+                {formData.plan || 'No'} Plan
               </div>
-              <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">ID: {user.schoolId.slice(0, 8)}...</span>
+              {user?.schoolId && (
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                  ID: {user.schoolId.slice(0, 8)}...
+                </span>
+              )}
             </div>
           </div>
 
@@ -158,9 +190,9 @@ export default function SchoolSettings({ user }: { user: any }) {
           >
             <form onSubmit={handleSubmit} className="space-y-8">
               {error && (
-                <div className="p-4 bg-red-50 text-red-600 text-sm rounded-2xl border border-red-100 flex items-center gap-3">
-                  <Info size={18} />
-                  {error}
+                <div className="p-4 bg-red-50 text-red-600 text-sm rounded-2xl border border-red-100 flex items-center gap-3 shadow-sm lg:p-6">
+                  <Info size={20} className="shrink-0" />
+                  <span className="font-medium">{error}</span>
                 </div>
               )}
               {success && (
