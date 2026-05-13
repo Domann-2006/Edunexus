@@ -12,7 +12,10 @@ import {
   FileSpreadsheet,
   Zap,
   MoreVertical,
-  CheckSquare
+  CheckSquare,
+  CreditCard,
+  Megaphone,
+  LifeBuoy
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -69,23 +72,28 @@ export default function Dashboard({ user }: { user: any }) {
       .finally(() => setLoading(false));
   }, [selectedSchoolId]);
 
-  const statCards = user?.role === 'TEACHER' 
-    ? [
-        { name: 'My Students', value: stats?.students || 0, icon: Users, color: 'blue', link: '/students' },
-        { name: 'My Classes', value: teacherProfile?.assignedClassIds?.length || 0, icon: BookOpen, color: 'emerald', link: '/classes' },
-        { name: 'My Subjects', value: teacherProfile?.assignedSubjectIds?.length || 0, icon: Book, color: 'amber', link: '/subjects' },
-        { name: 'Attendance Stats', value: 'Live', icon: CheckSquare, color: 'indigo', link: '/attendance' },
-      ]
-    : [
-        { name: 'Students', value: stats?.students || 0, icon: Users, color: 'blue', link: '/students' },
-        { name: 'Teachers', value: stats?.teachers || 0, icon: UserPlus, color: 'indigo', link: '/teachers' },
-        { name: 'Classes', value: stats?.classes || 0, icon: BookOpen, color: 'emerald', link: '/classes' },
-        { name: 'Subjects', value: stats?.subjects || 0, icon: Book, color: 'amber', link: '/subjects' },
-      ];
+  const superAdminCards = [
+    { name: 'Total Schools', value: stats?.schools || 0, icon: School, color: 'blue', link: '/schools' },
+    { name: 'Total Teachers', value: stats?.totalTeachers || 0, icon: UserPlus, color: 'indigo', link: '/super-admin/admins' },
+    { name: 'Total Students', value: stats?.totalStudents || 0, icon: Users, color: 'emerald', link: '/super-admin/reports' },
+    { name: 'Active Subscriptions', value: stats?.activePlans || 0, icon: CreditCard, color: 'rose', link: '/super-admin/subscriptions' },
+  ];
 
-  if (user?.role === 'SUPER_ADMIN') {
-    statCards.push({ name: 'Schools', value: stats?.schools || 0, icon: School, color: 'rose', link: '/schools' });
-  }
+  const statCards = user?.role === 'SUPER_ADMIN' 
+    ? superAdminCards
+    : user?.role === 'TEACHER' 
+      ? [
+          { name: 'My Students', value: stats?.students || 0, icon: Users, color: 'blue', link: '/students' },
+          { name: 'My Classes', value: teacherProfile?.assignedClassIds?.length || 0, icon: BookOpen, color: 'emerald', link: '/classes' },
+          { name: 'My Subjects', value: teacherProfile?.assignedSubjectIds?.length || 0, icon: Book, color: 'amber', link: '/subjects' },
+          { name: 'Attendance Stats', value: 'Live', icon: CheckSquare, color: 'indigo', link: '/attendance' },
+        ]
+      : [
+          { name: 'Students', value: stats?.students || 0, icon: Users, color: 'blue', link: '/students' },
+          { name: 'Teachers', value: stats?.teachers || 0, icon: UserPlus, color: 'indigo', link: '/teachers' },
+          { name: 'Classes', value: stats?.classes || 0, icon: BookOpen, color: 'emerald', link: '/classes' },
+          { name: 'Subjects', value: stats?.subjects || 0, icon: Book, color: 'amber', link: '/subjects' },
+        ];
 
   const chartData = [
     { name: 'Jan', value: 400 },
@@ -99,9 +107,11 @@ export default function Dashboard({ user }: { user: any }) {
     <div className="space-y-12 pb-20">
       <header id="overview-header" className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tighter">Overview</h1>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tighter">
+            {user?.role === 'SUPER_ADMIN' ? 'Platform Dashboard' : 'Overview'}
+          </h1>
           <p className="text-gray-500 font-medium mt-1 uppercase tracking-widest text-[10px]">
-            Academic Year {new Date().getMonth() >= 8 ? `${new Date().getFullYear()}/${new Date().getFullYear() + 1}` : `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`} • {new Date().getMonth() < 3 ? 'Second Term' : new Date().getMonth() < 7 ? 'Third Term' : 'First Term'}
+            {user?.role === 'SUPER_ADMIN' ? 'Global Platform Analytics & Management' : `Academic Year ${new Date().getMonth() >= 8 ? `${new Date().getFullYear()}/${new Date().getFullYear() + 1}` : `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`} • ${new Date().getMonth() < 3 ? 'Second Term' : new Date().getMonth() < 7 ? 'Third Term' : 'First Term'}`}
           </p>
         </div>
         <div className="flex flex-col md:flex-row gap-4">
@@ -228,30 +238,58 @@ export default function Dashboard({ user }: { user: any }) {
           <div className="relative z-10 flex flex-col h-full">
             <h2 className="text-2xl font-black tracking-tight leading-tight mb-4">Quick Actions</h2>
             <div className="space-y-3 mt-4">
-              {(user?.role === 'TEACHER' || user?.role === 'SUPER_ADMIN') && (
-                <Link to="/attendance" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
-                  <div className="w-10 h-10 bg-indigo-500 rounded-2xl flex items-center justify-center">
-                    <CheckSquare size={18} />
-                  </div>
-                  <span className="text-sm font-bold">Mark Attendance</span>
-                  <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
-                </Link>
-              )}
-              <Link to="/results" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
-                <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center">
-                  <FileSpreadsheet size={18} />
-                </div>
-                <span className="text-sm font-bold">Record Results</span>
-                <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
-              </Link>
-              {user?.role !== 'TEACHER' && (
-                <Link to="/students" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
-                  <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center">
-                    <UserPlus size={18} />
-                  </div>
-                  <span className="text-sm font-bold">Admit Student</span>
-                  <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
-                </Link>
+              {user?.role === 'SUPER_ADMIN' ? (
+                <>
+                  <Link to="/schools" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                    <div className="w-10 h-10 bg-indigo-500 rounded-2xl flex items-center justify-center">
+                      <School size={18} />
+                    </div>
+                    <span className="text-sm font-bold">Register New School</span>
+                    <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+                  </Link>
+                  <Link to="/super-admin/announcements" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                    <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center">
+                      <Megaphone size={18} />
+                    </div>
+                    <span className="text-sm font-bold">Global Announcement</span>
+                    <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+                  </Link>
+                  <Link to="/super-admin/support" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                    <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center">
+                      <LifeBuoy size={18} />
+                    </div>
+                    <span className="text-sm font-bold">Support Tickets</span>
+                    <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+                  </Link>
+                </>
+              ) : (
+                <>
+                  {(user?.role === 'TEACHER') && (
+                    <Link to="/attendance" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                      <div className="w-10 h-10 bg-indigo-500 rounded-2xl flex items-center justify-center">
+                        <CheckSquare size={18} />
+                      </div>
+                      <span className="text-sm font-bold">Mark Attendance</span>
+                      <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+                    </Link>
+                  )}
+                  <Link to="/results" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                    <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center">
+                      <FileSpreadsheet size={18} />
+                    </div>
+                    <span className="text-sm font-bold">Record Results</span>
+                    <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+                  </Link>
+                  {user?.role === 'SCHOOL_ADMIN' && (
+                    <Link to="/students" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                      <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center">
+                        <UserPlus size={18} />
+                      </div>
+                      <span className="text-sm font-bold">Admit Student</span>
+                      <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+                    </Link>
+                  )}
+                </>
               )}
             </div>
 

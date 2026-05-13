@@ -135,8 +135,10 @@ export default function ActivityLogs({ user }: { user: any }) {
       <div className="flex items-center gap-1 bg-white p-1.5 rounded-[1.5rem] border border-gray-100 w-fit">
         {[
           { id: 'activity', label: 'System Logs', icon: Shield },
-          { id: 'attendance', label: 'Attendance Monitor', icon: CheckSquare },
-          { id: 'results', label: 'Result Audits', icon: FileSpreadsheet },
+          ...(user?.role !== 'SUPER_ADMIN' ? [
+            { id: 'attendance', label: 'Attendance Monitor', icon: CheckSquare },
+            { id: 'results', label: 'Result Audits', icon: FileSpreadsheet },
+          ] : []),
         ].map((tab) => (
           <button
             key={tab.id}

@@ -385,13 +385,13 @@ const resultTransform = (data) => {
 
 // Mount CRUD routes
 router.use('/schools', createCRUD('schools', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
-router.use('/students', createCRUD('students', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']));
+router.use('/students', createCRUD('students', ['SCHOOL_ADMIN', 'TEACHER']));
 
 // Customized Teachers Creation to handle User account and Login Credentials
-const teacherRouter = createCRUD('teachers', ['SUPER_ADMIN', 'SCHOOL_ADMIN'], null, { skipPost: true, skipPut: true, skipDelete: true });
+const teacherRouter = createCRUD('teachers', ['SCHOOL_ADMIN'], null, { skipPost: true, skipPut: true, skipDelete: true });
 
 // Override POST for teachers to create user account
-teacherRouter.post('/', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN']), async (req, res) => {
+teacherRouter.post('/', authenticate, authorize(['SCHOOL_ADMIN']), async (req, res) => {
   try {
     const { name, email, username, password, assignedClassIds, assignedSubjectIds, ...teacherFields } = req.body;
     const schoolId = req.user?.role === 'SUPER_ADMIN' ? (req.body.schoolId || req.user.schoolId) : req.user.schoolId;
@@ -458,7 +458,7 @@ teacherRouter.post('/', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN'])
 });
 
 // Sync Teacher updates with Users collection
-teacherRouter.put('/:id', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN']), async (req, res) => {
+teacherRouter.put('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (req, res) => {
   try {
     const docRef = db.collection('teachers').doc(req.params.id);
     const doc = await docRef.get();
@@ -466,7 +466,7 @@ teacherRouter.put('/:id', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN'
     const teacherData = doc.data();
 
     // Verification
-    if (req.user?.role !== 'SUPER_ADMIN' && teacherData.schoolId !== req.user?.schoolId) {
+    if (teacherData.schoolId !== req.user?.schoolId) {
       return res.status(403).json({ message: 'Forbidden' });
     }
 
@@ -498,14 +498,14 @@ teacherRouter.put('/:id', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN'
 });
 
 // Sync Teacher deletions with Users collection
-teacherRouter.delete('/:id', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN']), async (req, res) => {
+teacherRouter.delete('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (req, res) => {
   try {
     const docRef = db.collection('teachers').doc(req.params.id);
     const doc = await docRef.get();
     if (!doc.exists) return res.status(404).json({ message: 'Teacher profile not found' });
     const teacherData = doc.data();
 
-    if (req.user?.role !== 'SUPER_ADMIN' && teacherData.schoolId !== req.user?.schoolId) {
+    if (teacherData.schoolId !== req.user?.schoolId) {
       return res.status(403).json({ message: 'Forbidden' });
     }
 
@@ -524,11 +524,11 @@ teacherRouter.delete('/:id', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADM
 });
 
 router.use('/teachers', teacherRouter);
-router.use('/classes', createCRUD('classes', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
-router.use('/subjects', createCRUD('subjects', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
-router.use('/results', createCRUD('results', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'], resultTransform));
-router.use('/sessions', createCRUD('sessions', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
-router.use('/attendance', createCRUD('attendance', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']));
+router.use('/classes', createCRUD('classes', ['SCHOOL_ADMIN']));
+router.use('/subjects', createCRUD('subjects', ['SCHOOL_ADMIN']));
+router.use('/results', createCRUD('results', ['SCHOOL_ADMIN', 'TEACHER'], resultTransform));
+router.use('/sessions', createCRUD('sessions', ['SCHOOL_ADMIN']));
+router.use('/attendance', createCRUD('attendance', ['TEACHER']));
 router.use('/activity-logs', createCRUD('activity-logs', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 
 // Dashboard Stats

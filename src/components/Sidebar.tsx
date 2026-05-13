@@ -13,7 +13,13 @@ import {
   CheckSquare,
   ShieldCheck,
   User as UserIcon,
-  Settings
+  Settings,
+  CreditCard,
+  PieChart,
+  Megaphone,
+  LifeBuoy,
+  Monitor,
+  Activity
 } from 'lucide-react';
 import ProfileImage from './ProfileImage';
 
@@ -25,37 +31,53 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProps) {
-  const menuItems = [
-    { name: 'Overview', path: '/', icon: LayoutDashboard },
-    { name: 'My Profile', path: '/profile', icon: UserIcon },
-    { name: 'Students', path: '/students', icon: Users },
+  const role = user?.role;
+
+  // Platform Management for SUPER_ADMIN
+  const superAdminItems = [
+    { section: 'Platform', items: [
+      { name: 'Overview', path: '/', icon: LayoutDashboard },
+      { name: 'Schools', path: '/schools', icon: School },
+      { name: 'School Admins', path: '/super-admin/admins', icon: user?.role === 'SUPER_ADMIN' ? UserPlus : undefined },
+      { name: 'Subscriptions', path: '/super-admin/subscriptions', icon: CreditCard },
+    ]},
+    { section: 'Insights', items: [
+      { name: 'Reports', path: '/super-admin/reports', icon: PieChart },
+      { name: 'Audit Logs', path: '/activity-logs', icon: ShieldCheck },
+    ]},
+    { section: 'Operations', items: [
+      { name: 'Announcements', path: '/super-admin/announcements', icon: Megaphone },
+      { name: 'Support Tickets', path: '/super-admin/support', icon: LifeBuoy },
+    ]},
+    { section: 'System', items: [
+      { name: 'Platform Settings', path: '/super-admin/settings', icon: Monitor },
+      { name: 'My Profile', path: '/profile', icon: UserIcon },
+    ]}
   ];
 
-  if (user?.role !== 'TEACHER') {
-    menuItems.push({ name: 'Teachers', path: '/teachers', icon: UserPlus });
-  }
+  // School Operations for SCHOOL_ADMIN and TEACHER
+  const schoolItems = [
+    { section: 'Management', items: [
+      { name: 'Overview', path: '/', icon: LayoutDashboard },
+      { name: 'Students', path: '/students', icon: Users },
+      ...(role === 'SCHOOL_ADMIN' ? [{ name: 'Teachers', path: '/teachers', icon: UserPlus }] : []),
+      { name: 'Classes', path: '/classes', icon: BookOpen },
+      { name: 'Subjects', path: '/subjects', icon: Book },
+    ]},
+    { section: 'Academic', items: [
+      { name: 'Attendance', path: '/attendance', icon: CheckSquare },
+      { name: 'Results', path: '/results', icon: FileSpreadsheet },
+    ]},
+    { section: 'Settings', items: [
+      ...(role === 'SCHOOL_ADMIN' ? [
+        { name: 'School Settings', path: '/settings/school', icon: Settings },
+        { name: 'Audit Logs', path: '/activity-logs', icon: ShieldCheck }
+      ] : []),
+      { name: 'My Profile', path: '/profile', icon: UserIcon },
+    ]}
+  ];
 
-  if (user?.role === 'TEACHER' || user?.role === 'SUPER_ADMIN') {
-    menuItems.push({ name: 'Attendance', path: '/attendance', icon: CheckSquare });
-  }
-
-  menuItems.push(
-    { name: 'Classes', path: '/classes', icon: BookOpen },
-    { name: 'Subjects', path: '/subjects', icon: Book },
-    { name: 'Results', path: '/results', icon: FileSpreadsheet },
-  );
-
-  if (user?.role === 'SUPER_ADMIN') {
-    menuItems.push({ name: 'Schools', path: '/schools', icon: School });
-  }
-
-  if (user?.role === 'SCHOOL_ADMIN') {
-    menuItems.push({ name: 'School Settings', path: '/settings/school', icon: Settings });
-  }
-
-  if (user?.role === 'SUPER_ADMIN' || user?.role === 'SCHOOL_ADMIN') {
-    menuItems.push({ name: 'Audit & Monitoring', path: '/activity-logs', icon: ShieldCheck });
-  }
+  const sections = role === 'SUPER_ADMIN' ? superAdminItems : schoolItems;
 
   return (
     <>
@@ -68,7 +90,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
       )}
 
       <div className={`
-        w-64 bg-white border-r border-gray-100 flex flex-col h-[100dvh] fixed left-0 top-0 z-40 transition-transform duration-300
+        w-64 bg-white border-r border-gray-100 flex flex-col h-[100dvh] fixed left-0 top-0 z-40 transition-all duration-300
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
       <div className="p-8 flex items-center justify-between">
@@ -86,58 +108,48 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
         </button>
       </div>
 
-      <nav id="sidebar-nav" className="flex-1 px-4 space-y-1 mt-4">
-        <div className="px-4 mb-4">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Management</span>
-        </div>
-        {menuItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            onClick={onClose}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group ${
-                isActive 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 font-bold' 
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 font-medium'
-              }`
-            }
-          >
-            <item.icon size={18} className="group-hover:scale-110 transition-transform" />
-            <span className="text-sm tracking-tight">{item.name}</span>
-          </NavLink>
+      <nav id="sidebar-nav" className="flex-1 px-4 space-y-6 overflow-y-auto pb-8 scrollbar-hide">
+        {sections.map((section) => (
+          <div key={section.section} className="space-y-1">
+            <div className="px-4 mb-2">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{section.section}</span>
+            </div>
+            {section.items.filter(item => item.icon).map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 group ${
+                    isActive 
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 font-bold' 
+                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900 font-medium'
+                  }`
+                }
+              >
+                <item.icon size={18} className="group-hover:scale-110 transition-transform" />
+                <span className="text-sm tracking-tight">{item.name}</span>
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 
-      <div id="profile-section" className="p-6">
-        <div className="bg-gray-50/80 rounded-3xl p-5 mb-4 border border-gray-100 flex items-center gap-3">
+      <div id="profile-section" className="p-4 border-t border-gray-50">
+        <div className="bg-gray-50/80 rounded-3xl p-4 mb-3 border border-gray-100 flex items-center gap-3">
           <ProfileImage url={user?.avatarUrl} size="sm" />
           <div className="min-w-0">
-            <div className="font-bold text-sm text-gray-900 truncate tracking-tight">{user?.name || 'User'}</div>
-            {user?.schoolName && (
-              <div className="text-[9px] font-bold text-gray-400 truncate tracking-tight">{user.schoolName}</div>
-            )}
-            <div className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-1 opacity-70">
+            <div className="font-bold text-xs text-gray-900 truncate tracking-tight">{user?.name || 'User'}</div>
+            <div className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-0.5 opacity-70">
               {user?.role?.replace('_', ' ') || 'GUEST'}
             </div>
-            {user?.role === 'SCHOOL_ADMIN' && (
-              <button 
-                onClick={() => {
-                  localStorage.removeItem(`edunexus_onboarding_completed_${user?.id}`);
-                  window.location.reload();
-                }}
-                className="text-[9px] font-bold text-gray-400 mt-2 hover:text-blue-600 transition-colors uppercase tracking-widest"
-              >
-                Restart Tour
-              </button>
-            )}
           </div>
         </div>
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-5 py-4 text-red-500 hover:bg-red-50 rounded-2xl transition-all font-bold text-sm"
+          className="w-full flex items-center gap-3 px-5 py-3.5 text-red-500 hover:bg-red-50 rounded-2xl transition-all font-bold text-xs"
         >
-          <LogOut size={18} />
+          <LogOut size={16} />
           <span>Logout</span>
         </button>
       </div>

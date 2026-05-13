@@ -12,6 +12,12 @@ import Attendance from './pages/Attendance';
 import ActivityLogs from './pages/ActivityLogs';
 import Profile from './pages/Profile';
 import SchoolSettings from './pages/SchoolSettings';
+import SchoolAdmins from './pages/SchoolAdmins';
+import Subscriptions from './pages/Subscriptions';
+import PlatformReports from './pages/PlatformReports';
+import Announcements from './pages/Announcements';
+import SupportTickets from './pages/SupportTickets';
+import PlatformSettings from './pages/PlatformSettings';
 import Layout from './components/Layout';
 import InstallPWA from './components/InstallPWA';
 import { authService } from './services/api';
@@ -111,6 +117,8 @@ export default function App() {
     return <>{children}</>;
   };
 
+  const OPERATIONAL_ROLES = ['SCHOOL_ADMIN', 'TEACHER'];
+
   return (
     <Router>
       <InstallPWA />
@@ -126,7 +134,7 @@ export default function App() {
         } />
 
         <Route path="/students" element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={OPERATIONAL_ROLES}>
             <Layout user={user} onLogout={handleLogout}>
               <Students user={user} />
             </Layout>
@@ -134,7 +142,7 @@ export default function App() {
         } />
 
         <Route path="/teachers" element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={['SCHOOL_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
               <Teachers user={user} />
             </Layout>
@@ -142,7 +150,7 @@ export default function App() {
         } />
 
         <Route path="/classes" element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={OPERATIONAL_ROLES}>
             <Layout user={user} onLogout={handleLogout}>
               <Classes user={user} />
             </Layout>
@@ -150,7 +158,7 @@ export default function App() {
         } />
 
         <Route path="/subjects" element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={OPERATIONAL_ROLES}>
             <Layout user={user} onLogout={handleLogout}>
               <Subjects user={user} />
             </Layout>
@@ -158,7 +166,7 @@ export default function App() {
         } />
 
         <Route path="/results" element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={OPERATIONAL_ROLES}>
             <Layout user={user} onLogout={handleLogout}>
               <Results user={user} />
             </Layout>
@@ -166,7 +174,7 @@ export default function App() {
         } />
 
         <Route path="/attendance" element={
-          <ProtectedRoute roles={['SUPER_ADMIN', 'TEACHER']}>
+          <ProtectedRoute roles={['SCHOOL_ADMIN', 'TEACHER']}>
             <Layout user={user} onLogout={handleLogout}>
               <Attendance user={user} />
             </Layout>
@@ -193,6 +201,54 @@ export default function App() {
           <ProtectedRoute roles={['SUPER_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
               <Schools />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/super-admin/admins" element={
+          <ProtectedRoute roles={['SUPER_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <SchoolAdmins />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/super-admin/subscriptions" element={
+          <ProtectedRoute roles={['SUPER_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <Subscriptions />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/super-admin/reports" element={
+          <ProtectedRoute roles={['SUPER_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <PlatformReports />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/super-admin/announcements" element={
+          <ProtectedRoute roles={['SUPER_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <Announcements />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/super-admin/support" element={
+          <ProtectedRoute roles={['SUPER_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <SupportTickets />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/super-admin/settings" element={
+          <ProtectedRoute roles={['SUPER_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <PlatformSettings />
             </Layout>
           </ProtectedRoute>
         } />
