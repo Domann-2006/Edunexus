@@ -51,19 +51,32 @@ export default function App() {
         const savedUser = safeLocalStorage.getItem('user');
         
         if (token && savedUser) {
-          // Verify token with server
-          const { data } = await authService.getCurrentUser();
-          setUser(data.user);
-          safeLocalStorage.setItem('user', JSON.stringify(data.user));
+          // Optimistic update: Show UI immediately if we have cached user
+          try {
+            const parsedUser = JSON.parse(savedUser);
+            setUser(parsedUser);
+            // We set loading to false here so the UI shows up immediately
+            setLoading(false);
+
+            // Verify session in background
+            const { data } = await authService.getCurrentUser();
+            // If data differs or token refreshed, update state
+            setUser(data.user);
+            safeLocalStorage.setItem('user', JSON.stringify(data.user));
+          } catch (err: any) {
+            console.error('Session validation failed in background:', err);
+            if (err.response?.status === 401) {
+              handleLogout();
+            }
+          }
         } else {
-          // Clear if inconsistent
+          // No session found
           safeLocalStorage.removeItem('user');
           safeLocalStorage.removeItem('token');
+          setLoading(false);
         }
       } catch (err) {
-        console.error('Session validation failed:', err);
-        handleLogout(); // Clear local storage on error
-      } finally {
+        console.error('Auth initialization error:', err);
         setLoading(false);
       }
     };

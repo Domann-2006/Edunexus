@@ -139,6 +139,10 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         }
       });
 
+      // Add default limit to prevent server overload
+      const limit = parseInt(req.query.limit) || 100;
+      query = query.limit(limit);
+
       const snapshot = await query.get();
       const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       res.json(docs);
@@ -541,8 +545,10 @@ router.get('/dashboard-stats', authenticate, async (req, res) => {
       if (selectedSchoolId) {
         q = q.where('schoolId', '==', selectedSchoolId);
       }
-      const snap = await q.get();
-      return snap.size;
+      
+      // Use count() aggregation for performance and cost efficiency
+      const snap = await q.count().get();
+      return snap.data().count;
     };
 
     const stats = {
