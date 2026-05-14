@@ -103,6 +103,24 @@ export default function App() {
     safeLocalStorage.removeItem('token');
   };
 
+  const refreshUser = async () => {
+    try {
+      const { data } = await authService.getCurrentUser();
+      setUser(data.user);
+      safeLocalStorage.setItem('user', JSON.stringify(data.user));
+      return data.user;
+    } catch (err) {
+      console.error('Failed to refresh user:', err);
+      throw err;
+    }
+  };
+
+  const updateUser = (newData: any) => {
+    const updatedUser = { ...user, ...newData };
+    setUser(updatedUser);
+    safeLocalStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
   const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?: string[] }) => {
     if (loading) {
       return (
@@ -192,7 +210,7 @@ export default function App() {
         <Route path="/profile" element={
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
-              <Profile user={user} />
+              <Profile user={user} updateUser={updateUser} refreshUser={refreshUser} />
             </Layout>
           </ProtectedRoute>
         } />
@@ -256,7 +274,7 @@ export default function App() {
         <Route path="/settings/school" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <SchoolSettings user={user} />
+              <SchoolSettings user={user} refreshUser={refreshUser} />
             </Layout>
           </ProtectedRoute>
         } />

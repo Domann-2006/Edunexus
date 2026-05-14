@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { schoolService } from '../services/api';
+import { schoolService, authService } from '../services/api';
 import { Save, Loader2, Info, MapPin, Phone, CreditCard, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
-export default function SchoolSettings({ user }: { user: any }) {
+export default function SchoolSettings({ 
+  user,
+  refreshUser
+}: { 
+  user: any;
+  refreshUser: () => Promise<any>;
+}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [school, setSchool] = useState<any>(null);
@@ -17,26 +23,26 @@ export default function SchoolSettings({ user }: { user: any }) {
     phone: '',
     logoUrl: '',
     plan: '',
+    // Admin personal info
+    adminName: user?.name || '',
+    adminPhone: user?.phone || '',
+    adminAddress: user?.address || '',
   });
 
   useEffect(() => {
     if (user?.schoolId) {
       fetchSchool();
     } else if (user) {
-      // If user is loaded but schoolId is missing, stop loading and show error
       setLoading(false);
       setError('Your account is not linked to a school. Please contact support.');
     }
-  }, [user]); // Use user object to detect change from null to loaded
+  }, [user]);
 
   const fetchSchool = async () => {
-    // Only set loading if not already fetching (optional safety)
     setLoading(true);
     setError('');
     try {
       const res = await schoolService.list();
-      // Since backend already filters by user's schoolId for non-Super Admins, 
-      // the result should contain our school.
       const schoolData = Array.isArray(res.data) 
         ? res.data.find((s: any) => s.id === user.schoolId) || res.data[0]
         : res.data;
@@ -49,13 +55,16 @@ export default function SchoolSettings({ user }: { user: any }) {
           phone: schoolData.phone || '',
           logoUrl: schoolData.logoUrl || '',
           plan: schoolData.plan || 'BASIC',
+          adminName: user?.name || '',
+          adminPhone: user?.phone || '',
+          adminAddress: user?.address || '',
         });
       } else {
         setError('School details not found.');
       }
     } catch (err: any) {
       console.error('Failed to fetch school details:', err);
-      setError(err.response?.data?.message || 'Could not load school settings. Please check your connection.');
+      setError(err.response?.data?.message || 'Could not load school settings.');
     } finally {
       setLoading(false);
     }
@@ -70,32 +79,37 @@ export default function SchoolSettings({ user }: { user: any }) {
     setSuccess('');
     
     try {
-      // Sanitize payload: strip any undefined or null values
-      const payload: any = {};
-      Object.keys(formData).forEach(key => {
-        const val = (formData as any)[key];
-        if (val !== undefined && val !== null && val !== '') {
-          payload[key] = val;
-        } else if (val === '') {
-          payload[key] = ''; // Keep empty strings if they are intentional resets
-        }
-      });
+      // 1. Update School Info
+      const schoolPayload = {
+        name: formData.name,
+        address: formData.address,
+        phone: formData.phone,
+        logoUrl: formData.logoUrl,
+      };
 
-      // Special handling for the Plan which is immutable for School Admins
-      if (user.role !== 'SUPER_ADMIN') {
-        delete payload.plan;
-      }
+      await schoolService.update(user.schoolId, schoolPayload);
 
-      await schoolService.update(user.schoolId, payload);
-      setSuccess('School settings updated successfully!');
+      // 2. Update Admin Profile Info (Sync)
+      const adminPayload = {
+        name: formData.adminName,
+        phone: formData.adminPhone,
+        address: formData.adminAddress,
+      };
       
-      // Refresh the local school detail state
+      await authService.updateProfile(adminPayload);
+
+      setSuccess('All settings updated successfully! UI synced.');
+      
+      // 3. Centralized refresh to update Sidebar, Profile, Header etc.
+      await refreshUser();
+      
+      // Refresh local form states just in case
       fetchSchool();
       
       setTimeout(() => setSuccess(''), 5000);
     } catch (err: any) {
       console.error('Update failed:', err);
-      setError(err.response?.data?.message || 'Failed to update settings. Please check your connection.');
+      setError(err.response?.data?.message || 'Failed to update settings.');
     } finally {
       setSaving(false);
     }
@@ -205,46 +219,89 @@ export default function SchoolSettings({ user }: { user: any }) {
               )}
 
               <div className="grid grid-cols-1 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Institution Name</label>
-                  <div className="relative">
-                    <Info className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="w-full pl-12 pr-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
-                      placeholder="School Name"
-                    />
+                <div className="space-y-4">
+                  <h3 className="text-sm font-black text-blue-600 uppercase tracking-widest border-b border-blue-50 pb-2">Institution Identity</h3>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Institution Name</label>
+                    <div className="relative">
+                      <Info className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                      <input
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        className="w-full pl-12 pr-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
+                        placeholder="School Name"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Official Address</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input
-                      type="text"
-                      value={formData.address}
-                      onChange={(e) => setFormData({...formData, address: e.target.value})}
-                      className="w-full pl-12 pr-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
-                      placeholder="Street, City"
-                    />
+                <div className="space-y-4 pt-4">
+                  <h3 className="text-sm font-black text-blue-600 uppercase tracking-widest border-b border-blue-50 pb-2">Admin Information</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Admin Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.adminName}
+                        onChange={(e) => setFormData({...formData, adminName: e.target.value})}
+                        className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
+                        placeholder="Your Name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Admin Phone</label>
+                      <input
+                        type="text"
+                        value={formData.adminPhone}
+                        onChange={(e) => setFormData({...formData, adminPhone: e.target.value})}
+                        className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 font-mono"
+                        placeholder="Admin Phone"
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Admin Address</label>
+                      <input
+                        type="text"
+                        value={formData.adminAddress}
+                        onChange={(e) => setFormData({...formData, adminAddress: e.target.value})}
+                        className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
+                        placeholder="Admin Home Address"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Contact Phone</label>
-                  <div className="relative">
-                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input
-                      type="text"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      className="w-full pl-12 pr-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 font-mono"
-                      placeholder="+234..."
-                    />
+                <div className="space-y-4 pt-4">
+                  <h3 className="text-sm font-black text-blue-600 uppercase tracking-widest border-b border-blue-50 pb-2">Location & Contact</h3>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Official Address</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                      <input
+                        type="text"
+                        value={formData.address}
+                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                        className="w-full pl-12 pr-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
+                        placeholder="Street, City"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Contact Phone</label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                      <input
+                        type="text"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        className="w-full pl-12 pr-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 font-mono"
+                        placeholder="+234..."
+                      />
+                    </div>
                   </div>
                 </div>
 

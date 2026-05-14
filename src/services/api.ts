@@ -55,6 +55,7 @@ export const authService = {
   login: (credentials: any) => api.post('/auth/login', credentials),
   logout: () => api.post('/auth/logout'),
   getCurrentUser: () => api.get('/auth/me'),
+  updateProfile: (data: any) => api.put('/auth/profile', data),
   setupInitial: (data: any) => api.post('/auth/setup-initial', data),
 };
 

@@ -1,16 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, MapPin, BookOpen, Book, Shield, Clock } from 'lucide-react';
-import api, { classService } from '../services/api';
+import api, { classService, authService } from '../services/api';
 import ProfileImage from '../components/ProfileImage';
 
-export default function Profile({ user }: { user: any }) {
+export default function Profile({ 
+  user, 
+  updateUser, 
+  refreshUser 
+}: { 
+  user: any; 
+  updateUser: (data: any) => void;
+  refreshUser: () => Promise<any>;
+}) {
   const [teacherProfile, setTeacherProfile] = useState<any>(null);
   const [assignedClasses, setAssignedClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState('');
+  
+  const [formData, setFormData] = useState({
+    name: user?.name || '',
+    phone: user?.phone || '',
+    address: user?.address || '',
+  });
 
   useEffect(() => {
     fetchProfile();
+    setFormData({
+      name: user?.name || '',
+      phone: user?.phone || '',
+      address: user?.address || '',
+    });
   }, [user]);
+
+  const handleUpdateProfile = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setSaving(true);
+    try {
+      await authService.updateProfile(formData);
+      await refreshUser();
+      setSuccess('Profile updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Update failed:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAvatarUpload = async (url: string) => {
+    try {
+      await authService.updateProfile({ avatarUrl: url });
+      await refreshUser();
+    } catch (err) {
+      console.error('Avatar sync failed:', err);
+    }
+  };
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -59,13 +104,10 @@ export default function Profile({ user }: { user: any }) {
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm text-center">
             <div className="flex justify-center mb-6">
               <ProfileImage 
-                url={user?.avatarUrl} 
+                url={user?.avatarUrl || (user?.role === 'SCHOOL_ADMIN' ? user?.schoolLogo : undefined)} 
                 size="xl" 
                 editable={true} 
-                onUpload={(url) => {
-                  // In a real app we'd update the user document here too
-                  window.location.reload();
-                }}
+                onUpload={handleAvatarUpload}
               />
             </div>
             <h2 className="text-xl font-bold text-gray-900 tracking-tight">{profileData.name}</h2>
@@ -96,30 +138,71 @@ export default function Profile({ user }: { user: any }) {
         {/* Details Section */}
         <div className="md:col-span-2 space-y-6">
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-            <h3 className="text-sm font-black text-gray-400 uppercase tracking-[0.2em] mb-8">Personal Information</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-gray-400 mb-1">
-                  <Mail size={14} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Email Address</span>
-                </div>
-                <div className="font-bold text-gray-900 border-b border-gray-50 pb-2">{profileData.email}</div>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-gray-400 mb-1">
-                  <Phone size={14} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Phone Number</span>
-                </div>
-                <div className="font-bold text-gray-900 border-b border-gray-50 pb-2">{profileData.phone || 'Not Provided'}</div>
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <div className="flex items-center gap-2 text-gray-400 mb-1">
-                  <MapPin size={14} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Home Address</span>
-                </div>
-                <div className="font-bold text-gray-900 border-b border-gray-50 pb-2">{profileData.address || 'Not Provided'}</div>
-              </div>
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-sm font-black text-gray-400 uppercase tracking-[0.2em]">Personal Information</h3>
+              {success && (
+                <span className="text-xs font-bold text-emerald-600 animate-pulse">{success}</span>
+              )}
             </div>
+            <form onSubmit={handleUpdateProfile} className="space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-gray-400 mb-1">
+                    <User size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Full Name</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className="w-full font-bold text-gray-900 border-b border-gray-100 focus:border-blue-500 outline-none pb-2 bg-transparent transition-all"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-gray-400 mb-1">
+                    <Mail size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Email Address (Read Only)</span>
+                  </div>
+                  <div className="font-bold text-gray-400 border-b border-gray-50 pb-2 cursor-not-allowed">{profileData.email}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-gray-400 mb-1">
+                    <Phone size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Phone Number</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Provide phone number"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    className="w-full font-bold text-gray-900 border-b border-gray-100 focus:border-blue-500 outline-none pb-2 bg-transparent transition-all"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <div className="flex items-center gap-2 text-gray-400 mb-1">
+                    <MapPin size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Home Address</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Provide address"
+                    value={formData.address}
+                    onChange={(e) => setFormData({...formData, address: e.target.value})}
+                    className="w-full font-bold text-gray-900 border-b border-gray-100 focus:border-blue-500 outline-none pb-2 bg-transparent transition-all"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-8 py-3 bg-blue-600 text-white font-bold uppercase tracking-widest text-[10px] rounded-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {saving && <Clock className="animate-spin" size={12} />}
+                  Save Profile Changes
+                </button>
+              </div>
+            </form>
           </div>
 
           {user.role === 'TEACHER' && (

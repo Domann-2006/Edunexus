@@ -297,6 +297,7 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         });
 
         await docRef.update(updateData);
+        const updatedDoc = await docRef.get();
 
         // Log Activity for teachers and admins
         if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
@@ -318,7 +319,7 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           await db.collection('activity-logs').add(logData);
         }
 
-        res.json({ message: 'Updated successfully' });
+        res.json({ message: 'Updated successfully', data: { id: updatedDoc.id, ...updatedDoc.data() } });
       } catch (err) {
         res.status(500).json({ message: err.message });
       }

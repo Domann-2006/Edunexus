@@ -95,10 +95,18 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
       `}>
       <div className="p-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-100 transform rotate-3">
-            <BookOpen size={20} />
-          </div>
-          <span className="font-black text-2xl tracking-tighter text-gray-900 italic">EduNexus</span>
+          {user?.schoolLogo ? (
+            <img src={user.schoolLogo} alt="Logo" className="w-10 h-10 rounded-xl object-contain shadow-sm" />
+          ) : (
+            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-100 transform rotate-3">
+              <BookOpen size={20} />
+            </div>
+          )}
+          <span className="font-black text-2xl tracking-tighter text-gray-900 italic transform transition-all group-hover:scale-105 origin-left">
+            {user?.schoolName ? (
+              <span className="truncate max-w-[120px] block">{user.schoolName}</span>
+            ) : 'EduNexus'}
+          </span>
         </div>
         <button 
           onClick={onClose}
@@ -137,7 +145,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
 
       <div id="profile-section" className="p-4 border-t border-gray-50">
         <div className="bg-gray-50/80 rounded-3xl p-4 mb-3 border border-gray-100 flex items-center gap-3">
-          <ProfileImage url={user?.avatarUrl} size="sm" />
+          <ProfileImage url={user?.avatarUrl || (user?.role === 'SCHOOL_ADMIN' ? user?.schoolLogo : undefined)} size="sm" />
           <div className="min-w-0">
             <div className="font-bold text-xs text-gray-900 truncate tracking-tight">{user?.name || 'User'}</div>
             <div className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-0.5 opacity-70">

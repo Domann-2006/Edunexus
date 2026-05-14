@@ -92,8 +92,72 @@ router.post('/logout', (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
-router.get('/me', authenticate, (req, res) => {
-  res.json({ user: req.user });
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const userDoc = await db.collection('users').doc(req.user.id).get();
+    if (!userDoc.exists) return res.status(404).json({ message: 'User not found' });
+    
+    const userData = userDoc.data();
+    let schoolName = null;
+    let schoolLogo = null;
+
+    if (userData.schoolId && userData.schoolId !== 'SUPER') {
+      const schoolDoc = await db.collection('schools').doc(userData.schoolId).get();
+      if (schoolDoc.exists) {
+        const sData = schoolDoc.data();
+        schoolName = sData.name;
+        schoolLogo = sData.logoUrl;
+      }
+    }
+
+    res.json({ 
+      user: {
+        id: userDoc.id,
+        ...userData,
+        schoolName,
+        schoolLogo // Include school logo for potential UI use
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Update current user profile
+router.put('/profile', authenticate, async (req, res) => {
+  try {
+    const { password, ...updateData } = req.body;
+    const finalUpdate = { ...updateData, updatedAt: new Date().toISOString() };
+
+    // Remove immutable/dangerous fields
+    delete finalUpdate.role;
+    delete finalUpdate.schoolId;
+    delete finalUpdate.id;
+    delete finalUpdate.email; // Email usually immutable or requires special flow
+
+    if (password) {
+      finalUpdate.passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    await db.collection('users').doc(req.user.id).update(finalUpdate);
+
+    // If teacher, sync with teachers collection
+    if (req.user.role === 'TEACHER') {
+      const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+      if (!teacherSnap.empty) {
+        await db.collection('teachers').doc(teacherSnap.docs[0].id).update({
+          name: finalUpdate.name || req.user.name,
+          avatarUrl: finalUpdate.avatarUrl || req.user.avatarUrl,
+          phone: finalUpdate.phone || null,
+          address: finalUpdate.address || null
+        });
+      }
+    }
+
+    res.json({ message: 'Profile updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // Setup Initial User (Development tool)

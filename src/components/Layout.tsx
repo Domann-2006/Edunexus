@@ -18,10 +18,16 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
       {/* Mobile Header */}
       <header className="lg:hidden bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white transform rotate-3">
-            <BookOpen size={16} />
-          </div>
-          <span className="font-black text-xl tracking-tighter text-gray-900 italic">EduNexus</span>
+          {user?.schoolLogo ? (
+            <img src={user.schoolLogo} alt="Logo" className="w-8 h-8 rounded-lg object-contain" />
+          ) : (
+            <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white transform rotate-3">
+              <BookOpen size={16} />
+            </div>
+          )}
+          <span className="font-black text-xl tracking-tighter text-gray-900 italic">
+            {user?.schoolName || 'EduNexus'}
+          </span>
         </div>
         <button 
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
