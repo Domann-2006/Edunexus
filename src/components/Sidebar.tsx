@@ -65,13 +65,14 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
       { name: 'Subjects', path: '/subjects', icon: Book },
     ]},
     { section: 'Academic', items: [
-      { name: 'Attendance', path: '/attendance', icon: CheckSquare },
-      { name: 'Results', path: '/results', icon: FileSpreadsheet },
+      { name: role === 'SCHOOL_ADMIN' ? 'Attendance Monitor' : 'Attendance', path: '/attendance', icon: CheckSquare },
+      { name: role === 'SCHOOL_ADMIN' ? 'Result Monitoring' : 'Results', path: '/results', icon: FileSpreadsheet },
     ]},
     { section: 'Settings', items: [
       ...(role === 'SCHOOL_ADMIN' ? [
+        { name: 'Teacher Activity', path: '/activity-logs?filter=teacher', icon: Activity },
         { name: 'School Settings', path: '/settings/school', icon: Settings },
-        { name: 'Audit Logs', path: '/activity-logs', icon: ShieldCheck }
+        { name: 'System Logs', path: '/activity-logs', icon: ShieldCheck }
       ] : []),
       { name: 'My Profile', path: '/profile', icon: UserIcon },
     ]}

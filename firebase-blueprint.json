@@ -78,11 +78,14 @@
       "type": "object",
       "properties": {
         "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "admissionNumber": { "type": "string" },
         "classId": { "type": "string" },
         "schoolId": { "type": "string" },
         "date": { "type": "string", "format": "date" },
         "status": { "type": "string", "enum": ["PRESENT", "ABSENT", "LATE", "EXCUSED"] },
         "recordedBy": { "type": "string" },
+        "teacherName": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["studentId", "classId", "schoolId", "date", "status", "recordedBy"]
@@ -111,6 +114,7 @@
         "level": { "type": "string", "enum": ["CRECHE", "KINDERGARTEN", "NURSERY", "PRIMARY", "JSS", "SSS"] },
         "schoolId": { "type": "string" },
         "teacherId": { "type": "string" },
+        "teacherName": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "level", "schoolId"]
@@ -135,20 +139,31 @@
       "type": "object",
       "properties": {
         "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "admissionNumber": { "type": "string" },
         "classId": { "type": "string" },
         "subjectId": { "type": "string" },
+        "subjectName": { "type": "string" },
         "schoolId": { "type": "string" },
         "ca1": { "type": "number" },
         "ca2": { "type": "number" },
+        "assignment": { "type": "number" },
+        "test": { "type": "number" },
         "exam": { "type": "number" },
         "total": { "type": "number" },
         "grade": { "type": "string" },
+        "status": { "type": "string", "enum": ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"] },
         "term": { "type": "string", "enum": ["1st", "2nd", "3rd"] },
         "session": { "type": "string" },
         "teacherId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "teacherName": { "type": "string" },
+        "teacherRemark": { "type": "string" },
+        "adminRemark": { "type": "string" },
+        "position": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["studentId", "classId", "subjectId", "schoolId", "term", "session"]
+      "required": ["studentId", "classId", "subjectId", "schoolId", "term", "session", "status"]
     },
     "Session": {
        "title": "Session",

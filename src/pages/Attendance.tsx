@@ -76,10 +76,12 @@ export default function Attendance({ user }: { user: any }) {
   };
 
   const handleStatusChange = (studentId: string, status: string) => {
+    if (user.role === 'SCHOOL_ADMIN') return;
     setAttendance(prev => ({ ...prev, [studentId]: status }));
   };
 
   const handleSave = async () => {
+    if (user.role === 'SCHOOL_ADMIN') return;
     setSaving(true);
     try {
       const records = students.map(student => ({
@@ -137,14 +139,21 @@ export default function Attendance({ user }: { user: any }) {
           >
             {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <button 
-            onClick={handleSave}
-            disabled={saving || students.length === 0}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all uppercase tracking-widest text-xs disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-            <span>Save Records</span>
-          </button>
+          {user.role === 'TEACHER' && (
+            <button 
+              onClick={handleSave}
+              disabled={saving || students.length === 0}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all uppercase tracking-widest text-xs disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              <span>Save Records</span>
+            </button>
+          )}
+          {user.role === 'SCHOOL_ADMIN' && (
+            <div className="px-5 py-3 bg-gray-50 text-gray-400 font-bold text-[10px] uppercase tracking-widest rounded-2xl border border-gray-100">
+              Monitoring Mode
+            </div>
+          )}
         </div>
       </header>
 
@@ -177,28 +186,30 @@ export default function Attendance({ user }: { user: any }) {
               className="w-full pl-12 pr-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-sm"
             />
           </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => {
-                const newAtt = { ...attendance };
-                filteredStudents.forEach(s => newAtt[s.id] = 'PRESENT');
-                setAttendance(newAtt);
-              }}
-              className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all"
-            >
-              All Present
-            </button>
-            <button 
-              onClick={() => {
-                const newAtt = { ...attendance };
-                filteredStudents.forEach(s => newAtt[s.id] = 'ABSENT');
-                setAttendance(newAtt);
-              }}
-              className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-rose-100 transition-all"
-            >
-              All Absent
-            </button>
-          </div>
+          {user.role === 'TEACHER' && (
+            <div className="flex gap-2">
+              <button 
+                onClick={() => {
+                  const newAtt = { ...attendance };
+                  filteredStudents.forEach(s => newAtt[s.id] = 'PRESENT');
+                  setAttendance(newAtt);
+                }}
+                className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all"
+              >
+                All Present
+              </button>
+              <button 
+                onClick={() => {
+                  const newAtt = { ...attendance };
+                  filteredStudents.forEach(s => newAtt[s.id] = 'ABSENT');
+                  setAttendance(newAtt);
+                }}
+                className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-rose-100 transition-all"
+              >
+                All Absent
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto text-sm uppercase">

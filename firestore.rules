@@ -74,8 +74,17 @@ service cloud.firestore {
 
     // Results
     match /results/{resultId} {
-      allow read: if isSuperAdmin() || (isSignedIn() && getUserData().schoolId == resource.data.schoolId);
-      allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId) || isTeacher(resource.data.schoolId);
+      allow read: if isSuperAdmin() || (isSignedIn() && (getUserData().schoolId == resource.data.schoolId || getUserData().schoolId == request.resource.data.schoolId));
+      allow create: if isTeacher(request.resource.data.schoolId);
+      allow update: if isSchoolAdmin(resource.data.schoolId) || (isTeacher(resource.data.schoolId) && resource.data.status != 'APPROVED');
+      allow delete: if isSchoolAdmin(resource.data.schoolId);
+    }
+
+    // Attendance
+    match /attendance/{attendanceId} {
+      allow read: if isSuperAdmin() || (isSignedIn() && (getUserData().schoolId == resource.data.schoolId || getUserData().schoolId == request.resource.data.schoolId));
+      allow create, update: if isTeacher(request.resource.data.schoolId);
+      allow delete: if isSchoolAdmin(resource.data.schoolId);
     }
 
     // Sessions

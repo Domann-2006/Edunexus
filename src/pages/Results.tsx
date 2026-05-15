@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api, { resultService, studentService, classService, subjectService, sessionService, teacherService } from '../services/api';
-import { Save, Loader2, Trophy, AlertCircle, FileText, Download, Filter, Eye, X, BookOpen, User } from 'lucide-react';
+import { Save, Loader2, Trophy, AlertCircle, FileText, Download, Filter, Eye, X, BookOpen, User, MapPin, ShieldCheck, CheckSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function Results({ user }: { user: any }) {
@@ -24,7 +24,17 @@ export default function Results({ user }: { user: any }) {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [scores, setScores] = useState<Record<string, { ca1: number; ca2: number; exam: number }>>({});
+  const [scores, setScores] = useState<Record<string, { 
+    ca1: number; 
+    ca2: number; 
+    assignment: number; 
+    test: number; 
+    exam: number;
+    status: string;
+    teacherRemark: string;
+    adminRemark: string;
+    id?: string;
+  }>>({});
 
   useEffect(() => {
     loadInitialData();
@@ -97,10 +107,8 @@ export default function Results({ user }: { user: any }) {
         term: filters.term
       });
       
-      // Filter students who should take this subject
       let classStudents = allStudents.filter((s: any) => s.classId === filters.classId);
       
-      // If SSS, filter by stream compatibility
       if (selectedClass?.level === 'SSS' && selectedSubject?.stream !== 'GENERAL') {
         classStudents = classStudents.filter(s => s.stream === selectedSubject.stream);
       }
@@ -113,9 +121,15 @@ export default function Results({ user }: { user: any }) {
         const studentId = student.userId || student.id;
         const result = resRes.data.find((r: any) => r.studentId === studentId);
         initialScores[studentId] = {
+          id: result?.id,
           ca1: result?.ca1 || 0,
           ca2: result?.ca2 || 0,
-          exam: result?.exam || 0
+          assignment: result?.assignment || 0,
+          test: result?.test || 0,
+          exam: result?.exam || 0,
+          status: result?.status || 'DRAFT',
+          teacherRemark: result?.teacherRemark || '',
+          adminRemark: result?.adminRemark || ''
         };
       });
       setScores(initialScores);
@@ -126,37 +140,47 @@ export default function Results({ user }: { user: any }) {
     }
   };
 
-  const handleScoreChange = (studentId: string, field: string, value: string) => {
-    const numValue = Math.min(Number(value) || 0, field === 'exam' ? 60 : 20);
+  const handleScoreChange = (studentId: string, field: string, value: string | number) => {
+    let finalValue: any = value;
+    if (['ca1', 'ca2', 'assignment', 'test', 'exam'].includes(field)) {
+      const max = field === 'exam' ? 60 : 10;
+      finalValue = Math.min(Number(value) || 0, max);
+    }
+    
     setScores(prev => ({
       ...prev,
       [studentId]: {
         ...prev[studentId],
-        [field]: numValue
+        [field]: finalValue
       }
     }));
   };
 
-  const handleSave = async () => {
+  const handleSaveAll = async (targetStatus?: string) => {
     setSaving(true);
     try {
       const promises = students.map(student => {
         const studentId = student.userId || student.id;
-        const studentScores = scores[studentId];
+        const s = scores[studentId];
         const existingResult = results.find(r => r.studentId === studentId);
         
-        const schoolId = student.schoolId || user?.schoolId || null;
+        // Skip if teacher tries to update approved result
+        if (user.role === 'TEACHER' && existingResult?.status === 'APPROVED') {
+          return Promise.resolve();
+        }
 
-        const data = {
-          ...studentScores,
+        const data: any = {
+          ...s,
           studentId: studentId,
           classId: filters.classId,
           subjectId: filters.subjectId,
+          subjectName: subjects.find(sub => sub.id === filters.subjectId)?.name,
           sessionId: filters.sessionId,
           term: filters.term,
-          schoolId: schoolId,
+          schoolId: user?.schoolId,
+          status: targetStatus || s.status
         };
-        
+
         if (existingResult) {
           return resultService.update(existingResult.id, data);
         } else {
@@ -165,11 +189,21 @@ export default function Results({ user }: { user: any }) {
       });
       
       await Promise.all(promises);
-      alert('Scores saved successfully');
       loadResults();
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Failed to save scores';
-      alert(`Error: ${msg}`);
+      alert(`Error: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleStatusUpdate = async (resultId: string, status: string, adminRemark?: string) => {
+    setSaving(true);
+    try {
+      await resultService.update(resultId, { status, adminRemark });
+      loadResults();
+    } catch (err) {
+      console.error('Status update failed:', err);
     } finally {
       setSaving(false);
     }
@@ -232,6 +266,20 @@ export default function Results({ user }: { user: any }) {
     return s.level === selectedClass.level;
   });
 
+  const getStatusBadge = (status: string) => {
+    const colors: any = {
+      DRAFT: 'bg-gray-100 text-gray-600',
+      SUBMITTED: 'bg-blue-100 text-blue-600',
+      APPROVED: 'bg-emerald-100 text-emerald-600',
+      REJECTED: 'bg-rose-100 text-rose-600'
+    };
+    return (
+      <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-tighter ${colors[status] || colors.DRAFT}`}>
+        {status}
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-8 pb-20">
       <AnimatePresence>
@@ -242,122 +290,159 @@ export default function Results({ user }: { user: any }) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsReportModalOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/40 backdrop-blur-md"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[95vh] overflow-y-auto"
+              className="relative w-full max-w-4xl bg-white rounded-[3rem] shadow-2xl overflow-hidden max-h-[95vh] overflow-y-auto"
             >
-              <div className="print:p-0 p-8">
-                <header className="flex justify-between items-center mb-8 pb-6 border-b border-gray-100 print:hidden">
-                  <h2 className="text-xl font-bold text-gray-900 tracking-tight uppercase italic flex items-center gap-3">
-                    <FileText size={24} className="text-blue-600" />
-                    Student Progress Report
-                  </h2>
-                  <div className="flex gap-2">
+              <div className="p-8 lg:p-12">
+                <header className="flex justify-between items-center mb-10 pb-6 border-b border-gray-100 print:hidden">
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                      <FileText size={28} className="text-blue-600" />
+                      Academic Progress Report
+                    </h2>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Official Student Performance Record</p>
+                  </div>
+                  <div className="flex gap-3">
                     <button 
                       onClick={printReport}
-                      className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all flex items-center gap-2 font-bold text-xs uppercase tracking-widest"
+                      className="px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all flex items-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100"
                     >
                       <Download size={18} />
-                      Export / Print
+                      Print / Download PDF
                     </button>
-                    <button onClick={() => setIsReportModalOpen(false)} className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition-all">
+                    <button onClick={() => setIsReportModalOpen(false)} className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-2xl transition-all">
                       <X size={24} />
                     </button>
                   </div>
                 </header>
 
-                <div id="report-card-content" className="space-y-8 bg-white text-gray-900 font-sans tracking-tight">
-                  <div className="text-center space-y-2 mb-10">
-                    <div className="w-20 h-20 bg-blue-600 rounded-3xl mx-auto flex items-center justify-center text-white mb-4 transform rotate-3 shadow-xl">
-                      <BookOpen size={40} />
+                <div id="report-card-printable" className="bg-white text-gray-900 p-4 lg:p-0">
+                  {/* School Header */}
+                  <div className="flex items-center justify-between gap-8 mb-12 border-b-4 border-gray-900 pb-10">
+                    <div className="flex items-center gap-6">
+                      {user?.schoolLogo ? (
+                        <img src={user.schoolLogo} alt="School Logo" className="w-24 h-24 object-contain rounded-2xl shadow-xl shadow-blue-50" />
+                      ) : (
+                        <div className="w-24 h-24 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-xl shadow-blue-100 transform rotate-3">
+                          <BookOpen size={48} />
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <h1 className="text-4xl font-black tracking-tighter text-gray-900 italic uppercase">
+                          {user?.schoolName || 'EduNexus Academy'}
+                        </h1>
+                        <p className="text-base font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                          <MapPin size={16} />
+                          {user?.schoolAddress || 'School Address Not Configured'}
+                        </p>
+                        <p className="text-xs font-mono font-bold text-blue-600">
+                          TEL: {user?.schoolPhone || '+234 800 000 000'} • EMAIL: education@edunexus.com
+                        </p>
+                      </div>
                     </div>
-                    <h1 className="text-3xl font-black italic tracking-tighter uppercase">EduNexus School Management</h1>
-                    <p className="text-[10px] font-black tracking-[0.4em] text-gray-400 uppercase">Knowledge • Excellence • Leadership</p>
+                    <div className="hidden md:block text-right">
+                        <div className="text-[10px] font-black text-gray-300 uppercase tracking-[0.5em] mb-2 leading-none">Motto</div>
+                        <div className="text-xl font-black italic text-gray-900 leading-none">Excellence in Learning</div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-8 py-8 border-y-4 border-gray-900">
-                    <div className="space-y-4">
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Student Name</span>
-                        <div className="text-xl font-bold text-gray-900 uppercase">{selectedStudent.name}</div>
+                  {/* Student Info Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-12 bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100">
+                    <div className="flex gap-5">
+                      <div className="w-24 h-24 bg-gray-200 rounded-2xl flex items-center justify-center text-gray-400 overflow-hidden ring-4 ring-white shadow-sm shrink-0">
+                         {selectedStudent.avatarUrl ? <img src={selectedStudent.avatarUrl} className="w-full h-full object-cover" /> : <User size={40} />}
                       </div>
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Admission Number</span>
-                        <div className="font-mono font-bold text-blue-600">{selectedStudent.admissionNumber}</div>
+                      <div className="space-y-4">
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest block mb-1">Student Name</span>
+                          <div className="text-lg font-black text-gray-900 uppercase leading-none">{selectedStudent.name}</div>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest block mb-1">Admission No</span>
+                          <div className="font-mono font-black text-blue-600 text-sm">{selectedStudent.admissionNumber}</div>
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-4 text-right">
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Academic Level</span>
-                        <div className="text-xl font-bold text-gray-900 uppercase">
-                          {classes.find(c => c.id === selectedStudent.classId)?.level} - {classes.find(c => c.id === selectedStudent.classId)?.name}
-                        </div>
+
+                    <div className="space-y-4 md:border-l md:pl-10 border-gray-200">
+                       <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest block mb-1">Class Arm</span>
+                          <div className="text-lg font-black text-gray-900 uppercase">
+                            {classes.find(c => c.id === selectedStudent.classId)?.name}
+                          </div>
                       </div>
-                      <div className="flex justify-end gap-6">
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Session</span>
-                          <div className="font-bold text-gray-900">{sessions.find(s => s.id === filters.sessionId)?.name}</div>
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Term</span>
-                          <div className="font-bold text-gray-900 italic">{filters.term} Term</div>
-                        </div>
+                      <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest block mb-1">Gender</span>
+                          <div className="font-bold text-gray-700 uppercase italic text-sm">{selectedStudent.gender || 'N/A'}</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 md:border-l md:pl-10 border-gray-200">
+                      <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest block mb-1">Academic Session</span>
+                          <div className="font-black text-gray-900 text-lg uppercase">{sessions.find(s => s.id === filters.sessionId)?.name}</div>
+                      </div>
+                      <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest block mb-1">Evaluation Term</span>
+                          <div className="font-black text-blue-600 uppercase italic text-sm">{filters.term} Term</div>
                       </div>
                     </div>
                   </div>
 
                   {/* Results Table */}
-                  <div className="mt-8 border-2 border-gray-100 rounded-2xl overflow-hidden">
+                  <div className="mb-12 rounded-[2rem] border-2 border-gray-900 overflow-hidden shadow-xl shadow-gray-100">
                     <table className="w-full text-left">
-                      <thead className="bg-gray-50/80 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                      <thead className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
                         <tr>
-                          <th className="px-6 py-4">Subject</th>
-                          <th className="px-4 py-4 text-center">CA 1 (20)</th>
-                          <th className="px-4 py-4 text-center">CA 2 (20)</th>
-                          <th className="px-4 py-4 text-center">Exam (60)</th>
-                          <th className="px-4 py-4 text-center">Total (100)</th>
-                          <th className="px-6 py-4 text-center">Grade</th>
+                          <th className="px-8 py-5">Subject</th>
+                          <th className="px-4 py-5 text-center">CA 1 (10)</th>
+                          <th className="px-4 py-5 text-center">CA 2 (10)</th>
+                          <th className="px-4 py-5 text-center">ASS (10)</th>
+                          <th className="px-4 py-5 text-center">TST (10)</th>
+                          <th className="px-4 py-5 text-center">EXM (60)</th>
+                          <th className="px-4 py-5 text-center">Total</th>
+                          <th className="px-8 py-5 text-center">Grade</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100 uppercase tracking-tight text-sm">
-                        {studentResults.length > 0 ? studentResults.map(r => {
-                          const subjectData = subjects.find(s => s.id === r.subjectId);
-                          return (
-                            <tr key={r.id}>
-                              <td className="px-6 py-4 font-bold text-gray-900">{subjectData?.name || 'Unknown'}</td>
-                              <td className="px-4 py-4 text-center text-gray-500">{r.ca1}</td>
-                              <td className="px-4 py-4 text-center text-gray-500">{r.ca2}</td>
-                              <td className="px-4 py-4 text-center text-gray-500">{r.exam}</td>
-                              <td className="px-4 py-4 text-center font-black text-gray-900">{r.total}</td>
-                              <td className="px-6 py-4 text-center">
-                                <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${
-                                  r.grade === 'A1' ? 'bg-emerald-50 text-emerald-600' :
-                                  r.grade.startsWith('B') ? 'bg-blue-50 text-blue-600' :
-                                  r.grade.startsWith('C') ? 'bg-amber-50 text-amber-600' :
-                                  'bg-red-50 text-red-600'
+                      <tbody className="divide-y divide-gray-100 uppercase tracking-tight text-sm font-bold">
+                        {studentResults.filter(r => r.status === 'APPROVED' || user.role === 'SCHOOL_ADMIN').length > 0 ? 
+                          studentResults.map(r => (
+                            <tr key={r.id} className="hover:bg-gray-50/50">
+                              <td className="px-8 py-5 font-black text-gray-900 italic border-r border-gray-50">{r.subjectName || subjects.find(s => s.id === r.subjectId)?.name || 'Unknown'}</td>
+                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.ca1}</td>
+                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.ca2}</td>
+                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.assignment || 0}</td>
+                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.test || 0}</td>
+                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.exam}</td>
+                              <td className="px-4 py-5 text-center font-black text-gray-900 text-lg border-r border-gray-50">{r.total}</td>
+                              <td className="px-8 py-5 text-center whitespace-nowrap">
+                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest border-2 ${
+                                  r.total >= 70 ? 'bg-emerald-50 border-emerald-500/10 text-emerald-600' :
+                                  r.total >= 50 ? 'bg-blue-50 border-blue-500/10 text-blue-600' :
+                                  'bg-rose-50 border-rose-500/10 text-rose-600'
                                 }`}>
                                   {r.grade}
                                 </span>
                               </td>
                             </tr>
-                          );
-                        }) : (
+                          )) : (
                           <tr>
-                            <td colSpan={6} className="px-6 py-12 text-center text-gray-400 lowercase italic">No results recorded for this term yet.</td>
+                            <td colSpan={8} className="px-8 py-16 text-center text-gray-400 lowercase italic">No approved results found.</td>
                           </tr>
                         )}
                       </tbody>
-                      <tfoot className="bg-gray-50/50 border-t-2 border-gray-100">
+                      <tfoot className="bg-gray-900 text-white border-t-4 border-white">
                         <tr>
-                          <td colSpan={4} className="px-6 py-4 font-black uppercase text-[10px] tracking-widest text-gray-400">Grand Summary</td>
-                          <td className="px-4 py-4 text-center font-black text-xl text-blue-600">
+                          <td colSpan={6} className="px-8 py-5 font-black uppercase text-[10px] tracking-[0.3em]">Aggregate Analysis</td>
+                          <td className="px-4 py-5 text-center font-black text-2xl italic">
                             {studentResults.reduce((acc, r) => acc + r.total, 0)}
                           </td>
-                          <td className="px-6 py-4 text-center font-black text-xs text-gray-400">
+                          <td className="px-8 py-5 text-center font-black text-sm italic">
                             Avg: {studentResults.length > 0 ? (studentResults.reduce((acc, r) => acc + r.total, 0) / studentResults.length).toFixed(1) : 0}%
                           </td>
                         </tr>
@@ -365,15 +450,43 @@ export default function Results({ user }: { user: any }) {
                     </table>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-12 pt-16">
-                    <div className="border-t-2 border-dashed border-gray-200 pt-4">
-                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-8">Class Teacher's Remark & Signature</div>
-                      <div className="h-0.5 bg-gray-50 w-full mb-1"></div>
-                    </div>
-                    <div className="border-t-2 border-dashed border-gray-200 pt-4 text-right">
-                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-8">Principal's Signature & School Seal</div>
-                      <div className="h-0.5 bg-gray-50 w-full mb-1"></div>
-                    </div>
+                  {/* Remarks Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-16">
+                     <div className="bg-blue-50/30 p-8 rounded-[2rem] border border-blue-100 flex flex-col justify-between">
+                        <div>
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-4 flex items-center gap-2">
+                             <Trophy size={14} /> TEACHER'S ASSESSMENT
+                          </h4>
+                          <p className="text-sm font-bold text-gray-700 italic leading-relaxed">
+                            {studentResults.find(r => r.teacherRemark)?.teacherRemark || "Academic performance is consistent. Keep aiming higher for maximum results."}
+                          </p>
+                        </div>
+                        <div className="mt-8 pt-8 border-t border-blue-100 flex items-center justify-between">
+                           <div className="h-10 w-32 border-b border-gray-300 italic text-gray-400 text-xs flex items-center">Signature Stamp</div>
+                           <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Date: {new Date().toLocaleDateString()}</div>
+                        </div>
+                     </div>
+
+                     <div className="bg-emerald-50/30 p-8 rounded-[2rem] border border-emerald-100 flex flex-col justify-between">
+                        <div>
+                           <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-4 flex items-center gap-2">
+                              <ShieldCheck size={14} /> PRINCIPAL'S COMMENT
+                           </h4>
+                           <p className="text-sm font-bold text-gray-700 italic leading-relaxed">
+                              {studentResults.find(r => r.adminRemark)?.adminRemark || "An impressive result. The school management congratulates the student on this milestones."}
+                           </p>
+                        </div>
+                        <div className="mt-8 pt-8 border-t border-emerald-100 flex items-center justify-between">
+                           <div className="w-24 h-24 bg-white/50 rounded-full border-4 border-dashed border-emerald-200 flex items-center justify-center text-[8px] font-black text-emerald-300 uppercase tracking-tighter text-center">
+                              OFFICIAL SEAL
+                           </div>
+                           <div className="h-10 w-32 border-b border-gray-300"></div>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="text-center">
+                    <p className="text-[8px] font-black uppercase tracking-[0.8em] text-gray-200">Generated by EduNexus SaaS Platform</p>
                   </div>
                 </div>
               </div>
@@ -384,47 +497,67 @@ export default function Results({ user }: { user: any }) {
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Academic Results</h1>
-          <p className="text-gray-500 mt-1">Record scores following the new academic hierarchy.</p>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+             {user.role === 'SCHOOL_ADMIN' ? 'Evaluation Monitor' : 'Result Upload Portal'}
+          </h1>
+          <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-1">
+             {user.role === 'SCHOOL_ADMIN' 
+               ? 'Review and approve academic scores submitted by teachers.' 
+               : 'Upload student scores for assigned subjects and submit for review.'}
+          </p>
         </div>
         <div className="flex gap-3">
           <button 
             onClick={exportCSV}
             disabled={students.length === 0}
-            className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-100 text-gray-700 font-bold uppercase tracking-widest text-[10px] rounded-2xl shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-100 text-gray-900 font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-sm hover:shadow-md transition-all disabled:opacity-50"
           >
             <Download size={18} />
-            <span>Export CSV</span>
+            <span>Aggregate CSV</span>
           </button>
-          <button 
-            onClick={handleSave}
-            disabled={saving || students.length === 0}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold uppercase tracking-widest text-[10px] rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-            <span>Save Results</span>
-          </button>
+          
+          {user.role === 'TEACHER' && (
+            <button 
+              onClick={() => handleSaveAll('SUBMITTED')}
+              disabled={saving || students.length === 0}
+              className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              <span>Submit for Review</span>
+            </button>
+          )}
+
+          {user.role === 'SCHOOL_ADMIN' && (
+            <button 
+              onClick={() => handleSaveAll('APPROVED')}
+              disabled={saving || students.length === 0}
+              className="flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="animate-spin" size={18} /> : <CheckSquare size={18} />}
+              <span>Bulk Approve</span>
+            </button>
+          )}
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-white border border-gray-100 rounded-3xl shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm">
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Session</label>
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-4">Yearly Session</label>
           <select 
             value={filters.sessionId}
             onChange={(e) => setFilters(f => ({ ...f, sessionId: e.target.value }))}
-            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none"
+            className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors"
           >
             <option value="">Select Session</option>
             {sessions.map(s => <option key={s.id} value={s.id}>{s.name} {s.isCurrent ? '(Current)' : ''}</option>)}
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Term</label>
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-4">Current Term</label>
           <select 
             value={filters.term}
             onChange={(e) => setFilters(f => ({ ...f, term: e.target.value }))}
-            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none"
+            className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors"
           >
             <option value="1st">1st Term</option>
             <option value="2nd">2nd Term</option>
@@ -432,23 +565,23 @@ export default function Results({ user }: { user: any }) {
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Class</label>
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-4">Academic Level</label>
           <select 
             value={filters.classId}
             onChange={(e) => setFilters(f => ({ ...f, classId: e.target.value, subjectId: '' }))}
-            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none"
+            className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors"
           >
             <option value="">Select Class</option>
             {classes.map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Subject</label>
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-4">Curriculum Subject</label>
           <select 
             value={filters.subjectId}
             disabled={!filters.classId}
             onChange={(e) => setFilters(f => ({ ...f, subjectId: e.target.value }))}
-            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none disabled:opacity-50"
+            className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors disabled:opacity-50"
           >
             <option value="">Select Subject</option>
             {filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.stream})</option>)}
@@ -457,121 +590,116 @@ export default function Results({ user }: { user: any }) {
       </div>
 
       {!filters.classId || !filters.subjectId || !filters.sessionId ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-gray-50 rounded-[3rem] border border-dashed border-gray-200">
-          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-gray-300 mb-4 shadow-sm">
-            <Filter size={32} />
+        <div className="flex flex-col items-center justify-center py-24 bg-gray-50 rounded-[4rem] border border-dashed border-gray-200">
+          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-gray-300 mb-6 shadow-sm">
+            <Filter size={40} />
           </div>
-          <p className="text-gray-400 font-medium">Select class, session, and subject to begin recording scores.</p>
+          <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Filter for curriculum data to begin</p>
         </div>
       ) : (
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-4 bg-blue-50/50 border-b border-blue-50 flex items-center gap-2 text-blue-700">
-             <Trophy size={16} />
-             <span className="text-[10px] font-black uppercase tracking-widest">Recording for: {subjects.find(s => s.id === filters.subjectId)?.name}</span>
+        <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-6 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+            <div className="flex items-center gap-3 text-white">
+              <Trophy size={18} className="text-blue-400" />
+              <div>
+                 <span className="text-[10px] font-black uppercase tracking-[0.2em] block leading-none">Evaluation Matrix</span>
+                 <span className="text-sm font-black italic tracking-tight">{subjects.find(s => s.id === filters.subjectId)?.name} • {selectedClass?.name}</span>
+              </div>
+            </div>
+            
+            {loading && <Loader2 className="animate-spin text-white/20" size={24} />}
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left">
-              <thead className="bg-gray-50/80 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50">
+              <thead className="bg-gray-50/80 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
                 <tr>
-                  <th className="px-8 py-5">Student</th>
-                  <th className="px-8 py-5">Adm #</th>
-                  <th className="px-8 py-5 text-center">CA 1 (20)</th>
-                  <th className="px-8 py-5 text-center">CA 2 (20)</th>
-                  <th className="px-8 py-5 text-center">Exam (60)</th>
-                  <th className="px-8 py-5 text-center">Total</th>
-                  <th className="px-8 py-5 text-center">Grade</th>
+                  <th className="px-8 py-6">Student Basis</th>
+                  <th className="px-4 py-6 text-center">CA 1 (10)</th>
+                  <th className="px-4 py-6 text-center">CA 2 (10)</th>
+                  <th className="px-4 py-6 text-center">ASS (10)</th>
+                  <th className="px-4 py-6 text-center">TST (10)</th>
+                  <th className="px-4 py-6 text-center">EXM (60)</th>
+                  <th className="px-4 py-6 text-center">TOT</th>
+                  <th className="px-6 py-6 text-center">Grade</th>
+                  <th className="px-8 py-6 text-center">Workflow</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-8 py-20 text-center">
-                      <Loader2 className="animate-spin inline text-blue-600 mb-2" size={32} />
-                      <div className="text-sm font-medium text-gray-400 uppercase tracking-widest">Fetching students...</div>
-                    </td>
-                  </tr>
-                ) : students.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-8 py-20 text-center">
-                      <AlertCircle className="inline text-amber-400 mb-2" size={32} />
-                      <div className="text-sm font-medium text-gray-400 uppercase tracking-widest">No students assigned to this class/stream for this subject.</div>
-                    </td>
-                  </tr>
-                ) : (
-                  students.map((student) => {
-                    const studentId = student.userId || student.id;
-                    const s = scores[studentId] || { ca1: 0, ca2: 0, exam: 0 };
-                    const res = results.find(r => r.studentId === studentId);
-                    const total = s.ca1 + s.ca2 + s.exam;
-                    
-                    return (
-                      <tr key={student.id} className="hover:bg-gray-50/30 transition-colors">
-                        <td className="px-8 py-6">
-                          <div className="flex items-center gap-4">
-                            <div className="flex flex-col">
-                              <div className="font-bold text-gray-900">{student.name}</div>
-                              {student.stream !== 'GENERAL' && (
-                                <div className="text-[9px] text-blue-500 font-black tracking-widest uppercase">{student.stream}</div>
-                              )}
+                {students.map((student) => {
+                  const studentId = student.userId || student.id;
+                  const s = (scores[studentId] || { ca1: 0, ca2: 0, assignment: 0, test: 0, exam: 0, status: 'DRAFT', id: undefined }) as any;
+                  const res = results.find(r => r.studentId === studentId);
+                  const total = s.ca1 + s.ca2 + s.assignment + s.test + s.exam;
+                  const isLocked = user.role === 'TEACHER' && res?.status === 'APPROVED';
+                  
+                  return (
+                    <tr key={student.id} className="hover:bg-gray-50/50 transition-colors group">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="flex flex-col">
+                            <div className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{student.name}</div>
+                            <div className="text-[10px] text-gray-400 font-mono flex items-center gap-1 uppercase tracking-tighter">
+                               {student.admissionNumber} {getStatusBadge(s.status)}
                             </div>
-                            <button 
-                              onClick={() => openReportCard(student)}
-                              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                              title="View Full Report Card"
-                            >
-                              <Eye size={18} />
-                            </button>
                           </div>
-                        </td>
-                        <td className="px-8 py-6 text-xs font-mono text-gray-400">{student.admissionNumber}</td>
-                        <td className="px-8 py-6 text-center">
+                        </div>
+                      </td>
+                      {['ca1', 'ca2', 'assignment', 'test', 'exam'].map(field => (
+                        <td key={field} className="px-3 py-6 text-center">
                           <input 
                             type="number" 
-                            max={20}
-                            value={s.ca1}
-                            onChange={(e) => handleScoreChange(studentId, 'ca1', e.target.value)}
-                            className="w-16 px-3 py-2 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-blue-500/20 text-center font-bold text-gray-900 outline-none"
+                            disabled={isLocked || user.role === 'SCHOOL_ADMIN'}
+                            value={(s as any)[field]}
+                            onChange={(e) => handleScoreChange(studentId, field, e.target.value)}
+                            className={`w-14 px-2 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 text-center font-black text-gray-900 outline-none transition-all ${isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 focus:bg-white'}`}
                           />
                         </td>
-                        <td className="px-8 py-6 text-center">
-                          <input 
-                            type="number" 
-                            max={20}
-                            value={s.ca2}
-                            onChange={(e) => handleScoreChange(studentId, 'ca2', e.target.value)}
-                            className="w-16 px-3 py-2 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-blue-500/20 text-center font-bold text-gray-900 outline-none"
-                          />
-                        </td>
-                        <td className="px-8 py-6 text-center">
-                          <input 
-                            type="number" 
-                            max={60}
-                            value={s.exam}
-                            onChange={(e) => handleScoreChange(studentId, 'exam', e.target.value)}
-                            className="w-16 px-3 py-2 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-blue-500/20 text-center font-bold text-gray-900 outline-none"
-                          />
-                        </td>
-                        <td className="px-8 py-6 text-center font-bold text-gray-900">
-                          {res?.total || total}
-                        </td>
-                        <td className="px-8 py-6 text-center">
-                          {res?.grade ? (
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${
-                              res.grade === 'A1' ? 'bg-emerald-50 text-emerald-600' :
-                              res.grade.startsWith('B') ? 'bg-blue-50 text-blue-600' :
-                              res.grade.startsWith('C') ? 'bg-amber-50 text-amber-600' :
-                              'bg-red-50 text-red-600'
-                            }`}>
-                              {res.grade}
-                            </span>
-                          ) : (
-                            <span className="text-gray-300">-</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                      ))}
+                      <td className="px-4 py-6 text-center">
+                        <span className="text-lg font-black text-blue-600 italic leading-none">{res?.total || total}</span>
+                      </td>
+                      <td className="px-6 py-6 text-center">
+                         <span className={`px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest ${
+                            (res?.total || total) >= 70 ? 'bg-emerald-50 text-emerald-600' :
+                            (res?.total || total) >= 50 ? 'bg-blue-50 text-blue-600' :
+                            'bg-rose-50 text-rose-600'
+                          }`}>
+                            {res?.grade || '-'}
+                          </span>
+                      </td>
+                      <td className="px-8 py-6">
+                         <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                               onClick={() => openReportCard(student)}
+                               className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                               title="Full Report Card"
+                            >
+                               <Eye size={18} />
+                            </button>
+                            {user.role === 'SCHOOL_ADMIN' && s.id && (
+                              <div className="flex gap-1 border-l border-gray-100 pl-1 ml-1">
+                                <button
+                                  onClick={() => handleStatusUpdate(s.id, 'APPROVED')}
+                                  className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                                  title="Approve"
+                                >
+                                  <CheckSquare size={18} />
+                                </button>
+                                <button
+                                  onClick={() => handleStatusUpdate(s.id, 'REJECTED')}
+                                  className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                  title="Reject"
+                                >
+                                  <X size={18} />
+                                </button>
+                              </div>
+                            )}
+                         </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -579,4 +707,4 @@ export default function Results({ user }: { user: any }) {
       )}
     </div>
   );
-}
+};

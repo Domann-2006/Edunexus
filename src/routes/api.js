@@ -378,10 +378,12 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 const resultTransform = (data) => {
   const ca1 = Number(data.ca1) || 0;
   const ca2 = Number(data.ca2) || 0;
+  const assignment = Number(data.assignment) || 0;
+  const test = Number(data.test) || 0;
   const exam = Number(data.exam) || 0;
-  const total = ca1 + ca2 + exam;
+  const total = ca1 + ca2 + assignment + test + exam;
   const { grade, remark } = calculateGrade(total);
-  return { ...data, ca1, ca2, exam, total, grade, remark };
+  return { ...data, ca1, ca2, assignment, test, exam, total, grade, remark };
 };
 
 // Mount CRUD routes
@@ -527,9 +529,106 @@ teacherRouter.delete('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (r
 router.use('/teachers', teacherRouter);
 router.use('/classes', createCRUD('classes', ['SCHOOL_ADMIN']));
 router.use('/subjects', createCRUD('subjects', ['SCHOOL_ADMIN']));
-router.use('/results', createCRUD('results', ['SCHOOL_ADMIN', 'TEACHER'], resultTransform));
+
+// Customized Results route for Status workflow
+const resultsRouter = createCRUD('results', ['SCHOOL_ADMIN', 'TEACHER'], resultTransform, { skipPost: true, skipPut: true });
+
+// POST Results - Only Teachers can create
+resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) => {
+  try {
+    const data = {
+      ...req.body,
+      schoolId: req.user.schoolId,
+      status: req.body.status || 'DRAFT',
+      teacherId: req.user.id,
+      teacherName: req.user.name,
+      createdAt: new Date().toISOString()
+    };
+
+    // Teacher assignment check
+    const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+    if (!teacherSnap.empty) {
+      const tData = teacherSnap.docs[0].data();
+      if (!tData.assignedClassIds?.includes(data.classId)) {
+        return res.status(403).json({ message: 'Not assigned to this class' });
+      }
+    }
+
+    const transformed = resultTransform(data);
+    const ref = await db.collection('results').add(transformed);
+    
+    await db.collection('activity-logs').add({
+      userId: req.user.id,
+      userName: req.user.name,
+      role: req.user.role,
+      action: 'CREATE_RESULT',
+      details: `Teacher uploaded result for student ${data.studentId} in ${data.subjectName}`,
+      schoolId: req.user.schoolId,
+      createdAt: new Date().toISOString()
+    });
+
+    res.status(201).json({ id: ref.id, ...transformed });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT Results - Teachers edit DRAFT/REJECTED, Admins APPROVE
+resultsRouter.put('/:id', authenticate, authorize(['SCHOOL_ADMIN', 'TEACHER']), async (req, res) => {
+  try {
+    const docRef = db.collection('results').doc(req.params.id);
+    const doc = await docRef.get();
+    if (!doc.exists) return res.status(404).json({ message: 'Result not found' });
+    const existing = doc.data();
+
+    if (existing.schoolId !== req.user.schoolId) return res.status(403).json({ message: 'Forbidden' });
+
+    let updateData = { ...req.body, updatedAt: new Date().toISOString() };
+
+    if (req.user.role === 'TEACHER') {
+      // Cannot edit Approved results
+      if (existing.status === 'APPROVED') {
+        return res.status(403).json({ message: 'Cannot edit approved results' });
+      }
+      // Cannot set to Approved
+      if (updateData.status === 'APPROVED') {
+        delete updateData.status; 
+      }
+      updateData = resultTransform({ ...existing, ...updateData });
+    } else if (req.user.role === 'SCHOOL_ADMIN') {
+      // Admins should only touch status and adminRemark
+      const adminOnly = {
+        status: updateData.status,
+        adminRemark: updateData.adminRemark,
+        updatedAt: updateData.updatedAt
+      };
+      updateData = adminOnly;
+    }
+
+    await docRef.update(updateData);
+    
+    await db.collection('activity-logs').add({
+      userId: req.user.id,
+      userName: req.user.name,
+      role: req.user.role,
+      action: 'UPDATE_RESULT',
+      details: `${req.user.role} updated result ID: ${req.params.id} (Status: ${updateData.status || existing.status})`,
+      schoolId: req.user.schoolId,
+      createdAt: new Date().toISOString()
+    });
+
+    res.json({ message: 'Updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.use('/results', resultsRouter);
+
 router.use('/sessions', createCRUD('sessions', ['SCHOOL_ADMIN']));
-router.use('/attendance', createCRUD('attendance', ['TEACHER']));
+
+// Attendance - Teachers POST, Admins/Teachers GET
+router.use('/attendance', createCRUD('attendance', ['SCHOOL_ADMIN', 'TEACHER']));
 router.use('/activity-logs', createCRUD('activity-logs', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 
 // Dashboard Stats
