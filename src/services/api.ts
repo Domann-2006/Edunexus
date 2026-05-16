@@ -90,6 +90,7 @@ export const classService = {
 export const subjectService = {
   list: (params?: any) => api.get('/v1/subjects', { params }),
   create: (data: any) => api.post('/v1/subjects', data),
+  bulkCreate: (data: any) => api.post('/v1/subjects/bulk', data),
   update: (id: string, data: any) => api.put(`/v1/subjects/${id}`, data),
   delete: (id: string) => api.delete(`/v1/subjects/${id}`),
 };

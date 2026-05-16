@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { subjectService, schoolService } from '../services/api';
-import { Plus, Edit2, Trash2, X, Loader2, Book, GraduationCap, Layers, Sparkles, Filter, ChevronRight } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Loader2, Book, GraduationCap, Layers, Sparkles, Filter, ChevronRight, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { EDUCATION_LEVELS, LEVEL_CLASSES, SSS_STREAMS, DEFAULT_SUBJECTS } from '../constants';
 
@@ -14,6 +14,7 @@ export default function Subjects({ user }: { user: any }) {
   
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [bulkSummary, setBulkSummary] = useState<{ added: number; skipped: number; total: number } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
@@ -74,36 +75,32 @@ export default function Subjects({ user }: { user: any }) {
     const streamKey = level === 'SSS' ? stream : 'DEFAULT';
     const defaults = DEFAULT_SUBJECTS[level]?.[streamKey] || [];
     
-    if (defaults.length === 0) return;
+    if (defaults.length === 0) {
+      alert('No standard subjects defined for this level/stream yet.');
+      return;
+    }
     
-    if (!confirm(`Add ${defaults.length} standard subjects for ${className}${level === 'SSS' ? ` (${stream})` : ''}?`)) return;
-
+    setLoading(true);
     try {
-      setLoading(true);
-      // Fetch latest list to be sure
-      const currentRes = await subjectService.list({ 
+      const response = await subjectService.bulkCreate({
+        subjects: defaults,
         schoolId: selectedSchoolId || user?.schoolId,
         level,
         class: className,
         stream: level === 'SSS' ? stream : 'GENERAL'
       });
-      const existingNames = new Set(currentRes.data.map((s: any) => s.name.toLowerCase()));
-
-      for (const name of defaults) {
-        if (!existingNames.has(name.toLowerCase())) {
-          await subjectService.create({
-            name,
-            schoolId: selectedSchoolId || user?.schoolId,
-            level,
-            class: className,
-            stream: level === 'SSS' ? stream : 'GENERAL'
-          });
-        }
-      }
+      
+      setBulkSummary({
+        added: response.data.addedCount,
+        skipped: response.data.skippedCount,
+        total: defaults.length
+      });
       fetchData();
     } catch (err: any) {
-      alert('Some subjects failed to add. They might already exist.');
-      fetchData();
+      console.error('Bulk add failed:', err);
+      alert(`Error adding subjects: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -332,6 +329,49 @@ export default function Subjects({ user }: { user: any }) {
       </div>
 
       <AnimatePresence>
+        {bulkSummary && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setBulkSummary(null)} 
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.9, y: 20 }} 
+              className="relative w-full max-w-sm bg-white rounded-[3rem] shadow-2xl overflow-hidden p-10 text-center"
+            >
+              <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${bulkSummary.added > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                {bulkSummary.added > 0 ? <CheckCircle2 size={40} /> : <AlertTriangle size={40} />}
+              </div>
+              
+              <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2">Subject Auto-Sync</h3>
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8">Process complete for {selectedClass}</p>
+
+              <div className="grid grid-cols-2 gap-4 mb-10">
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <div className="text-2xl font-black text-emerald-600">{bulkSummary.added}</div>
+                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Added</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <div className="text-2xl font-black text-amber-500">{bulkSummary.skipped}</div>
+                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Skipped</div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setBulkSummary(null)}
+                className="w-full py-4 bg-gray-900 text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl shadow-xl hover:bg-black transition-all"
+              >
+                Continue Management
+              </button>
+            </motion.div>
+          </div>
+        )}
+
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" />

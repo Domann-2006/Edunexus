@@ -36,41 +36,47 @@ export const DEFAULT_SUBJECTS: Record<string, Record<string, string[]>> = {
   },
   PRIMARY: {
     DEFAULT: [
-      'English Language', 
+      'English Studies', 
       'Mathematics', 
-      'Basic Science', 
+      'Basic Science & Technology', 
       'Social Studies', 
       'Civic Education', 
-      'Computer Studies', 
+      'Computer Studies (ICT)', 
       'Agricultural Science', 
       'Physical & Health Education', 
       'Cultural & Creative Arts',
       'Home Economics',
-      'Religious Education (CRS/IRS)',
-      'History'
+      'Christian Religious Studies',
+      'Islamic Religious Studies',
+      'History',
+      'Verbal Reasoning',
+      'Quantitative Reasoning',
+      'Yoruba/Igbo/Hausa'
     ]
   },
   JSS: {
     DEFAULT: [
-      'English Language', 
+      'English Studies', 
       'Mathematics', 
       'Basic Science', 
+      'Basic Technology',
       'Social Studies', 
       'Civic Education', 
       'Business Studies', 
       'Agricultural Science', 
-      'Basic Technology', 
       'Home Economics', 
       'French', 
       'Computer Studies',
       'Cultural & Creative Arts',
       'Physical & Health Education',
-      'Religious Education (CRS/IRS)',
-      'History'
+      'Christian Religious Studies',
+      'Islamic Religious Studies',
+      'History',
+      'Yoruba/Igbo/Hausa'
     ]
   },
   SSS: {
-    GENERAL: ['English Language', 'Mathematics', 'Civic Education', 'Data Processing', 'Economics'],
+    GENERAL: ['English Language', 'Mathematics', 'Civic Education', 'Data Processing', 'Economics', 'Biology'],
     SCIENCE: [
       'Physics', 
       'Chemistry', 
@@ -78,25 +84,27 @@ export const DEFAULT_SUBJECTS: Record<string, Record<string, string[]>> = {
       'Further Mathematics', 
       'Agricultural Science', 
       'Technical Drawing',
-      'Geography'
+      'Geography',
+      'Computer Science'
     ],
     COMMERCIAL: [
       'Financial Accounting', 
       'Commerce', 
       'Marketing', 
-      'Insurance', 
       'Office Practice',
+      'Insurance',
       'Salesmanship'
     ],
     ARTS: [
       'Literature in English', 
       'Government', 
       'History', 
-      'Christian Religious Studies (CRS)', 
-      'Islamic Religious Studies (IRS)', 
+      'Christian Religious Studies', 
+      'Islamic Religious Studies', 
       'Visual Arts',
       'Music',
-      'French'
+      'French',
+      'Yoruba/Igbo/Hausa'
     ]
   }
 };

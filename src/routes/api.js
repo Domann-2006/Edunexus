@@ -528,6 +528,81 @@ teacherRouter.delete('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (r
 
 router.use('/teachers', teacherRouter);
 router.use('/classes', createCRUD('classes', ['SCHOOL_ADMIN']));
+
+// Specialized Bulk Subject Creation
+router.post('/subjects/bulk', authenticate, authorize(['SCHOOL_ADMIN']), async (req, res) => {
+  try {
+    const { subjects, schoolId, level, class: className, stream } = req.body;
+    if (!subjects || !Array.isArray(subjects)) {
+      return res.status(400).json({ message: 'Subjects array is required' });
+    }
+
+    const targetSchoolId = req.user.role === 'SUPER_ADMIN' ? (schoolId || req.user.schoolId) : req.user.schoolId;
+
+    // 1. Fetch current subjects to prevent duplicates
+    const currentSnap = await db.collection('subjects')
+      .where('schoolId', '==', targetSchoolId)
+      .where('level', '==', level)
+      .where('class', '==', className)
+      .where('stream', '==', stream || 'GENERAL')
+      .get();
+    
+    const existingNames = new Set(currentSnap.docs.map(doc => doc.data().name.toLowerCase().trim()));
+    
+    // 2. Filter new subjects
+    const newSubjects = subjects.filter(name => !existingNames.has(name.toLowerCase().trim()));
+    
+    if (newSubjects.length === 0) {
+      return res.json({ 
+        message: 'No new subjects to add', 
+        addedCount: 0, 
+        skippedCount: subjects.length 
+      });
+    }
+
+    // 3. Batch Create
+    const batch = db.batch();
+    const createdDocs = [];
+
+    newSubjects.forEach(name => {
+      const ref = db.collection('subjects').doc();
+      const subjectData = {
+        name: name.trim(),
+        schoolId: targetSchoolId,
+        level,
+        class: className,
+        stream: stream || 'GENERAL',
+        createdAt: new Date().toISOString()
+      };
+      batch.set(ref, subjectData);
+      createdDocs.push({ id: ref.id, ...subjectData });
+    });
+
+    await batch.commit();
+
+    // Log activity
+    await db.collection('activity-logs').add({
+      userId: req.user.id,
+      userName: req.user.name,
+      role: req.user.role,
+      action: 'BULK_CREATE_SUBJECTS',
+      details: `Added ${newSubjects.length} subjects to ${className} (${level})`,
+      schoolId: targetSchoolId,
+      createdAt: new Date().toISOString()
+    });
+
+    res.status(201).json({
+      message: `${newSubjects.length} subjects added successfully`,
+      addedCount: newSubjects.length,
+      skippedCount: subjects.length - newSubjects.length,
+      data: createdDocs
+    });
+  } catch (err) {
+    console.error('Bulk subject creation failed:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 router.use('/subjects', createCRUD('subjects', ['SCHOOL_ADMIN']));
 
 // Customized Results route for Status workflow
