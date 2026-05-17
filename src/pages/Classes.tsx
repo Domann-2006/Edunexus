@@ -13,6 +13,8 @@ export default function Classes({ user }: { user: any }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
+  const isAdmin = user?.role === 'SCHOOL_ADMIN' || user?.role === 'SUPER_ADMIN';
+
   const [formData, setFormData] = useState({
     name: '',
     level: '',
@@ -139,29 +141,33 @@ export default function Classes({ user }: { user: any }) {
               {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
-          <button 
-            onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
-          >
-            <Plus size={18} />
-            <span>New Class</span>
-          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => openModal()}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+            >
+              <Plus size={18} />
+              <span>New Class</span>
+            </button>
+          )}
         </div>
       </header>
 
       {/* Quick Setup Bar */}
-      <div className="bg-white p-4 rounded-[1.5rem] border border-gray-100 shadow-sm flex flex-wrap items-center gap-3">
-        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Quick Setup:</span>
-        {EDUCATION_LEVELS.map(l => (
-          <button
-            key={l.id}
-            onClick={() => handleBulkAddClasses(l.id)}
-            className="px-4 py-2 bg-gray-50 text-[10px] font-bold text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all border border-transparent hover:border-blue-100"
-          >
-            + {l.name}
-          </button>
-        ))}
-      </div>
+      {isAdmin && (
+        <div className="bg-white p-4 rounded-[1.5rem] border border-gray-100 shadow-sm flex flex-wrap items-center gap-3">
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Quick Setup:</span>
+          {EDUCATION_LEVELS.map(l => (
+            <button
+              key={l.id}
+              onClick={() => handleBulkAddClasses(l.id)}
+              className="px-4 py-2 bg-gray-50 text-[10px] font-bold text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all border border-transparent hover:border-blue-100"
+            >
+              + {l.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
@@ -189,22 +195,24 @@ export default function Classes({ user }: { user: any }) {
                   </div>
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">{cls.level || 'UNSET'}</span>
                 </div>
-                <div className="flex gap-1">
-                  <button 
-                    onClick={() => openModal(cls)}
-                    className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
-                    title="Edit Class"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(cls.id)}
-                    className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
-                    title="Delete Class"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={() => openModal(cls)}
+                      className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
+                      title="Edit Class"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(cls.id)}
+                      className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
+                      title="Delete Class"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-1">{cls.name}</h3>
               <p className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-4">

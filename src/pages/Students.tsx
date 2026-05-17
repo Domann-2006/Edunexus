@@ -18,6 +18,8 @@ export default function Students({ user }: { user: any }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
   
+  const isAdmin = user?.role === 'SCHOOL_ADMIN' || user?.role === 'SUPER_ADMIN';
+
   const [searchParams] = useSearchParams();
   
   const [formData, setFormData] = useState({
@@ -171,13 +173,15 @@ export default function Students({ user }: { user: any }) {
               {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
-          <button 
-            onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
-          >
-            <Plus size={20} />
-            <span>Add Student</span>
-          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => openModal()}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+            >
+              <Plus size={20} />
+              <span>Add Student</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -255,22 +259,26 @@ export default function Students({ user }: { user: any }) {
                       </td>
                       <td className="px-6 py-4 text-gray-500">{student.guardianName}</td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2 text-xs">
-                          <button 
-                            onClick={() => openModal(student)}
-                            className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
-                            title="Edit Student"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(student.id)}
-                            className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
-                            title="Delete Student"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        {isAdmin ? (
+                          <div className="flex justify-end gap-2 text-xs">
+                            <button 
+                              onClick={() => openModal(student)}
+                              className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
+                              title="Edit Student"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(student.id)}
+                              className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
+                              title="Delete Student"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Read Only</span>
+                        )}
                       </td>
                     </tr>
                   );

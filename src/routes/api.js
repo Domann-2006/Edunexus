@@ -100,7 +100,7 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           // The admin now inputs names like "Primary 1", which are stored in assignedClassIds
           const assignedClassNames = teacherData.assignedClassIds || [];
           
-          if (collectionName === 'students' || collectionName === 'classes' || collectionName === 'results' || collectionName === 'attendance') {
+          if (collectionName === 'students' || collectionName === 'classes' || collectionName === 'results' || collectionName === 'attendance' || collectionName === 'subjects') {
             if (assignedClassNames.length > 0) {
               // 1. Resolve names to IDs for data that uses IDs
               const classesSnap = await db.collection('classes')
@@ -117,6 +117,10 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
                   // Fallback: search by name if they are names
                   query = query.where('name', 'in', assignedClassNames.slice(0, 10));
                 }
+              } else if (collectionName === 'subjects') {
+                // Subjects use 'class' name string instead of classId in some places, 
+                // but let's check for 'class' matches
+                query = query.where('class', 'in', assignedClassNames.slice(0, 10));
               } else {
                 if (resolvedClassIds.length > 0) {
                   query = query.where('classId', 'in', resolvedClassIds.slice(0, 10));
@@ -530,7 +534,7 @@ router.use('/teachers', teacherRouter);
 router.use('/classes', createCRUD('classes', ['SCHOOL_ADMIN']));
 
 // Specialized Bulk Subject Creation
-router.post('/subjects/bulk', authenticate, authorize(['SCHOOL_ADMIN']), async (req, res) => {
+router.post('/subjects/bulk', authenticate, authorize(['SCHOOL_ADMIN', 'SUPER_ADMIN']), async (req, res) => {
   try {
     const { subjects, schoolId, level, class: className, stream } = req.body;
     if (!subjects || !Array.isArray(subjects)) {
@@ -603,7 +607,7 @@ router.post('/subjects/bulk', authenticate, authorize(['SCHOOL_ADMIN']), async (
   }
 });
 
-router.use('/subjects', createCRUD('subjects', ['SCHOOL_ADMIN']));
+router.use('/subjects', createCRUD('subjects', ['SCHOOL_ADMIN', 'SUPER_ADMIN']));
 
 // Customized Results route for Status workflow
 const resultsRouter = createCRUD('results', ['SCHOOL_ADMIN', 'TEACHER'], resultTransform, { skipPost: true, skipPut: true });

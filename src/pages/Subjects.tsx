@@ -15,7 +15,17 @@ export default function Subjects({ user }: { user: any }) {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [bulkSummary, setBulkSummary] = useState<{ added: number; skipped: number; total: number } | null>(null);
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const isAdmin = user?.role === 'SCHOOL_ADMIN' || user?.role === 'SUPER_ADMIN';
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -65,9 +75,10 @@ export default function Subjects({ user }: { user: any }) {
       }
       setIsModalOpen(false);
       fetchData();
+      setToast({ message: `Subject ${editingId ? 'updated' : 'created'} successfully`, type: 'success' });
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Operation failed';
-      alert(`Error: ${msg}`);
+      setToast({ message: `Error: ${msg}`, type: 'error' });
     }
   };
 
@@ -76,7 +87,7 @@ export default function Subjects({ user }: { user: any }) {
     const defaults = DEFAULT_SUBJECTS[level]?.[streamKey] || [];
     
     if (defaults.length === 0) {
-      alert('No standard subjects defined for this level/stream yet.');
+      setToast({ message: 'No standard subjects defined for this level yet.', type: 'info' });
       return;
     }
     
@@ -98,7 +109,7 @@ export default function Subjects({ user }: { user: any }) {
       fetchData();
     } catch (err: any) {
       console.error('Bulk add failed:', err);
-      alert(`Error adding subjects: ${err.response?.data?.message || err.message}`);
+      setToast({ message: `Error adding subjects: ${err.response?.data?.message || err.message}`, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -109,9 +120,10 @@ export default function Subjects({ user }: { user: any }) {
     try {
       await subjectService.delete(id);
       fetchData();
+      setToast({ message: 'Subject deleted successfully', type: 'success' });
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Delete failed';
-      alert(`Error: ${msg}`);
+      setToast({ message: `Delete failed: ${msg}`, type: 'error' });
     }
   };
 
@@ -156,13 +168,15 @@ export default function Subjects({ user }: { user: any }) {
               {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
-          <button 
-            onClick={() => openModal()}
-            className="flex items-center gap-2 px-8 py-4 bg-gray-900 text-white font-bold uppercase tracking-widest text-[10px] rounded-2xl shadow-xl hover:bg-black transition-all group active:scale-95"
-          >
-            <Plus size={18} className="group-hover:rotate-90 transition-transform" />
-            <span>Add Single Subject</span>
-          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => openModal()}
+              className="flex items-center gap-2 px-8 py-4 bg-gray-900 text-white font-bold uppercase tracking-widest text-[10px] rounded-2xl shadow-xl hover:bg-black transition-all group active:scale-95"
+            >
+              <Plus size={18} className="group-hover:rotate-90 transition-transform" />
+              <span>Add Single Subject</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -253,7 +267,7 @@ export default function Subjects({ user }: { user: any }) {
                 </div>
               </div>
 
-              {selectedClass && (
+              {selectedClass && isAdmin && (
                 <button 
                   onClick={() => handleBulkAdd(selectedLevel, selectedClass, selectedStream)}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors"
@@ -280,12 +294,14 @@ export default function Subjects({ user }: { user: any }) {
                 <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
                   <Book className="text-gray-300 mb-4" size={48} />
                   <p className="text-sm text-gray-400 font-medium mb-4">No subjects found for this class.</p>
-                  <button 
-                    onClick={() => handleBulkAdd(selectedLevel, selectedClass, selectedStream)}
-                    className="px-6 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm"
-                  >
-                    Auto-populate standard subjects
-                  </button>
+                  {isAdmin && (
+                    <button 
+                      onClick={() => handleBulkAdd(selectedLevel, selectedClass, selectedStream)}
+                      className="px-6 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm"
+                    >
+                      Auto-populate standard subjects
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -303,22 +319,24 @@ export default function Subjects({ user }: { user: any }) {
                         </div>
                         <span className="text-sm font-bold text-gray-700">{sub.name}</span>
                       </div>
-                      <div className="flex gap-2 transition-opacity">
-                        <button 
-                          onClick={() => openModal(sub)} 
-                          className="p-2 text-blue-600 hover:bg-blue-50 bg-white shadow-sm rounded-lg border border-gray-100 transition-all active:scale-90"
-                          title="Edit Subject"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(sub.id)} 
-                          className="p-2 text-red-600 hover:bg-red-50 bg-white shadow-sm rounded-lg border border-gray-100 transition-all active:scale-90"
-                          title="Delete Subject"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {isAdmin && (
+                        <div className="flex gap-2 transition-opacity">
+                          <button 
+                            onClick={() => openModal(sub)} 
+                            className="p-2 text-blue-600 hover:bg-blue-50 bg-white shadow-sm rounded-lg border border-gray-100 transition-all active:scale-90"
+                            title="Edit Subject"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(sub.id)} 
+                            className="p-2 text-red-600 hover:bg-red-50 bg-white shadow-sm rounded-lg border border-gray-100 transition-all active:scale-90"
+                            title="Delete Subject"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
                     </motion.div>
                   ))}
                 </div>
@@ -473,6 +491,33 @@ export default function Subjects({ user }: { user: any }) {
               </form>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 50 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 50 }}
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100]"
+          >
+            <div className={`px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${
+              toast.type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' :
+              toast.type === 'error' ? 'bg-rose-600 border-rose-500 text-white' :
+              'bg-gray-900 border-gray-800 text-white'
+            }`}>
+              {toast.type === 'success' ? <CheckCircle2 size={18} /> : 
+               toast.type === 'error' ? <AlertTriangle size={18} /> : <Book size={18} />}
+              <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">{toast.message}</span>
+              <button 
+                onClick={() => setToast(null)}
+                className="ml-4 p-1 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
