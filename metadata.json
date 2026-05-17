@@ -2,5 +2,5 @@
   "name": "EduNexus",
   "description": "A comprehensive, multi-tenant school management system for administrators, teachers, and students.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

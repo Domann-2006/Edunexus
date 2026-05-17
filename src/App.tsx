@@ -256,9 +256,9 @@ export default function App() {
         } />
 
         <Route path="/super-admin/support" element={
-          <ProtectedRoute roles={['SUPER_ADMIN']}>
+          <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <SupportTickets />
+              <SupportTickets user={user} />
             </Layout>
           </ProtectedRoute>
         } />

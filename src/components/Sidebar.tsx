@@ -71,6 +71,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
     { section: 'Settings', items: [
       ...(role === 'SCHOOL_ADMIN' ? [
         { name: 'Teacher Activity', path: '/activity-logs?filter=teacher', icon: Activity },
+        { name: 'Support Center', path: '/super-admin/support', icon: LifeBuoy },
         { name: 'School Settings', path: '/settings/school', icon: Settings },
         { name: 'System Logs', path: '/activity-logs', icon: ShieldCheck }
       ] : []),

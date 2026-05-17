@@ -121,6 +121,25 @@ export const activityService = {
   list: (params?: any) => api.get('/v1/activity-logs', { params }),
 };
 
+export const ticketService = {
+  list: (params?: any) => api.get('/v1/tickets', { params }),
+  create: (data: any) => api.post('/v1/tickets', data),
+  update: (id: string, data: any) => api.put(`/v1/tickets/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/tickets/${id}`),
+};
+
+export const announcementService = {
+  list: (params?: any) => api.get('/v1/announcements', { params }),
+  create: (data: any) => api.post('/v1/announcements', data),
+  update: (id: string, data: any) => api.put(`/v1/announcements/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/announcements/${id}`),
+};
+
+export const platformSettingsService = {
+  get: () => api.get('/v1/platform-settings'),
+  update: (data: any) => api.post('/v1/platform-settings', data),
+};
+
 export const dashboardService = {
   getStats: (params?: any) => api.get('/v1/dashboard-stats', { params }),
 };

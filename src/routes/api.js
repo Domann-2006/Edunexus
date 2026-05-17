@@ -609,6 +609,45 @@ router.post('/subjects/bulk', authenticate, authorize(['SCHOOL_ADMIN', 'SUPER_AD
 
 router.use('/subjects', createCRUD('subjects', ['SCHOOL_ADMIN', 'SUPER_ADMIN']));
 
+// Support Tickets
+router.use('/tickets', createCRUD('tickets', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
+
+// Announcements
+router.use('/announcements', createCRUD('announcements', ['SUPER_ADMIN']));
+
+// Platform Settings (Super Admin only)
+router.get('/platform-settings', authenticate, authorize(['SUPER_ADMIN']), async (req, res) => {
+  try {
+    const snap = await db.collection('platform-settings').doc('global').get();
+    if (!snap.exists) {
+      return res.json({
+        platformName: 'EduNexus',
+        platformLogo: '',
+        maintenanceMode: false,
+        registrationEnabled: true,
+        supportEmail: 'support@edunexus.com'
+      });
+    }
+    res.json(snap.data());
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post('/platform-settings', authenticate, authorize(['SUPER_ADMIN']), async (req, res) => {
+  try {
+    const data = {
+      ...req.body,
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.user.id
+    };
+    await db.collection('platform-settings').doc('global').set(data, { merge: true });
+    res.json({ message: 'Settings updated successfully', data });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Customized Results route for Status workflow
 const resultsRouter = createCRUD('results', ['SCHOOL_ADMIN', 'TEACHER'], resultTransform, { skipPost: true, skipPut: true });
 
