@@ -18,6 +18,8 @@ import PlatformReports from './pages/PlatformReports';
 import Announcements from './pages/Announcements';
 import SupportTickets from './pages/SupportTickets';
 import PlatformSettings from './pages/PlatformSettings';
+import Messages from './pages/Messages';
+import SubscriptionDetails from './pages/SubscriptionDetails';
 import Layout from './components/Layout';
 import InstallPWA from './components/InstallPWA';
 import { authService } from './services/api';
@@ -238,6 +240,22 @@ export default function App() {
           <ProtectedRoute roles={['SUPER_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
               <SchoolAdmins />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/messages" element={
+          <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <Messages user={user} />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/subscription-details" element={
+          <ProtectedRoute roles={['SCHOOL_ADMIN']}>
+            <Layout user={user} onLogout={handleLogout}>
+              <SubscriptionDetails />
             </Layout>
           </ProtectedRoute>
         } />

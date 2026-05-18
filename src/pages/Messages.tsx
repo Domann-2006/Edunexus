@@ -4,8 +4,10 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, s
 import { Send, Search, User, Check, CheckCheck, Loader2, School as SchoolIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { schoolService } from '../services/api';
+import { useLocation } from 'react-router-dom';
 
 export default function Messages({ user }: { user: any }) {
+  const location = useLocation();
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -20,6 +22,13 @@ export default function Messages({ user }: { user: any }) {
   useEffect(() => {
     if (isSuper) {
       fetchSchools();
+      // Handle navigation state if passed
+      if (location.state?.selectedChatId) {
+        setSelectedChat({
+          id: location.state.selectedChatId,
+          name: location.state.selectedSchoolName || 'School Admin'
+        });
+      }
     } else {
       // School Admin: Select their own school chat automatically
       setSelectedChat({
@@ -28,7 +37,7 @@ export default function Messages({ user }: { user: any }) {
         schoolId: user.schoolId
       });
     }
-  }, []);
+  }, [location.state]);
 
   const fetchSchools = async () => {
     try {

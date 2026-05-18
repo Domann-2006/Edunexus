@@ -194,19 +194,19 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 
         // Special case: School Creation by Super Admin
         if (collectionName === 'schools' && req.user?.role === 'SUPER_ADMIN') {
-          const { adminName, adminEmail, adminPassword, ...schoolData } = req.body;
+          const { adminPassword, ...schoolData } = req.body;
           
-          // Remove admin fields from school document
+          // Create the school document (keeping adminName and adminEmail for metadata)
           const cleanSchoolData = { ...schoolData, createdAt: new Date().toISOString(), active: true };
           const schoolRef = await db.collection('schools').add(cleanSchoolData);
           const schoolId = schoolRef.id;
 
           // Create the SCHOOL_ADMIN user
-          if (adminEmail && adminPassword) {
+          if (schoolData.adminEmail && adminPassword) {
             const passwordHash = await bcrypt.hash(adminPassword, 10);
             await db.collection('users').add({
-              name: adminName || schoolData.name,
-              email: adminEmail,
+              name: schoolData.adminName || schoolData.name,
+              email: schoolData.adminEmail,
               passwordHash,
               role: 'SCHOOL_ADMIN',
               schoolId: schoolId,

@@ -92,5 +92,16 @@ service cloud.firestore {
       allow read: if isSuperAdmin() || (isSignedIn() && getUserData().schoolId == resource.data.schoolId);
       allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
     }
+
+    // Chats & Messaging Uplink
+    match /chats/{chatId} {
+      allow read: if isSuperAdmin() || isSchoolAdmin(chatId);
+      allow write: if isSuperAdmin() || isSchoolAdmin(chatId);
+
+      match /messages/{messageId} {
+        allow read: if isSuperAdmin() || isSchoolAdmin(chatId);
+        allow create: if isSuperAdmin() || isSchoolAdmin(chatId);
+      }
+    }
   }
 }
