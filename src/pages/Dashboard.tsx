@@ -240,11 +240,11 @@ export default function Dashboard({ user }: { user: any }) {
                     <span className="text-sm font-bold">Global Announcement</span>
                     <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
                   </Link>
-                  <Link to="/super-admin/support" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                  <Link to="/messages" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
                     <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center">
                       <LifeBuoy size={18} />
                     </div>
-                    <span className="text-sm font-bold">Support Tickets</span>
+                    <span className="text-sm font-bold">Support Desk</span>
                     <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
                   </Link>
                 </>
@@ -266,15 +266,13 @@ export default function Dashboard({ user }: { user: any }) {
                     <span className="text-sm font-bold">Record Results</span>
                     <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
                   </Link>
-                  {user?.role === 'SCHOOL_ADMIN' && (
-                    <Link to="/students" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
-                      <div className="w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center">
-                        <UserPlus size={18} />
-                      </div>
-                      <span className="text-sm font-bold">Admit Student</span>
-                      <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
-                    </Link>
-                  )}
+                   <Link to="/messages" className="flex items-center gap-4 p-5 bg-white/5 hover:bg-white/10 rounded-[2rem] transition-all group">
+                    <div className="w-10 h-10 bg-indigo-500 rounded-2xl flex items-center justify-center">
+                      <LifeBuoy size={18} />
+                    </div>
+                    <span className="text-sm font-bold">Support Chat</span>
+                    <ArrowRight size={16} className="ml-auto opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" />
+                  </Link>
                 </>
               )}
             </div>
@@ -283,8 +281,8 @@ export default function Dashboard({ user }: { user: any }) {
               <div className="p-6 bg-blue-600 rounded-[2rem] relative overflow-hidden group">
                 <div className="relative z-10">
                   <div className="text-xs font-black uppercase tracking-[0.2em] opacity-80 mb-1">Status</div>
-                  <div className="text-lg font-black tracking-tight mb-4">Premium Support</div>
-                  <button className="w-full py-3 bg-white text-blue-600 rounded-xl font-black text-[10px] uppercase tracking-widest group-hover:scale-105 transition-transform">Get Help</button>
+                  <div className="text-lg font-black tracking-tight mb-4">Direct Helpdesk</div>
+                  <Link to="/messages" className="w-full flex items-center justify-center py-3 bg-white text-blue-600 rounded-xl font-black text-[10px] uppercase tracking-widest group-hover:scale-105 transition-transform">Start Chat</Link>
                 </div>
               </div>
             </div>

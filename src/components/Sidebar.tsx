@@ -47,7 +47,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
     ]},
     { section: 'Operations', items: [
       { name: 'Announcements', path: '/super-admin/announcements', icon: Megaphone },
-      { name: 'School Chats', path: '/messages', icon: LifeBuoy },
+      { name: 'Support Desk', path: '/messages', icon: LifeBuoy },
     ]},
     { section: 'System', items: [
       { name: 'Platform Settings', path: '/super-admin/settings', icon: Monitor },
@@ -68,14 +68,13 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
       { name: role === 'SCHOOL_ADMIN' ? 'Attendance Monitor' : 'Attendance', path: '/attendance', icon: CheckSquare },
       { name: role === 'SCHOOL_ADMIN' ? 'Result Monitoring' : 'Results', path: '/results', icon: FileSpreadsheet },
     ]},
-    { section: 'Uplink', items: [
-       ...(role === 'SCHOOL_ADMIN' ? [{ name: 'Admin Support Chat', path: '/messages', icon: LifeBuoy }] : []),
+    { section: 'Support Uplink', items: [
+       ...(role === 'SCHOOL_ADMIN' ? [{ name: 'Support Chat', path: '/messages', icon: LifeBuoy }] : []),
        ...(role === 'SCHOOL_ADMIN' ? [{ name: 'My Subscription', path: '/subscription-details', icon: CreditCard }] : []),
     ]},
     { section: 'Settings', items: [
       ...(role === 'SCHOOL_ADMIN' ? [
         { name: 'Teacher Activity', path: '/activity-logs?filter=teacher', icon: Activity },
-        { name: 'Support Center', path: '/super-admin/support', icon: LifeBuoy },
         { name: 'School Settings', path: '/settings/school', icon: Settings },
         { name: 'System Logs', path: '/activity-logs', icon: ShieldCheck }
       ] : []),
