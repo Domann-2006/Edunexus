@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { teacherService, schoolService } from '../services/api';
+import api, { teacherService, schoolService } from '../services/api';
 import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin, CheckCircle, BookOpen, Book } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
@@ -7,12 +7,15 @@ import ProfileImage from '../components/ProfileImage';
 export default function Teachers({ user }: { user: any }) {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
+  const isAdmin = user?.role === 'SCHOOL_ADMIN' || user?.role === 'SUPER_ADMIN';
+
   const [formData, setFormData] = useState({
     name: '',
     avatarUrl: '',
@@ -24,7 +27,7 @@ export default function Teachers({ user }: { user: any }) {
     phone: '',
     address: '',
     schoolId: '',
-    assignedClasses: '',
+    assignedClasses: [] as string[],
     assignedSubjects: '',
   });
 
@@ -37,14 +40,17 @@ export default function Teachers({ user }: { user: any }) {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const targetSchoolId = selectedSchoolId || user?.schoolId;
       const promises: Promise<any>[] = [
-        teacherService.list({ schoolId: selectedSchoolId }),
+        teacherService.list({ schoolId: targetSchoolId }),
+        api.get('/v1/classes', { params: { schoolId: targetSchoolId } })
       ];
       if (user?.role === 'SUPER_ADMIN') {
         promises.push(schoolService.list());
       }
-      const [teacherRes, schoolRes] = await Promise.all(promises);
+      const [teacherRes, classRes, schoolRes] = await Promise.all(promises);
       setTeachers(teacherRes.data);
+      setClasses(classRes.data);
       if (schoolRes) setSchools(schoolRes.data);
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -59,7 +65,7 @@ export default function Teachers({ user }: { user: any }) {
       // Split the comma-separated strings into arrays for the backend
       const submitData = {
         ...formData,
-        assignedClassIds: formData.assignedClasses.split(',').map(s => s.trim()).filter(Boolean),
+        assignedClassIds: formData.assignedClasses,
         assignedSubjectIds: formData.assignedSubjects.split(',').map(s => s.trim()).filter(Boolean),
       };
 
@@ -111,7 +117,7 @@ export default function Teachers({ user }: { user: any }) {
         phone: teacher.phone || '',
         address: teacher.address || '',
         schoolId: teacher.schoolId || '',
-        assignedClasses: (teacher.assignedClassIds || []).join(', '),
+        assignedClasses: teacher.assignedClassIds || [],
         assignedSubjects: (teacher.assignedSubjectIds || []).join(', '),
       });
     } else {
@@ -127,7 +133,7 @@ export default function Teachers({ user }: { user: any }) {
         phone: '',
         address: '',
         schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || ''),
-        assignedClasses: '',
+        assignedClasses: [],
         assignedSubjects: '',
       });
     }
@@ -380,19 +386,38 @@ export default function Teachers({ user }: { user: any }) {
                         </div>
                       )}
                       
-                      <div className="space-y-2 md:col-span-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Classes</label>
-                        <div className="relative">
-                          <BookOpen className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                          <input
-                            type="text"
-                            value={formData.assignedClasses}
-                            onChange={(e) => setFormData({...formData, assignedClasses: e.target.value})}
-                            placeholder="e.g. Primary 1, JSS 3, SSS 1"
-                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
-                          />
+                      <div className="space-y-3 md:col-span-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Assigned Classes</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-3xl max-h-48 overflow-y-auto border border-gray-100">
+                           {classes.map(c => {
+                             const isSelected = formData.assignedClasses.includes(c.id);
+                             return (
+                               <div 
+                                 key={c.id} 
+                                 onClick={() => {
+                                   const newClasses = isSelected 
+                                     ? formData.assignedClasses.filter(id => id !== c.id)
+                                     : [...formData.assignedClasses, c.id];
+                                   setFormData({ ...formData, assignedClasses: newClasses });
+                                 }}
+                                 className={`cursor-pointer group flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                                   isSelected ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-gray-100 text-gray-600 hover:border-blue-200'
+                                 }`}
+                               >
+                                 <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                                   isSelected ? 'bg-white border-white' : 'bg-gray-100 border-gray-200 group-hover:border-blue-300'
+                                 }`}>
+                                   {isSelected && <CheckCircle size={10} className="text-blue-600" />}
+                                 </div>
+                                 <div className="flex flex-col">
+                                   <span className="text-[10px] font-black tracking-tight leading-none uppercase">{c.name}</span>
+                                   <span className={`text-[8px] font-bold ${isSelected ? 'text-blue-100' : 'text-gray-400'}`}>{c.level}</span>
+                                 </div>
+                               </div>
+                             );
+                           })}
                         </div>
-                        <p className="text-[9px] text-gray-400 font-medium px-2 italic">Separate multiple classes with commas.</p>
+                        <p className="text-[9px] text-gray-400 font-medium px-2 italic">Teachers will only be able to manage students and results in selected classes.</p>
                       </div>
 
                       <div className="space-y-2 md:col-span-2">

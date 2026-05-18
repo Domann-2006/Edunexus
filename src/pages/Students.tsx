@@ -19,6 +19,8 @@ export default function Students({ user }: { user: any }) {
   const [isImageUploading, setIsImageUploading] = useState(false);
   
   const isAdmin = user?.role === 'SCHOOL_ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isTeacher = user?.role === 'TEACHER';
+  const canManage = isAdmin || isTeacher;
 
   const [searchParams] = useSearchParams();
   
@@ -34,6 +36,15 @@ export default function Students({ user }: { user: any }) {
     dateOfBirth: '',
     gender: 'MALE',
   });
+
+  useEffect(() => {
+    if (isTeacher && classes.length > 0 && !formData.classId && !editingId) {
+      // If teacher has only one class, auto-select it
+      if (classes.length === 1) {
+        setFormData(prev => ({ ...prev, classId: classes[0].id }));
+      }
+    }
+  }, [classes, isTeacher, editingId]);
 
   useEffect(() => {
     const classIdFromUrl = searchParams.get('classId');
@@ -63,11 +74,22 @@ export default function Students({ user }: { user: any }) {
         const profileRes = await teacherService.list({ userId: user.id });
         if (profileRes.data.length > 0) {
           const profile = profileRes.data[0];
-          if (profile.assignedClassIds?.length > 0) {
+          const classIdentifiers = profile.assignedClassIds || [];
+          
+          if (classIdentifiers.length > 0) {
+            // Filter classes by ID or Name (since it might be names)
             fetchedClasses = fetchedClasses.filter((c: any) => 
-              profile.assignedClassIds.includes(c.id) || 
-              profile.assignedClassIds.includes(c.name)
+              classIdentifiers.includes(c.id) || 
+              classIdentifiers.includes(c.name)
             );
+            
+            // The backend already filters students if it detects a TEACHER role, 
+            // but we can double check here or just rely on backend.
+            const resolvedIds = fetchedClasses.map((c: any) => c.id);
+            fetchedStudents = fetchedStudents.filter((s: any) => resolvedIds.includes(s.classId));
+          } else {
+            fetchedClasses = [];
+            fetchedStudents = [];
           }
         }
       }
@@ -173,7 +195,7 @@ export default function Students({ user }: { user: any }) {
               {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
-          {isAdmin && (
+          {canManage && (
             <button 
               onClick={() => openModal()}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
@@ -259,7 +281,7 @@ export default function Students({ user }: { user: any }) {
                       </td>
                       <td className="px-6 py-4 text-gray-500">{student.guardianName}</td>
                       <td className="px-6 py-4 text-right">
-                        {isAdmin ? (
+                        {canManage ? (
                           <div className="flex justify-end gap-2 text-xs">
                             <button 
                               onClick={() => openModal(student)}
@@ -268,13 +290,15 @@ export default function Students({ user }: { user: any }) {
                             >
                               <Edit2 size={16} />
                             </button>
-                            <button 
-                              onClick={() => handleDelete(student.id)}
-                              className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
-                              title="Delete Student"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            {isAdmin && (
+                              <button 
+                                onClick={() => handleDelete(student.id)}
+                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
+                                title="Delete Student"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Read Only</span>

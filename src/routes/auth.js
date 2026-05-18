@@ -55,6 +55,15 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1d' }
     );
 
+    // Generate Firebase Custom Token for real-time frontend access
+    let firebaseToken = null;
+    try {
+      const { auth: adminAuth } = await import('../lib/firebase-admin.js');
+      firebaseToken = await adminAuth.createCustomToken(user.id);
+    } catch (fbErr) {
+      console.error('Failed to generate Firebase token:', fbErr);
+    }
+
     let schoolName = null;
     if (user.schoolId && user.schoolId !== 'SUPER') {
       const schoolDoc = await db.collection('schools').doc(user.schoolId).get();
@@ -73,6 +82,7 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
+      firebaseToken,
       user: {
         id: user.id,
         name: user.name,

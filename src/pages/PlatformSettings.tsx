@@ -262,7 +262,7 @@ export default function PlatformSettings() {
                    </div>
                    <div>
                       <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Multi-Tenancy</div>
-                      <div className="text-sm font-black text-gray-900 tracking-tight">Active Nodes: 124</div>
+                      <div className="text-sm font-black text-gray-900 tracking-tight">Active Nodes Monitoring Enabled</div>
                    </div>
                 </div>
              </div>

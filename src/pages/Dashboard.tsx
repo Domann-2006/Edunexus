@@ -15,7 +15,8 @@ import {
   CheckSquare,
   CreditCard,
   Megaphone,
-  LifeBuoy
+  LifeBuoy,
+  PieChart
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -158,10 +159,6 @@ export default function Dashboard({ user }: { user: any }) {
                 <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
                   <card.icon size={22} />
                 </div>
-                <div className="flex items-center text-emerald-500 text-[10px] font-black tracking-widest bg-emerald-50 px-3 py-1 rounded-full">
-                  <TrendingUp size={12} className="mr-1" />
-                  <span>+12%</span>
-                </div>
               </div>
               <div className="relative z-10">
                 <div className="text-4xl font-black text-gray-900 tracking-tight">{card.value}</div>
@@ -207,28 +204,17 @@ export default function Dashboard({ user }: { user: any }) {
                   </Link>
                 ))
               ) : (
-                <div className="col-span-2 py-12 text-center text-gray-400 lowercase italic">
+                <div className="col-span-2 py-12 text-center text-gray-400 italic">
                   No classes assigned yet.
                 </div>
               )}
             </div>
           ) : (
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} />
-                  <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} />
-                  <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={4} fillOpacity={1} fill="url(#colorVal)" />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="h-[300px] w-full flex items-center justify-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+               <div className="text-center">
+                  <PieChart className="mx-auto text-gray-300 mb-2" size={32} />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Trend logs propagating...</p>
+               </div>
             </div>
           )}
         </div>

@@ -47,7 +47,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
     ]},
     { section: 'Operations', items: [
       { name: 'Announcements', path: '/super-admin/announcements', icon: Megaphone },
-      { name: 'Support Tickets', path: '/super-admin/support', icon: LifeBuoy },
+      { name: 'School Chats', path: '/messages', icon: LifeBuoy },
     ]},
     { section: 'System', items: [
       { name: 'Platform Settings', path: '/super-admin/settings', icon: Monitor },
@@ -67,6 +67,10 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
     { section: 'Academic', items: [
       { name: role === 'SCHOOL_ADMIN' ? 'Attendance Monitor' : 'Attendance', path: '/attendance', icon: CheckSquare },
       { name: role === 'SCHOOL_ADMIN' ? 'Result Monitoring' : 'Results', path: '/results', icon: FileSpreadsheet },
+    ]},
+    { section: 'Uplink', items: [
+       { name: 'Admin Support Chat', path: '/messages', icon: LifeBuoy },
+       ...(role === 'SCHOOL_ADMIN' ? [{ name: 'My Subscription', path: '/subscription-details', icon: CreditCard }] : []),
     ]},
     { section: 'Settings', items: [
       ...(role === 'SCHOOL_ADMIN' ? [

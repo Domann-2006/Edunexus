@@ -182,6 +182,8 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         let data = {
           ...req.body,
           schoolId: req.user?.schoolId || null,
+          addedBy: req.user?.id || 'SYSTEM',
+          addedByRole: req.user?.role || 'SYSTEM',
           createdAt: new Date().toISOString()
         };
         
@@ -287,12 +289,20 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           const teacherData = teacherSnap.docs[0].data();
           const assignedClassIds = teacherData.assignedClassIds || [];
           
-          if (!assignedClassIds.includes(existingData.classId)) {
+          // For students, check classId. For attendance/results, check classId
+          const targetClassId = existingData.classId;
+          
+          if (!assignedClassIds.includes(targetClassId)) {
             return res.status(403).json({ message: 'You can only update data for your assigned classes' });
           }
         }
 
-        let updateData = { ...req.body, updatedAt: new Date().toISOString() };
+        let updateData = { 
+          ...req.body, 
+          updatedAt: new Date().toISOString(),
+          updatedBy: req.user?.id,
+          updatedByRole: req.user?.role
+        };
         if (transform) updateData = transform(updateData);
         
         // Remove undefined values to prevent Firestore crashes
@@ -612,8 +622,141 @@ router.use('/subjects', createCRUD('subjects', ['SCHOOL_ADMIN', 'SUPER_ADMIN']))
 // Support Tickets
 router.use('/tickets', createCRUD('tickets', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 
-// Announcements
+// Announcement routes...
 router.use('/announcements', createCRUD('announcements', ['SUPER_ADMIN']));
+
+// --- Subscription Management ---
+
+// Super Admin: Subscription Analytics
+router.get('/subscriptions/stats', authenticate, authorize(['SUPER_ADMIN']), async (req, res) => {
+  try {
+    const schoolsSnap = await db.collection('schools').get();
+    const schools = schoolsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    const stats = {
+      totalSchools: schools.length,
+      activeSubscriptions: schools.filter(s => s.subscriptionStatus === 'ACTIVE').length,
+       expiredSubscriptions: schools.filter(s => s.subscriptionStatus === 'EXPIRED').length,
+       totalRevenue: schools.reduce((sum, s) => sum + (Number(s.subscriptionAmount) || 0), 0),
+       byPlan: {
+          BASIC: schools.filter(s => s.plan === 'BASIC').length,
+          PRO: schools.filter(s => s.plan === 'PRO').length,
+          PREMIUM: schools.filter(s => s.plan === 'PREMIUM').length,
+          ENTERPRISE: schools.filter(s => s.plan === 'ENTERPRISE').length,
+       }
+    };
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// School Admin: Get my subscription details
+router.get('/subscriptions/my', authenticate, authorize(['SCHOOL_ADMIN']), async (req, res) => {
+  try {
+    const schoolDoc = await db.collection('schools').doc(req.user.schoolId).get();
+    if (!schoolDoc.exists) return res.status(404).json({ message: 'School profile not found' });
+    
+    const data = schoolDoc.data();
+    res.json({
+      plan: data.plan || 'BASIC',
+      status: data.subscriptionStatus || 'PENDING',
+      amount: data.subscriptionAmount || 0,
+      startDate: data.subscriptionStartDate,
+      endDate: data.subscriptionEndDate,
+      lastPaymentDate: data.lastPaymentDate
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// --- Private Messaging System (Super Admin <-> School Admin) ---
+
+// Get list of active conversations
+router.get('/chats', authenticate, async (req, res) => {
+  try {
+    let query = db.collection('chats');
+    
+    if (req.user.role === 'SUPER_ADMIN') {
+      // Super Admin sees all chats
+    } else if (req.user.role === 'SCHOOL_ADMIN') {
+      // School Admin only sees their chat with Super Admin
+      query = query.where('schoolId', '==', req.user.schoolId);
+    } else {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    const snap = await query.orderBy('updatedAt', 'desc').get();
+    const chats = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(chats);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get messages for a chat
+router.get('/chats/:chatId/messages', authenticate, async (req, res) => {
+  try {
+    const chatId = req.params.chatId;
+    const chatDoc = await db.collection('chats').doc(chatId).get();
+    
+    if (!chatDoc.exists) return res.status(404).json({ message: 'Chat not found' });
+    const chatData = chatDoc.data();
+    
+    if (req.user.role !== 'SUPER_ADMIN' && chatData.schoolId !== req.user.schoolId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const messagesSnap = await db.collection('chats').doc(chatId).collection('messages')
+      .orderBy('createdAt', 'asc').limit(100).get();
+    
+    const messages = messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(messages);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Send message
+router.post('/chats/:chatId/messages', authenticate, async (req, res) => {
+  try {
+    const { text } = req.body;
+    const chatId = req.params.chatId;
+    const chatDoc = await db.collection('chats').doc(chatId).get();
+
+    if (!chatDoc.exists) {
+      // If SUPER_ADMIN is starting chat with a school, or it's first message
+      if (req.user.role === 'SUPER_ADMIN' || req.user.role === 'SCHOOL_ADMIN') {
+         // We might need to auto-create chat if it doesn't exist?
+         // Convention: chatId is usually schoolId for school-super communication
+      } else {
+         return res.status(404).json({ message: 'Chat session not initialized' });
+      }
+    }
+
+    const messageData = {
+      text,
+      senderId: req.user.id,
+      senderName: req.user.name,
+      senderRole: req.user.role,
+      createdAt: new Date().toISOString()
+    };
+
+    const msgRef = await db.collection('chats').doc(chatId).collection('messages').add(messageData);
+    
+    // Update chat metadata
+    await db.collection('chats').doc(chatId).set({
+      lastMessage: text,
+      lastSenderId: req.user.id,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    res.status(201).json({ id: msgRef.id, ...messageData });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // Platform Settings (Super Admin only)
 router.get('/platform-settings', authenticate, authorize(['SUPER_ADMIN']), async (req, res) => {
@@ -777,7 +920,16 @@ router.get('/dashboard-stats', authenticate, async (req, res) => {
     };
 
     if (isSuper) {
-      stats.schools = await getCount('schools');
+      const schoolsSnap = await db.collection('schools').get();
+      const schools = schoolsSnap.docs.map(d => d.data());
+      
+      stats.schools = schools.length;
+      stats.totalTeachers = stats.teachers;
+      stats.totalStudents = stats.students;
+      stats.activePlans = schools.filter(s => s.status === 'ACTIVE').length;
+      
+      // Calculate revenue
+      stats.totalRevenue = schools.reduce((acc, s) => acc + (Number(s.amountPaid) || 0), 0);
     }
 
     res.json(stats);

@@ -21,6 +21,8 @@ import PlatformSettings from './pages/PlatformSettings';
 import Layout from './components/Layout';
 import InstallPWA from './components/InstallPWA';
 import { authService } from './services/api';
+import { auth } from './lib/firebase.ts';
+import { signInWithCustomToken } from 'firebase/auth';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -55,8 +57,12 @@ export default function App() {
       try {
         const token = safeLocalStorage.getItem('token');
         const savedUser = safeLocalStorage.getItem('user');
+        const fireToken = safeLocalStorage.getItem('fireToken');
         
         if (token && savedUser) {
+          if (fireToken) {
+            signInWithCustomToken(auth, fireToken).catch(err => console.error('Firebase Re-auth failed:', err));
+          }
           // Optimistic update: Show UI immediately if we have cached user
           try {
             const parsedUser = JSON.parse(savedUser);
@@ -95,12 +101,17 @@ export default function App() {
     setUser(userToSave);
     safeLocalStorage.setItem('user', JSON.stringify(userToSave));
     safeLocalStorage.setItem('token', userData.token);
+    if (userData.firebaseToken) {
+      safeLocalStorage.setItem('fireToken', userData.firebaseToken);
+      signInWithCustomToken(auth, userData.firebaseToken).catch(console.error);
+    }
   };
 
   const handleLogout = () => {
     setUser(null);
     safeLocalStorage.removeItem('user');
     safeLocalStorage.removeItem('token');
+    safeLocalStorage.removeItem('fireToken');
   };
 
   const refreshUser = async () => {

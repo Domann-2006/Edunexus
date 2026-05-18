@@ -135,6 +135,17 @@ export const announcementService = {
   delete: (id: string) => api.delete(`/v1/announcements/${id}`),
 };
 
+export const subscriptionService = {
+  getStats: () => api.get('/v1/subscriptions/stats'),
+  getMySubscription: () => api.get('/v1/subscriptions/my'),
+};
+
+export const chatService = {
+  list: () => api.get('/v1/chats'),
+  getMessages: (chatId: string) => api.get(`/v1/chats/${chatId}/messages`),
+  sendMessage: (chatId: string, text: string) => api.post(`/v1/chats/${chatId}/messages`, { text }),
+};
+
 export const platformSettingsService = {
   get: () => api.get('/v1/platform-settings'),
   update: (data: any) => api.post('/v1/platform-settings', data),
