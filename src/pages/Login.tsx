@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { authService } from '../services/api';
-import { BookOpen, User, Lock, ArrowRight, Loader2, Shield } from 'lucide-react';
+import { BookOpen, User, Lock, ArrowRight, Loader2, Shield, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface LoginProps {
@@ -14,6 +14,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [loginType, setLoginType] = useState<'teacher' | 'admin' | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +67,7 @@ export default function Login({ onLogin }: LoginProps) {
           onClick={() => {
             setLoginType(null);
             setError('');
+            setShowPassword(false);
           }}
           className="text-xs font-bold text-blue-600 uppercase tracking-widest hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
         >
@@ -100,13 +102,21 @@ export default function Login({ onLogin }: LoginProps) {
           <div className="relative">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none font-medium"
+              className="w-full pl-12 pr-12 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none font-medium"
               required
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
         </div>
 

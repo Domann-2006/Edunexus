@@ -39,8 +39,25 @@ export default function Classes({ user }: { user: any }) {
       }
 
       const results = await Promise.all(promises);
-      setClasses(results[0].data);
-      setTeachers(results[1].data);
+      let fetchedClasses = results[0].data;
+      const fetchedTeachers = results[1].data;
+
+      if (user?.role === 'TEACHER') {
+        const profileRes = await teacherService.list({ userId: user.id });
+        if (profileRes.data.length > 0) {
+          const profile = profileRes.data[0];
+          const classIdentifiers = profile.assignedClassIds || [];
+          fetchedClasses = fetchedClasses.filter((c: any) => 
+            classIdentifiers.includes(c.id) || 
+            classIdentifiers.includes(c.name)
+          );
+        } else {
+          fetchedClasses = [];
+        }
+      }
+
+      setClasses(fetchedClasses);
+      setTeachers(fetchedTeachers);
       if (results[2]) setSchools(results[2].data);
     } catch (err) {
       console.error('Failed to fetch data:', err);

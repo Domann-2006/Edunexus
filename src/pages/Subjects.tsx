@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { subjectService, schoolService } from '../services/api';
+import { subjectService, schoolService, classService, teacherService } from '../services/api';
 import { Plus, Edit2, Trash2, X, Loader2, Book, GraduationCap, Layers, Sparkles, Filter, ChevronRight, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { EDUCATION_LEVELS, LEVEL_CLASSES, SSS_STREAMS, DEFAULT_SUBJECTS } from '../constants';
@@ -56,7 +56,30 @@ export default function Subjects({ user }: { user: any }) {
         promises.push(schoolService.list());
       }
       const results = await Promise.all(promises);
-      setSubjects(results[0].data);
+      let fetchedSubjects = results[0].data;
+
+      if (user?.role === 'TEACHER') {
+        const profileRes = await teacherService.list({ userId: user.id });
+        if (profileRes.data.length > 0) {
+          const profile = profileRes.data[0];
+          const classIdentifiers = profile.assignedClassIds || [];
+          
+          const classesRes = await classService.list({ schoolId: selectedSchoolId || user?.schoolId });
+          const myClasses = classesRes.data.filter((c: any) => 
+            classIdentifiers.includes(c.id) || 
+            classIdentifiers.includes(c.name)
+          );
+          const myClassNames = myClasses.map((c: any) => c.name);
+
+          fetchedSubjects = fetchedSubjects.filter((s: any) => 
+            myClassNames.includes(s.class)
+          );
+        } else {
+          fetchedSubjects = [];
+        }
+      }
+
+      setSubjects(fetchedSubjects);
       if (results[1]) setSchools(results[1].data);
     } catch (err) {
       console.error('Failed to fetch data:', err);

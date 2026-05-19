@@ -38,7 +38,11 @@ export default function Attendance({ user }: { user: any }) {
               profile.assignedClassIds.includes(c.id) || 
               profile.assignedClassIds.includes(c.name)
             );
+          } else {
+            fetchedClasses = [];
           }
+        } else {
+          fetchedClasses = [];
         }
       }
 

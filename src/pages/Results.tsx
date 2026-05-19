@@ -86,7 +86,13 @@ export default function Results({ user }: { user: any }) {
       setAllStudents(studRes.data);
       
       const currentSess = sessRes.data.find((s: any) => s.isCurrent);
-      if (currentSess) setFilters(f => ({ ...f, sessionId: currentSess.id }));
+      if (currentSess) {
+        setFilters(f => ({ 
+          ...f, 
+          sessionId: currentSess.id,
+          term: currentSess.activeTerm || '1st'
+        }));
+      }
     } catch (err: any) {
       console.error('Failed to load initial data:', err);
     } finally {
