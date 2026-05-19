@@ -43,6 +43,22 @@ router.post('/login', async (req, res) => {
     }
 
     console.log(`Login successful for: ${email}, role: ${user.role}`);
+    
+    // Log Activity
+    try {
+      await db.collection('activity-logs').add({
+        userId: user.id,
+        userName: user.name || user.username || user.email.split('@')[0],
+        role: user.role,
+        action: 'LOGIN',
+        details: `${user.role === 'TEACHER' ? 'Teacher' : user.role === 'SCHOOL_ADMIN' ? 'School Admin' : 'Super Admin'} logged in successfully.`,
+        schoolId: user.schoolId || 'SUPER',
+        createdAt: new Date().toISOString()
+      });
+    } catch (logErr) {
+      console.error('Failed to write login activity log:', logErr);
+    }
+
     const token = jwt.sign(
       { 
         id: user.id, 

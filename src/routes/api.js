@@ -71,6 +71,35 @@ const PLAN_LIMITS = {
   PREMIUM: { users: 5000, classes: 100 },
 };
 
+// Helper to log activities
+async function logActivity(req, action, details, customSchoolId = null) {
+  try {
+    const schoolId = customSchoolId || req.user?.schoolId || 'SUPER';
+    let schoolName = 'System';
+    if (schoolId && schoolId !== 'SUPER') {
+      const sDoc = await db.collection('schools').doc(schoolId).get();
+      if (sDoc.exists) {
+        schoolName = sDoc.data().name;
+      }
+    }
+    const logData = {
+      userId: req.user?.id || 'SYSTEM',
+      userName: req.user?.name || 'System',
+      role: req.user?.role || 'SYSTEM',
+      action,
+      details,
+      schoolId,
+      schoolName,
+      status: 'SUCCESS',
+      createdAt: new Date().toISOString()
+    };
+    await db.collection('activity-logs').add(logData);
+    console.log(`[ACTIVITY LOG] ${action}: ${details}`);
+  } catch (err) {
+    console.error('Failed to write activity log:', err);
+  }
+}
+
 // Generic CRUD helper
 const createCRUD = (collectionName, roles, transform, options = {}) => {
   const crudRouter = express.Router();
@@ -232,17 +261,15 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         const ref = await db.collection(collectionName).add(data);
         console.log(`Document created with ID: ${ref.id}`);
 
-        // Log Activity for teachers
-        if (req.user?.role === 'TEACHER') {
-          await db.collection('activity-logs').add({
-            userId: req.user.id,
-            userName: req.user.name || 'Unknown',
-            role: req.user.role,
-            action: `CREATE_${collectionName.toUpperCase().slice(0, -1)}`,
-            details: `Teacher recorded new ${collectionName.slice(0, -1)}: ${JSON.stringify(req.body).slice(0, 200)}`,
-            schoolId: req.user.schoolId,
-            createdAt: new Date().toISOString()
-          });
+        // Log Activity for all roles
+        try {
+          const entityName = collectionName.toUpperCase().replace(/S$/, '');
+          const roleText = req.user?.role === 'TEACHER' ? 'Teacher' : req.user?.role === 'SCHOOL_ADMIN' ? 'School Admin' : 'Super Admin';
+          let displayField = req.body.name || req.body.title || req.body.studentId || '';
+          const details = `${roleText} created ${collectionName.replace(/s$/, '')} ${displayField}`.trim();
+          await logActivity(req, `CREATE_${entityName}`, details, data.schoolId);
+        } catch (logErr) {
+          console.error('Error logging creation:', logErr);
         }
 
         res.status(201).json({ id: ref.id, ...data });
@@ -313,24 +340,15 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         await docRef.update(updateData);
         const updatedDoc = await docRef.get();
 
-        // Log Activity for teachers and admins
-        if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
-          const logData = {
-            userId: req.user.id,
-            userName: req.user.name || 'Unknown',
-            role: req.user.role,
-            action: `UPDATE_${collectionName.toUpperCase().replace(/S$/, '')}`,
-            details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} updated ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
-            schoolId: req.user.schoolId || 'SUPER',
-            createdAt: new Date().toISOString()
-          };
-          
-          // Final sanitize
-          Object.keys(logData).forEach(key => {
-            if (logData[key] === undefined) delete logData[key];
-          });
-
-          await db.collection('activity-logs').add(logData);
+        // Log Activity for all roles
+        try {
+          const entityName = collectionName.toUpperCase().replace(/S$/, '');
+          const roleText = req.user?.role === 'TEACHER' ? 'Teacher' : req.user?.role === 'SCHOOL_ADMIN' ? 'School Admin' : 'Super Admin';
+          const displayField = req.body.name || req.body.title || req.body.studentId || req.params.id;
+          const details = `${roleText} updated ${collectionName.replace(/s$/, '')} ${displayField}`.trim();
+          await logActivity(req, `UPDATE_${entityName}`, details, existingData.schoolId);
+        } catch (logErr) {
+          console.error('Error logging update:', logErr);
         }
 
         res.json({ message: 'Updated successfully', data: { id: updatedDoc.id, ...updatedDoc.data() } });
@@ -358,24 +376,15 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         }
         await docRef.delete();
 
-        // Log Activity for teachers and admins
-        if (req.user?.role === 'TEACHER' || req.user?.role === 'SCHOOL_ADMIN') {
-          const logData = {
-            userId: req.user.id,
-            userName: req.user.name || 'Unknown',
-            role: req.user.role,
-            action: `DELETE_${collectionName.toUpperCase().replace(/S$/, '')}`,
-            details: `${req.user.role === 'TEACHER' ? 'Teacher' : 'Admin'} deleted ${collectionName.replace(/s$/, '')} ID: ${req.params.id}`,
-            schoolId: req.user.schoolId || 'SUPER',
-            createdAt: new Date().toISOString()
-          };
-
-          // Final sanitize
-          Object.keys(logData).forEach(key => {
-            if (logData[key] === undefined) delete logData[key];
-          });
-
-          await db.collection('activity-logs').add(logData);
+        // Log Activity for all roles
+        try {
+          const entityName = collectionName.toUpperCase().replace(/S$/, '');
+          const roleText = req.user?.role === 'TEACHER' ? 'Teacher' : req.user?.role === 'SCHOOL_ADMIN' ? 'School Admin' : 'Super Admin';
+          const displayField = existingData.name || existingData.title || req.params.id;
+          const details = `${roleText} deleted ${collectionName.replace(/s$/, '')} ${displayField}`.trim();
+          await logActivity(req, `DELETE_${entityName}`, details, existingData.schoolId);
+        } catch (logErr) {
+          console.error('Error logging deletion:', logErr);
         }
 
         res.json({ message: 'Deleted successfully' });
@@ -450,15 +459,7 @@ teacherRouter.post('/', authenticate, authorize(['SCHOOL_ADMIN']), async (req, r
     const teacherRef = await db.collection('teachers').add(teacherData);
 
     // Log Activity
-    await db.collection('activity-logs').add({
-      userId: req.user.id,
-      userName: req.user.name || 'Unknown',
-      role: req.user.role,
-      action: 'CREATE_TEACHER',
-      details: `Created teacher ${name} (${email}). Credentials generated.`,
-      schoolId: schoolId,
-      createdAt: new Date().toISOString()
-    });
+    await logActivity(req, 'CREATE_TEACHER', `School Admin created teacher ${name} (${email}). Credentials generated.`, schoolId);
 
     res.status(201).json({
       id: teacherRef.id,
@@ -595,15 +596,7 @@ router.post('/subjects/bulk', authenticate, authorize(['SCHOOL_ADMIN', 'SUPER_AD
     await batch.commit();
 
     // Log activity
-    await db.collection('activity-logs').add({
-      userId: req.user.id,
-      userName: req.user.name,
-      role: req.user.role,
-      action: 'BULK_CREATE_SUBJECTS',
-      details: `Added ${newSubjects.length} subjects to ${className} (${level})`,
-      schoolId: targetSchoolId,
-      createdAt: new Date().toISOString()
-    });
+    await logActivity(req, 'BULK_CREATE_SUBJECTS', `School Admin added ${newSubjects.length} subjects to ${className} (${level})`, targetSchoolId);
 
     res.status(201).json({
       message: `${newSubjects.length} subjects added successfully`,
@@ -818,15 +811,7 @@ resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) =
     const transformed = resultTransform(data);
     const ref = await db.collection('results').add(transformed);
     
-    await db.collection('activity-logs').add({
-      userId: req.user.id,
-      userName: req.user.name,
-      role: req.user.role,
-      action: 'CREATE_RESULT',
-      details: `Teacher uploaded result for student ${data.studentId} in ${data.subjectName}`,
-      schoolId: req.user.schoolId,
-      createdAt: new Date().toISOString()
-    });
+    await logActivity(req, 'CREATE_RESULT', `Teacher uploaded result for student ${data.studentId} in ${data.subjectName}`, req.user.schoolId);
 
     res.status(201).json({ id: ref.id, ...transformed });
   } catch (err) {
@@ -868,15 +853,7 @@ resultsRouter.put('/:id', authenticate, authorize(['SCHOOL_ADMIN', 'TEACHER']), 
 
     await docRef.update(updateData);
     
-    await db.collection('activity-logs').add({
-      userId: req.user.id,
-      userName: req.user.name,
-      role: req.user.role,
-      action: 'UPDATE_RESULT',
-      details: `${req.user.role} updated result ID: ${req.params.id} (Status: ${updateData.status || existing.status})`,
-      schoolId: req.user.schoolId,
-      createdAt: new Date().toISOString()
-    });
+    await logActivity(req, 'UPDATE_RESULT', `${req.user.role === 'TEACHER' ? 'Teacher' : 'School Admin'} updated result ID: ${req.params.id} (Status: ${updateData.status || existing.status})`, req.user.schoolId);
 
     res.json({ message: 'Updated successfully' });
   } catch (err) {
@@ -890,7 +867,62 @@ router.use('/sessions', createCRUD('sessions', ['SCHOOL_ADMIN']));
 
 // Attendance - Teachers POST, Admins/Teachers GET
 router.use('/attendance', createCRUD('attendance', ['SCHOOL_ADMIN', 'TEACHER']));
-router.use('/activity-logs', createCRUD('activity-logs', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
+// GET /activity-logs with advanced filters, search, and strict role segregation
+router.get('/activity-logs', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADMIN']), async (req, res) => {
+  try {
+    let query = db.collection('activity-logs');
+
+    if (req.user.role === 'SUPER_ADMIN') {
+      if (req.query.schoolId) {
+        query = query.where('schoolId', '==', req.query.schoolId);
+      }
+    } else if (req.user.role === 'SCHOOL_ADMIN') {
+      query = query.where('schoolId', '==', req.user.schoolId);
+    } else {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    // Sort by createdAt descending
+    query = query.orderBy('createdAt', 'desc').limit(500);
+
+    const snapshot = await query.get();
+    let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Role-based segregation for Super Admin
+    if (req.user.role === 'SUPER_ADMIN') {
+      // Super Admin should ONLY see School Admin and Super Admin and System logs.
+      // Super Admin should NOT see teacher-level operational logs directly!
+      docs = docs.filter(doc => doc.role !== 'TEACHER');
+    }
+
+    // Filter by search term if provided
+    if (req.query.search) {
+      const searchStr = req.query.search.toLowerCase();
+      docs = docs.filter(doc => 
+        doc.details?.toLowerCase().includes(searchStr) ||
+        doc.action?.toLowerCase().includes(searchStr) ||
+        doc.userName?.toLowerCase().includes(searchStr) ||
+        doc.role?.toLowerCase().includes(searchStr) ||
+        doc.schoolName?.toLowerCase().includes(searchStr)
+      );
+    }
+
+    // Filter by role if provided
+    if (req.query.roleFilter) {
+      docs = docs.filter(doc => doc.role === req.query.roleFilter);
+    }
+
+    // Filter by action if provided
+    if (req.query.actionFilter) {
+      docs = docs.filter(doc => doc.action === req.query.actionFilter);
+    }
+
+    res.json(docs);
+  } catch (err) {
+    console.error('Failed to retrieve activity-logs:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // Dashboard Stats
 router.get('/dashboard-stats', authenticate, async (req, res) => {
