@@ -53,7 +53,7 @@ export default function Dashboard({ user }: { user: any }) {
             const profile = profileRes.data[0];
             setTeacherProfile(profile);
             if (profile.assignedClassIds?.length > 0) {
-              const classesRes = await classService.list({ ids: profile.assignedClassIds });
+              const classesRes = await classService.list();
               setAssignedClasses(classesRes.data);
             }
           }
@@ -185,29 +185,63 @@ export default function Dashboard({ user }: { user: any }) {
           </div>
           
           {user?.role === 'TEACHER' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {assignedClasses.length > 0 ? (
-                assignedClasses.map((c, i) => (
-                  <Link 
-                    to={`/students?classId=${c.id}`}
-                    key={c.id} 
-                    className="p-6 bg-gray-50 rounded-3xl border border-transparent hover:border-blue-200 hover:bg-blue-50/30 transition-all group"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
+            <div className="space-y-8">
+              <div>
+                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Assigned Classes</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {assignedClasses.length > 0 ? (
+                    assignedClasses.map((c, i) => (
+                      <Link 
+                        to={`/students?classId=${c.id}`}
+                        key={c.id} 
+                        className="p-6 bg-gray-50 rounded-3xl border border-transparent hover:border-blue-200 hover:bg-blue-50/30 transition-all group animate-fade-in"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
+                            <BookOpen size={20} />
+                          </div>
+                          <div className="text-[10px] font-black text-blue-100 bg-blue-600 px-2 py-0.5 rounded-full uppercase tracking-widestScale">Active</div>
+                        </div>
+                        <div className="font-bold text-lg text-gray-900 group-hover:text-blue-600 transition-colors uppercase">{c.name}</div>
+                        <div className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider font-bold">Level: {c.level}</div>
+                      </Link>
+                    ))
+                  ) : (
+                    <div className="col-span-2 py-10 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-100 flex flex-col items-center justify-center">
+                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-300 shadow-sm mb-3">
                         <BookOpen size={20} />
                       </div>
-                      <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active</div>
+                      <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No assigned class yet</p>
+                      <p className="text-[9px] text-gray-400 mt-1 italic">Ask your school administrator to configure class assignments.</p>
                     </div>
-                    <div className="font-bold text-lg text-gray-900">{c.name}</div>
-                    <div className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-medium">{c.studentCount || 0} Students</div>
-                  </Link>
-                ))
-              ) : (
-                <div className="col-span-2 py-12 text-center text-gray-400 italic">
-                  No classes assigned yet.
+                  )}
                 </div>
-              )}
+              </div>
+
+              <div className="pt-6 border-t border-gray-100">
+                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Assigned Subjects</h3>
+                {teacherProfile?.assignedSubjectIds?.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 animate-fade-in">
+                    {teacherProfile.assignedSubjectIds.map((subject: string, idx: number) => (
+                      <span 
+                        key={idx} 
+                        className="px-4 py-2 bg-amber-50 border border-amber-100/50 text-amber-700 font-bold rounded-2xl text-[10px] uppercase tracking-wider flex items-center gap-2"
+                      >
+                        <Book size={12} className="text-amber-500" />
+                        {subject}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-10 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-100 flex flex-col items-center justify-center">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-300 shadow-sm mb-3">
+                      <Book size={20} />
+                    </div>
+                    <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No assigned subject yet</p>
+                    <p className="text-[9px] text-gray-400 mt-1 italic">Ask your school administrator to configure subject assignments.</p>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="h-[300px] w-full flex items-center justify-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">

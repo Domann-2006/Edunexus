@@ -121,46 +121,43 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         query = query.where('schoolId', '==', req.query.schoolId);
       }
 
-      // Teacher-based filtering for students and classes
+      // Teacher-based filtering for students, classes, subjects, results, and attendance
       if (req.user?.role === 'TEACHER') {
         const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
         if (!teacherSnap.empty) {
           const teacherData = teacherSnap.docs[0].data();
-          // The admin now inputs names like "Primary 1", which are stored in assignedClassIds
-          const assignedClassNames = teacherData.assignedClassIds || [];
+          // Clear up confusion: assignedClassIds stores class IDs; assignedSubjectIds stores subject Names.
+          const assignedClassIds = teacherData.assignedClassIds || [];
+          const assignedSubjectNames = teacherData.assignedSubjectIds || [];
           
-          if (collectionName === 'students' || collectionName === 'classes' || collectionName === 'results' || collectionName === 'attendance' || collectionName === 'subjects') {
-            if (assignedClassNames.length > 0) {
-              // 1. Resolve names to IDs for data that uses IDs
+          if (['students', 'classes', 'results', 'attendance', 'subjects'].includes(collectionName)) {
+            if (assignedClassIds.length > 0) {
+              // 1. Resolve Class Names for collections matching metadata names (like subjects)
               const classesSnap = await db.collection('classes')
                 .where('schoolId', '==', req.user.schoolId)
-                .where('name', 'in', assignedClassNames.slice(0, 10))
+                .where('__name__', 'in', assignedClassIds.slice(0, 30))
                 .get();
               
-              const resolvedClassIds = classesSnap.docs.map(d => d.id);
-              
+              const assignedClassNames = classesSnap.docs.map(doc => doc.data().name);
+
               if (collectionName === 'classes') {
-                if (resolvedClassIds.length > 0) {
-                  query = query.where('__name__', 'in', resolvedClassIds.slice(0, 10));
-                } else {
-                  // Fallback: search by name if they are names
-                  query = query.where('name', 'in', assignedClassNames.slice(0, 10));
-                }
+                query = query.where('__name__', 'in', assignedClassIds.slice(0, 30));
               } else if (collectionName === 'subjects') {
-                // Subjects use 'class' name string instead of classId in some places, 
-                // but let's check for 'class' matches
-                query = query.where('class', 'in', assignedClassNames.slice(0, 10));
-              } else {
-                if (resolvedClassIds.length > 0) {
-                  query = query.where('classId', 'in', resolvedClassIds.slice(0, 10));
+                if (assignedClassNames.length > 0) {
+                  query = query.where('class', 'in', assignedClassNames.slice(0, 30));
                 } else {
                   return res.json([]);
                 }
+              } else {
+                // students, results, attendance query using 'classId' lookup
+                query = query.where('classId', 'in', assignedClassIds.slice(0, 30));
               }
             } else {
               return res.json([]);
             }
           }
+        } else {
+          return res.json([]);
         }
       }
 
@@ -177,7 +174,23 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
       query = query.limit(limit);
 
       const snapshot = await query.get();
-      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      let docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      // If of type subjects or results, filter down to assigned subjects as well for TEACHERs
+      if (req.user?.role === 'TEACHER' && (collectionName === 'subjects' || collectionName === 'results')) {
+        const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+        if (!teacherSnap.empty) {
+          const teacherData = teacherSnap.docs[0].data();
+          const assignedSubjectNames = teacherData.assignedSubjectIds || [];
+          
+          if (collectionName === 'subjects') {
+            docs = docs.filter(doc => assignedSubjectNames.includes(doc.name));
+          } else if (collectionName === 'results') {
+            docs = docs.filter(doc => assignedSubjectNames.includes(doc.subjectName));
+          }
+        }
+      }
+
       res.json(docs);
     } catch (err) {
       res.status(500).json({ message: err.message });
@@ -374,6 +387,21 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         if (req.user?.role !== 'SUPER_ADMIN' && existingData?.schoolId !== req.user?.schoolId) {
           return res.status(403).json({ message: 'Forbidden' });
         }
+
+        // Teacher validation output on DELETE: Can only delete in assigned classes
+        if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
+          const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+          if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
+          
+          const teacherData = teacherSnap.docs[0].data();
+          const assignedClassIds = teacherData.assignedClassIds || [];
+          const targetClassId = existingData.classId;
+          
+          if (!assignedClassIds.includes(targetClassId)) {
+            return res.status(403).json({ message: 'You can only delete data for your assigned classes' });
+          }
+        }
+
         await docRef.delete();
 
         // Log Activity for all roles
@@ -801,17 +829,30 @@ resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) =
 
     // Teacher assignment check
     const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-    if (!teacherSnap.empty) {
-      const tData = teacherSnap.docs[0].data();
-      if (!tData.assignedClassIds?.includes(data.classId)) {
-        return res.status(403).json({ message: 'Not assigned to this class' });
+    if (teacherSnap.empty) {
+      return res.status(403).json({ message: 'Teacher profile not found' });
+    }
+    const tData = teacherSnap.docs[0].data();
+    if (!tData.assignedClassIds?.includes(data.classId)) {
+      return res.status(403).json({ message: 'Not assigned to this class' });
+    }
+    
+    // Secure subject check resolving subjectName
+    let subjectName = data.subjectName;
+    if (!subjectName && data.subjectId) {
+      const subDoc = await db.collection('subjects').doc(data.subjectId).get();
+      if (subDoc.exists) {
+        subjectName = subDoc.data().name;
       }
+    }
+    if (!tData.assignedSubjectIds?.includes(subjectName)) {
+      return res.status(403).json({ message: 'Not assigned to this subject' });
     }
 
     const transformed = resultTransform(data);
     const ref = await db.collection('results').add(transformed);
     
-    await logActivity(req, 'CREATE_RESULT', `Teacher uploaded result for student ${data.studentId} in ${data.subjectName}`, req.user.schoolId);
+    await logActivity(req, 'CREATE_RESULT', `Teacher uploaded result for student ${data.studentId} in ${subjectName}`, req.user.schoolId);
 
     res.status(201).json({ id: ref.id, ...transformed });
   } catch (err) {
@@ -832,6 +873,18 @@ resultsRouter.put('/:id', authenticate, authorize(['SCHOOL_ADMIN', 'TEACHER']), 
     let updateData = { ...req.body, updatedAt: new Date().toISOString() };
 
     if (req.user.role === 'TEACHER') {
+      const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
+      if (teacherSnap.empty) {
+        return res.status(403).json({ message: 'Teacher profile not found' });
+      }
+      const tData = teacherSnap.docs[0].data();
+      if (!tData.assignedClassIds?.includes(existing.classId)) {
+        return res.status(403).json({ message: 'Not assigned to this class' });
+      }
+      if (!tData.assignedSubjectIds?.includes(existing.subjectName)) {
+        return res.status(403).json({ message: 'Not assigned to this subject' });
+      }
+
       // Cannot edit Approved results
       if (existing.status === 'APPROVED') {
         return res.status(403).json({ message: 'Cannot edit approved results' });
