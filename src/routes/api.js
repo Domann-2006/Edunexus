@@ -181,12 +181,44 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
         if (!teacherSnap.empty) {
           const teacherData = teacherSnap.docs[0].data();
+          const roleType = teacherData.roleType || 'BOTH';
+          const isClassOrBoth = roleType === 'CLASS' || roleType === 'BOTH';
+          const isSubjectOrBoth = roleType === 'SUBJECT' || roleType === 'BOTH';
+          const classAssignments = teacherData.classAssignments || [];
+          const subjectAssignments = teacherData.subjectAssignments || [];
           const assignedSubjectNames = teacherData.assignedSubjectIds || [];
-          
+
+          // Pre-fetch class mappings
+          const classesSnapshot = await db.collection('classes').where('schoolId', '==', req.user.schoolId).get();
+          const allSchoolClasses = classesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
           if (collectionName === 'subjects') {
-            docs = docs.filter(doc => assignedSubjectNames.includes(doc.name));
+            docs = docs.filter(doc => {
+              // 1. If Class Teacher for the class of the subject, allow it
+              const isClassTeacherForThis = isClassOrBoth && classAssignments.some(cId => {
+                const foundClass = allSchoolClasses.find(c => c.id === cId);
+                return foundClass && foundClass.name === doc.class;
+              });
+              if (isClassTeacherForThis) return true;
+
+              // 2. Adjust for subject assignment matching subject and class names
+              if (isSubjectOrBoth) {
+                if (subjectAssignments.length > 0) {
+                  return subjectAssignments.some(sa => sa.subjectName === doc.name && sa.className === doc.class);
+                }
+                return assignedSubjectNames.includes(doc.name);
+              }
+              return false;
+            });
           } else if (collectionName === 'results') {
-            docs = docs.filter(doc => assignedSubjectNames.includes(doc.subjectName));
+            docs = docs.filter(doc => {
+              // Results are exclusively subject-teacher and both roles domain
+              if (!isSubjectOrBoth) return false;
+              if (subjectAssignments.length > 0) {
+                return subjectAssignments.some(sa => sa.classId === doc.classId && sa.subjectName === doc.subjectName);
+              }
+              return assignedSubjectNames.includes(doc.subjectName);
+            });
           }
         }
       }
@@ -213,11 +245,20 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
           
           const teacherData = teacherSnap.docs[0].data();
-          const assignedClassIds = teacherData.assignedClassIds || [];
           const targetClassId = req.body.classId;
-          
-          if (!assignedClassIds.includes(targetClassId)) {
-            return res.status(403).json({ message: 'You can only manage data for your assigned classes' });
+
+          if (collectionName === 'students') {
+            const isClassTeacher = !teacherData.roleType || teacherData.roleType === 'CLASS' || teacherData.roleType === 'BOTH';
+            const classAssignments = teacherData.classAssignments || teacherData.assignedClassIds || [];
+            if (!isClassTeacher || !classAssignments.includes(targetClassId)) {
+              return res.status(403).json({ message: 'Only Class Teachers assigned to this class can manage students.' });
+            }
+          } else {
+            // Attendance / Results
+            const assignedClassIds = teacherData.assignedClassIds || [];
+            if (!assignedClassIds.includes(targetClassId)) {
+              return res.status(403).json({ message: 'You can only manage data for your assigned classes' });
+            }
           }
         }
 
@@ -327,13 +368,20 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
           
           const teacherData = teacherSnap.docs[0].data();
-          const assignedClassIds = teacherData.assignedClassIds || [];
-          
-          // For students, check classId. For attendance/results, check classId
           const targetClassId = existingData.classId;
-          
-          if (!assignedClassIds.includes(targetClassId)) {
-            return res.status(403).json({ message: 'You can only update data for your assigned classes' });
+
+          if (collectionName === 'students') {
+            const isClassTeacher = !teacherData.roleType || teacherData.roleType === 'CLASS' || teacherData.roleType === 'BOTH';
+            const classAssignments = teacherData.classAssignments || teacherData.assignedClassIds || [];
+            if (!isClassTeacher || !classAssignments.includes(targetClassId)) {
+              return res.status(403).json({ message: 'Only Class Teachers assigned to this class can update students.' });
+            }
+          } else {
+            // Attendance / Results
+            const assignedClassIds = teacherData.assignedClassIds || [];
+            if (!assignedClassIds.includes(targetClassId)) {
+              return res.status(403).json({ message: 'You can only update data for your assigned classes' });
+            }
           }
         }
 
@@ -394,11 +442,20 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
           
           const teacherData = teacherSnap.docs[0].data();
-          const assignedClassIds = teacherData.assignedClassIds || [];
           const targetClassId = existingData.classId;
-          
-          if (!assignedClassIds.includes(targetClassId)) {
-            return res.status(403).json({ message: 'You can only delete data for your assigned classes' });
+
+          if (collectionName === 'students') {
+            const isClassTeacher = !teacherData.roleType || teacherData.roleType === 'CLASS' || teacherData.roleType === 'BOTH';
+            const classAssignments = teacherData.classAssignments || teacherData.assignedClassIds || [];
+            if (!isClassTeacher || !classAssignments.includes(targetClassId)) {
+              return res.status(403).json({ message: 'Only Class Teachers assigned to this class can delete students.' });
+            }
+          } else {
+            // Attendance / Results 
+            const assignedClassIds = teacherData.assignedClassIds || [];
+            if (!assignedClassIds.includes(targetClassId)) {
+              return res.status(403).json({ message: 'You can only delete data for your assigned classes' });
+            }
           }
         }
 
@@ -447,7 +504,7 @@ const teacherRouter = createCRUD('teachers', ['SCHOOL_ADMIN'], null, { skipPost:
 // Override POST for teachers to create user account
 teacherRouter.post('/', authenticate, authorize(['SCHOOL_ADMIN']), async (req, res) => {
   try {
-    const { name, email, username, password, assignedClassIds, assignedSubjectIds, ...teacherFields } = req.body;
+    const { name, email, username, password, assignedClassIds, assignedSubjectIds, roleType, classAssignments, subjectAssignments, ...teacherFields } = req.body;
     const schoolId = req.user?.role === 'SUPER_ADMIN' ? (req.body.schoolId || req.user.schoolId) : req.user.schoolId;
 
     // Check if user already exists
@@ -481,6 +538,9 @@ teacherRouter.post('/', authenticate, authorize(['SCHOOL_ADMIN']), async (req, r
       schoolId,
       assignedClassIds: assignedClassIds || [],
       assignedSubjectIds: assignedSubjectIds || [],
+      roleType: roleType || 'BOTH',
+      classAssignments: classAssignments || [],
+      subjectAssignments: subjectAssignments || [],
       createdAt: new Date().toISOString()
     };
     
@@ -833,9 +893,6 @@ resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) =
       return res.status(403).json({ message: 'Teacher profile not found' });
     }
     const tData = teacherSnap.docs[0].data();
-    if (!tData.assignedClassIds?.includes(data.classId)) {
-      return res.status(403).json({ message: 'Not assigned to this class' });
-    }
     
     // Secure subject check resolving subjectName
     let subjectName = data.subjectName;
@@ -845,8 +902,25 @@ resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) =
         subjectName = subDoc.data().name;
       }
     }
-    if (!tData.assignedSubjectIds?.includes(subjectName)) {
-      return res.status(403).json({ message: 'Not assigned to this subject' });
+
+    const isSubjectTeacher = !tData.roleType || tData.roleType === 'SUBJECT' || tData.roleType === 'BOTH';
+    if (!isSubjectTeacher) {
+      return res.status(403).json({ message: 'Only Subject Teachers can upload results' });
+    }
+
+    const sAssignments = tData.subjectAssignments || [];
+    if (sAssignments.length > 0) {
+      const match = sAssignments.find(sa => sa.classId === data.classId && sa.subjectName === subjectName);
+      if (!match) {
+        return res.status(403).json({ message: 'You are not assigned to teach this subject in this class' });
+      }
+    } else {
+      if (!tData.assignedClassIds?.includes(data.classId)) {
+        return res.status(403).json({ message: 'Not assigned to this class' });
+      }
+      if (!tData.assignedSubjectIds?.includes(subjectName)) {
+        return res.status(403).json({ message: 'Not assigned to this subject' });
+      }
     }
 
     const transformed = resultTransform(data);
@@ -878,11 +952,24 @@ resultsRouter.put('/:id', authenticate, authorize(['SCHOOL_ADMIN', 'TEACHER']), 
         return res.status(403).json({ message: 'Teacher profile not found' });
       }
       const tData = teacherSnap.docs[0].data();
-      if (!tData.assignedClassIds?.includes(existing.classId)) {
-        return res.status(403).json({ message: 'Not assigned to this class' });
+      const isSubjectTeacher = !tData.roleType || tData.roleType === 'SUBJECT' || tData.roleType === 'BOTH';
+      if (!isSubjectTeacher) {
+        return res.status(403).json({ message: 'Only Subject Teachers can edit results' });
       }
-      if (!tData.assignedSubjectIds?.includes(existing.subjectName)) {
-        return res.status(403).json({ message: 'Not assigned to this subject' });
+
+      const sAssignments = tData.subjectAssignments || [];
+      if (sAssignments.length > 0) {
+        const match = sAssignments.find(sa => sa.classId === existing.classId && sa.subjectName === existing.subjectName);
+        if (!match) {
+          return res.status(403).json({ message: 'You are not assigned to teach this subject in this class' });
+        }
+      } else {
+        if (!tData.assignedClassIds?.includes(existing.classId)) {
+          return res.status(403).json({ message: 'Not assigned to this class' });
+        }
+        if (!tData.assignedSubjectIds?.includes(existing.subjectName)) {
+          return res.status(403).json({ message: 'Not assigned to this subject' });
+        }
       }
 
       // Cannot edit Approved results

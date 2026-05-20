@@ -29,8 +29,13 @@ export default function Teachers({ user }: { user: any }) {
     schoolId: '',
     assignedClasses: [] as string[],
     assignedSubjects: '',
+    roleType: 'BOTH',
+    classAssignments: [] as string[],
+    subjectAssignments: [] as any[],
   });
 
+  const [fetchedSubjects, setFetchedSubjects] = useState<any[]>([]);
+  const [fetchedSessions, setFetchedSessions] = useState<any[]>([]);
   const [generatedCreds, setGeneratedCreds] = useState<any>(null);
 
   useEffect(() => {
@@ -43,14 +48,18 @@ export default function Teachers({ user }: { user: any }) {
       const targetSchoolId = selectedSchoolId || user?.schoolId;
       const promises: Promise<any>[] = [
         teacherService.list({ schoolId: targetSchoolId }),
-        api.get('/v1/classes', { params: { schoolId: targetSchoolId } })
+        api.get('/v1/classes', { params: { schoolId: targetSchoolId } }),
+        api.get('/v1/subjects', { params: { schoolId: targetSchoolId } }),
+        api.get('/v1/sessions', { params: { schoolId: targetSchoolId } })
       ];
       if (user?.role === 'SUPER_ADMIN') {
         promises.push(schoolService.list());
       }
-      const [teacherRes, classRes, schoolRes] = await Promise.all(promises);
+      const [teacherRes, classRes, subjectRes, sessionRes, schoolRes] = await Promise.all(promises);
       setTeachers(teacherRes.data);
       setClasses(classRes.data);
+      setFetchedSubjects(subjectRes?.data || []);
+      setFetchedSessions(sessionRes?.data || []);
       if (schoolRes) setSchools(schoolRes.data);
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -62,11 +71,23 @@ export default function Teachers({ user }: { user: any }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Split the comma-separated strings into arrays for the backend
+      // Calculate union of assigned classes for downstream compatibility
+      const classTeacherIds = formData.roleType === 'CLASS' || formData.roleType === 'BOTH' ? formData.classAssignments : [];
+      const subjectTeacherIds = formData.roleType === 'SUBJECT' || formData.roleType === 'BOTH' 
+        ? formData.subjectAssignments.map(sa => sa.classId).filter(Boolean)
+        : [];
+      const finalClassIds = [...new Set([...classTeacherIds, ...subjectTeacherIds])];
+      const finalSubjectNames = formData.roleType === 'SUBJECT' || formData.roleType === 'BOTH'
+        ? [...new Set(formData.subjectAssignments.map(sa => sa.subjectName).filter(Boolean))]
+        : [];
+
       const submitData = {
         ...formData,
-        assignedClassIds: formData.assignedClasses,
-        assignedSubjectIds: formData.assignedSubjects.split(',').map(s => s.trim()).filter(Boolean),
+        roleType: formData.roleType,
+        classAssignments: formData.classAssignments,
+        subjectAssignments: formData.subjectAssignments,
+        assignedClassIds: finalClassIds,
+        assignedSubjectIds: finalSubjectNames,
       };
 
       if (editingId) {
@@ -117,8 +138,11 @@ export default function Teachers({ user }: { user: any }) {
         phone: teacher.phone || '',
         address: teacher.address || '',
         schoolId: teacher.schoolId || '',
-        assignedClasses: teacher.assignedClassIds || [],
+        assignedClasses: teacher.classAssignments || teacher.assignedClassIds || [],
         assignedSubjects: (teacher.assignedSubjectIds || []).join(', '),
+        roleType: teacher.roleType || 'BOTH',
+        classAssignments: teacher.classAssignments || teacher.assignedClassIds || [],
+        subjectAssignments: teacher.subjectAssignments || [],
       });
     } else {
       setEditingId(null);
@@ -135,6 +159,9 @@ export default function Teachers({ user }: { user: any }) {
         schoolId: user?.role === 'SUPER_ADMIN' ? '' : (user?.schoolId || ''),
         assignedClasses: [],
         assignedSubjects: '',
+        roleType: 'BOTH',
+        classAssignments: [],
+        subjectAssignments: [],
       });
     }
     setIsModalOpen(true);
@@ -190,8 +217,8 @@ export default function Teachers({ user }: { user: any }) {
             <thead className="bg-gray-50/50 text-gray-400 text-xs font-bold tracking-widest border-b border-gray-50">
               <tr>
                 <th className="px-6 py-4">Teacher</th>
-                <th className="px-6 py-4">Employee ID</th>
-                <th className="px-6 py-4">Specialization</th>
+                <th className="px-6 py-4">Employee ID / Role</th>
+                <th className="px-6 py-4">Assignments Summary</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -230,20 +257,69 @@ export default function Teachers({ user }: { user: any }) {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         <div className="text-gray-500 font-mono text-xs">{teacher.employeeId}</div>
-                        {teacher.address && (
-                          <div className="flex items-center gap-1 text-[9px] text-gray-400 font-medium normal-case tracking-tight max-w-[150px] truncate" title={teacher.address}>
-                            <MapPin size={10} className="text-gray-300 shrink-0" />
-                            {teacher.address}
-                          </div>
-                        )}
+                        <div>
+                          {(!teacher.roleType || teacher.roleType === 'BOTH') && (
+                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100/50 rounded-full font-bold text-[9px] uppercase tracking-wide">
+                              Both Roles
+                            </span>
+                          )}
+                          {teacher.roleType === 'SUBJECT' && (
+                            <span className="px-2 py-0.5 bg-sky-50 text-sky-700 border border-sky-100/50 rounded-full font-bold text-[9px] uppercase tracking-wide">
+                              Subject Teacher
+                            </span>
+                          )}
+                          {teacher.roleType === 'CLASS' && (
+                            <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-100/50 rounded-full font-bold text-[9px] uppercase tracking-wide">
+                              Class Teacher
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full font-bold text-[10px]">
-                        {teacher.specialization}
-                      </span>
+                      <div className="space-y-1.5 max-w-xs text-[10px] uppercase font-bold text-gray-400">
+                        {(!teacher.roleType || teacher.roleType === 'CLASS' || teacher.roleType === 'BOTH') && (
+                          <div className="flex flex-wrap gap-1 items-center">
+                            <span className="text-gray-500 font-black shrink-0 text-[9px]">Class:</span>
+                            {(teacher.classAssignments || teacher.assignedClassIds || []).length > 0 ? (
+                              (teacher.classAssignments || teacher.assignedClassIds || []).map((cId: string) => {
+                                const found = classes.find(c => c.id === cId);
+                                return found ? (
+                                  <span key={cId} className="px-1.5 py-0.5 bg-purple-50 border border-purple-100/50 text-purple-600 rounded-lg">
+                                    {found.name}
+                                  </span>
+                                ) : null;
+                              })
+                            ) : (
+                              <span className="text-gray-400 italic lowercase font-normal">none</span>
+                            )}
+                          </div>
+                        )}
+                        {(!teacher.roleType || teacher.roleType === 'SUBJECT' || teacher.roleType === 'BOTH') && (
+                          <div className="flex flex-wrap gap-1 items-center mt-1">
+                            <span className="text-gray-500 font-black shrink-0 text-[9px]">Subject:</span>
+                            {(teacher.subjectAssignments || []).length > 0 ? (
+                              (teacher.subjectAssignments || []).map((sa: any, index: number) => (
+                                <span key={index} className="px-1.5 py-0.5 bg-amber-50 border border-amber-100/50 text-amber-600 rounded-lg" title={`${sa.subjectName} for class ${sa.className}`}>
+                                  {sa.subjectName} ({sa.className})
+                                </span>
+                              ))
+                            ) : (
+                              (teacher.assignedSubjectIds || []).length > 0 ? (
+                                (teacher.assignedSubjectIds || []).map((name: string, index: number) => (
+                                  <span key={index} className="px-1.5 py-0.5 bg-amber-50 border border-amber-100/50 text-amber-600 rounded-lg">
+                                    {name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-gray-400 italic lowercase font-normal text-[9px]">none</span>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 text-xs">
@@ -386,54 +462,216 @@ export default function Teachers({ user }: { user: any }) {
                         </div>
                       )}
                       
-                      <div className="space-y-3 md:col-span-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Assigned Classes</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-3xl max-h-48 overflow-y-auto border border-gray-100">
-                           {classes.map(c => {
-                             const isSelected = formData.assignedClasses.includes(c.id);
-                             return (
-                               <div 
-                                 key={c.id} 
-                                 onClick={() => {
-                                   const newClasses = isSelected 
-                                     ? formData.assignedClasses.filter(id => id !== c.id)
-                                     : [...formData.assignedClasses, c.id];
-                                   setFormData({ ...formData, assignedClasses: newClasses });
-                                 }}
-                                 className={`cursor-pointer group flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                                   isSelected ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-gray-100 text-gray-600 hover:border-blue-200'
-                                 }`}
-                               >
-                                 <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
-                                   isSelected ? 'bg-white border-white' : 'bg-gray-100 border-gray-200 group-hover:border-blue-300'
-                                 }`}>
-                                   {isSelected && <CheckCircle size={10} className="text-blue-600" />}
-                                 </div>
-                                 <div className="flex flex-col">
-                                   <span className="text-[10px] font-black tracking-tight leading-none uppercase">{c.name}</span>
-                                   <span className={`text-[8px] font-bold ${isSelected ? 'text-blue-100' : 'text-gray-400'}`}>{c.level}</span>
-                                 </div>
-                               </div>
-                             );
-                           })}
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Role Type</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {[
+                            { value: 'SUBJECT', label: 'Subject Teacher', desc: 'Teaches assigned subjects' },
+                            { value: 'CLASS', label: 'Class Teacher', desc: 'Manages a specific class' },
+                            { value: 'BOTH', label: 'Both (Subject + Class)', desc: 'Full teaching & management' }
+                          ].map(opt => (
+                            <div
+                              key={opt.value}
+                              onClick={() => {
+                                setFormData({ 
+                                  ...formData, 
+                                  roleType: opt.value
+                                });
+                              }}
+                              className={`cursor-pointer flex flex-col p-4 rounded-2xl border transition-all ${
+                                formData.roleType === opt.value 
+                                  ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' 
+                                  : 'bg-gray-50 border-gray-100 text-gray-700 hover:bg-gray-100/50'
+                              }`}
+                            >
+                              <span className="text-xs font-black uppercase tracking-wider">{opt.label}</span>
+                              <span className={`text-[9px] mt-1 ${formData.roleType === opt.value ? 'text-blue-100' : 'text-gray-400 font-medium'}`}>{opt.desc}</span>
+                            </div>
+                          ))}
                         </div>
-                        <p className="text-[9px] text-gray-400 font-medium px-2 italic">Teachers will only be able to manage students and results in selected classes.</p>
                       </div>
 
-                      <div className="space-y-2 md:col-span-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Subjects</label>
-                        <div className="relative">
-                          <Book className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                          <input
-                            type="text"
-                            value={formData.assignedSubjects}
-                            onChange={(e) => setFormData({...formData, assignedSubjects: e.target.value})}
-                            placeholder="e.g. Mathematics, English Language, Physics"
-                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
-                          />
+                      {(formData.roleType === 'CLASS' || formData.roleType === 'BOTH') && (
+                        <div className="space-y-3 md:col-span-2">
+                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Class Teacher Assignments</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-3xl max-h-48 overflow-y-auto border border-gray-100">
+                             {classes.map(c => {
+                               const isSelected = formData.classAssignments.includes(c.id);
+                               return (
+                                 <div 
+                                   key={c.id} 
+                                   onClick={() => {
+                                     const newClasses = isSelected 
+                                       ? formData.classAssignments.filter(id => id !== c.id)
+                                       : [...formData.classAssignments, c.id];
+                                     setFormData({ ...formData, classAssignments: newClasses });
+                                   }}
+                                   className={`cursor-pointer group flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                                     isSelected ? 'bg-purple-600 border-purple-600 text-white shadow-md' : 'bg-white border-gray-100 text-gray-600 hover:border-purple-200'
+                                   }`}
+                                 >
+                                   <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                                     isSelected ? 'bg-white border-white' : 'bg-gray-100 border-gray-200 group-hover:border-purple-300'
+                                   }`}>
+                                     {isSelected && <CheckCircle size={10} className="text-purple-600" />}
+                                   </div>
+                                   <div className="flex flex-col">
+                                     <span className="text-[10px] font-black tracking-tight leading-none uppercase">{c.name}</span>
+                                     <span className={`text-[8px] font-bold ${isSelected ? 'text-purple-100' : 'text-gray-400'}`}>{c.level}</span>
+                                   </div>
+                                 </div>
+                               );
+                             })}
+                          </div>
+                          <p className="text-[9px] text-gray-400 font-medium px-2 italic font-sans">Select one or multiple classes where this teacher is the designated Class Teacher.</p>
                         </div>
-                        <p className="text-[9px] text-gray-400 font-medium px-2 italic">Separate multiple subjects with commas.</p>
-                      </div>
+                      )}
+
+                      {(formData.roleType === 'SUBJECT' || formData.roleType === 'BOTH') && (
+                        <div className="space-y-4 md:col-span-2">
+                          <div className="flex justify-between items-center ml-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Subject Teacher Assignments</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const firstSession = fetchedSessions[0];
+                                const newAssign = {
+                                  subjectId: '',
+                                  subjectName: '',
+                                  classId: '',
+                                  className: '',
+                                  sessionId: firstSession?.id || '',
+                                  sessionName: firstSession?.name || '',
+                                };
+                                setFormData({
+                                  ...formData,
+                                  subjectAssignments: [...formData.subjectAssignments, newAssign]
+                                });
+                              }}
+                              className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1"
+                            >
+                              <Plus size={12} /> Add Subject Assignment
+                            </button>
+                          </div>
+
+                          <div className="space-y-3">
+                            {formData.subjectAssignments.length === 0 ? (
+                              <div className="p-6 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center text-gray-400">
+                                <Book size={18} className="mx-auto mb-2 text-gray-300" />
+                                <p className="text-[10px] uppercase font-bold text-gray-400/80 tracking-wider">No Subject Assignments Added</p>
+                                <p className="text-[9px] mt-0.5 lowercase italic font-normal">Click "+ Add Subject Assignment" above to map a subject, class, academic session, and term.</p>
+                              </div>
+                            ) : (
+                              formData.subjectAssignments.map((sa, idx) => (
+                                <div key={idx} className="p-4 bg-gray-50 border border-gray-100 rounded-3xl relative space-y-4 shadow-sm animate-fade-in">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs uppercase font-extrabold text-gray-700">
+                                    <div>
+                                      <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Subject</label>
+                                      <select
+                                        required
+                                        value={sa.subjectId || ''}
+                                        onChange={(e) => {
+                                          const subId = e.target.value;
+                                          const found = fetchedSubjects.find(s => s.id === subId);
+                                          const updated = [...formData.subjectAssignments];
+                                          updated[idx] = { 
+                                            ...sa, 
+                                            subjectId: subId, 
+                                            subjectName: found ? found.name : '' 
+                                          };
+                                          setFormData({ ...formData, subjectAssignments: updated });
+                                        }}
+                                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
+                                      >
+                                        <option value="">Select Subject</option>
+                                        {fetchedSubjects.map(sub => (
+                                          <option key={sub.id} value={sub.id}>{sub.name} ({sub.class})</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Class</label>
+                                      <select
+                                        required
+                                        value={sa.classId || ''}
+                                        onChange={(e) => {
+                                          const cId = e.target.value;
+                                          const found = classes.find(c => c.id === cId);
+                                          const updated = [...formData.subjectAssignments];
+                                          updated[idx] = { 
+                                            ...sa, 
+                                            classId: cId, 
+                                            className: found ? found.name : '' 
+                                          };
+                                          setFormData({ ...formData, subjectAssignments: updated });
+                                        }}
+                                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
+                                      >
+                                        <option value="">Select Class</option>
+                                        {classes.map(c => (
+                                          <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Session</label>
+                                      <select
+                                        required
+                                        value={sa.sessionId || ''}
+                                        onChange={(e) => {
+                                          const sId = e.target.value;
+                                          const found = fetchedSessions.find(s => s.id === sId);
+                                          const updated = [...formData.subjectAssignments];
+                                          updated[idx] = { 
+                                            ...sa, 
+                                            sessionId: sId, 
+                                            sessionName: found ? found.name : '' 
+                                          };
+                                          setFormData({ ...formData, subjectAssignments: updated });
+                                        }}
+                                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
+                                      >
+                                        <option value="">Select Session</option>
+                                        {fetchedSessions.map(s => (
+                                          <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Term</label>
+                                      <select
+                                        value={sa.term || ''}
+                                        onChange={(e) => {
+                                          const updated = [...formData.subjectAssignments];
+                                          updated[idx] = { ...sa, term: e.target.value || undefined };
+                                          setFormData({ ...formData, subjectAssignments: updated });
+                                        }}
+                                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
+                                      >
+                                        <option value="">All Terms</option>
+                                        <option value="First Term">First Term</option>
+                                        <option value="Second Term">Second Term</option>
+                                        <option value="Third Term">Third Term</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = formData.subjectAssignments.filter((_, i) => i !== idx);
+                                      setFormData({ ...formData, subjectAssignments: updated });
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 p-1 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                                    title="Delete Assignment"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="space-y-2">
                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Specialization</label>

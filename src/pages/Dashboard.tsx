@@ -190,22 +190,53 @@ export default function Dashboard({ user }: { user: any }) {
                 <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Assigned Classes</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {assignedClasses.length > 0 ? (
-                    assignedClasses.map((c, i) => (
-                      <Link 
-                        to={`/students?classId=${c.id}`}
-                        key={c.id} 
-                        className="p-6 bg-gray-50 rounded-3xl border border-transparent hover:border-blue-200 hover:bg-blue-50/30 transition-all group animate-fade-in"
-                      >
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
-                            <BookOpen size={20} />
+                    assignedClasses.map((c, i) => {
+                      const isClassAssigned = (teacherProfile?.classAssignments || []).includes(c.id);
+                      const assignedSubs = (teacherProfile?.subjectAssignments || []).filter(sa => sa.classId === c.id);
+                      const hasSubjectAssignments = assignedSubs.length > 0;
+                      return (
+                        <Link 
+                          to={`/students?classId=${c.id}`}
+                          key={c.id} 
+                          className="p-6 bg-gray-50 rounded-3xl border border-transparent hover:border-blue-200 hover:bg-blue-50/30 transition-all group animate-fade-in flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
+                                <BookOpen size={20} />
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                {isClassAssigned && (
+                                  <span className="text-[8.5px] font-black text-purple-705 bg-purple-50 px-2 py-0.5 rounded-full uppercase tracking-wider border border-purple-100/50">
+                                    Class Teacher
+                                  </span>
+                                )}
+                                {hasSubjectAssignments && (
+                                  <span className="text-[8.5px] font-black text-amber-705 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-100/50">
+                                    Subject Teacher
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="font-bold text-lg text-gray-900 group-hover:text-blue-600 transition-colors uppercase">{c.name}</div>
+                            <div className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider font-bold font-sans">Level: {c.level}</div>
                           </div>
-                          <div className="text-[10px] font-black text-blue-100 bg-blue-600 px-2 py-0.5 rounded-full uppercase tracking-widestScale">Active</div>
-                        </div>
-                        <div className="font-bold text-lg text-gray-900 group-hover:text-blue-600 transition-colors uppercase">{c.name}</div>
-                        <div className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider font-bold">Level: {c.level}</div>
-                      </Link>
-                    ))
+
+                          {hasSubjectAssignments && (
+                            <div className="mt-4 pt-3 border-t border-gray-100/70">
+                              <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">My Subjects:</div>
+                              <div className="flex flex-wrap gap-1">
+                                {assignedSubs.map((sa, sIdx) => (
+                                  <span key={sIdx} className="px-1.5 py-0.5 bg-amber-50 border border-amber-100/50 text-amber-600 rounded-lg text-[9px] font-bold">
+                                    {sa.subjectName}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </Link>
+                      );
+                    })
                   ) : (
                     <div className="col-span-2 py-10 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-100 flex flex-col items-center justify-center">
                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-300 shadow-sm mb-3">
@@ -219,8 +250,20 @@ export default function Dashboard({ user }: { user: any }) {
               </div>
 
               <div className="pt-6 border-t border-gray-100">
-                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Assigned Subjects</h3>
-                {teacherProfile?.assignedSubjectIds?.length > 0 ? (
+                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Assigned Subjects Overview</h3>
+                {teacherProfile?.subjectAssignments?.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 animate-fade-in">
+                    {teacherProfile.subjectAssignments.map((sa: any, idx: number) => (
+                      <span 
+                        key={idx} 
+                        className="px-4 py-2 bg-amber-50 border border-amber-100/50 text-amber-700 font-bold rounded-2xl text-[10px] uppercase tracking-wider flex items-center gap-2"
+                      >
+                        <Book size={12} className="text-amber-500" />
+                        {sa.subjectName} ({sa.className})
+                      </span>
+                    ))}
+                  </div>
+                ) : teacherProfile?.assignedSubjectIds?.length > 0 ? (
                   <div className="flex flex-wrap gap-2 animate-fade-in">
                     {teacherProfile.assignedSubjectIds.map((subject: string, idx: number) => (
                       <span 
