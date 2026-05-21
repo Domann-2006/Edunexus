@@ -51,6 +51,66 @@ api.interceptors.response.use(
 
 export default api;
 
+// --- CLIENT-SIDE INSTANT CACHE FOR HIGH-PERFORMANCE ROUTE TRANSITIONS ---
+const clientCache = new Map<string, { data: any; expires: number }>();
+
+const originalGet = api.get;
+api.get = function (url: string, config?: any) {
+  const isCacheable = url.includes('/v1/') && !url.includes('/chats') && !url.includes('/tickets');
+  
+  if (!isCacheable || config?.bypassCache) {
+    return originalGet.call(this, url, config);
+  }
+  
+  const cacheKey = url + JSON.stringify(config?.params || {});
+  const now = Date.now();
+  const cached = clientCache.get(cacheKey);
+  
+  if (cached && cached.expires > now) {
+    console.debug(`[CLIENT CACHE HIT] Returning sub-millisecond cached state for route ${url}`);
+    return Promise.resolve(cached.data);
+  }
+  
+  return originalGet.call(this, url, config).then((response) => {
+    if (response && response.status === 200) {
+      // Cache lists for 12 seconds to provide blistering fast dashboard navigation
+      clientCache.set(cacheKey, { data: response, expires: Date.now() + 12000 });
+    }
+    return response;
+  });
+};
+
+// Response Interceptor to automatically invalidate relevant cache scopes upon write operations
+api.interceptors.response.use(
+  (response) => {
+    const config = response.config;
+    if (config?.method && ['post', 'put', 'delete'].includes(config.method.toLowerCase())) {
+      const url = config.url || '';
+      const segments = url.split('/');
+      // e.g. /v1/students from /v1/students/someId
+      const baseResource = segments.slice(0, 3).join('/'); 
+      
+      console.debug(`[CLIENT MUTATION DETECTED] Invalidating cache prefix: ${baseResource}`);
+      for (const key of clientCache.keys()) {
+        if (key.includes(baseResource) || key.includes(url)) {
+          clientCache.delete(key);
+        }
+      }
+      
+      // Also invalidate stats dashboard data
+      for (const key of clientCache.keys()) {
+        if (key.includes('/v1/dashboard-stats') || key.includes('subscriptions')) {
+          clientCache.delete(key);
+        }
+      }
+    }
+    return response;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export const authService = {
   login: (credentials: any) => api.post('/auth/login', credentials),
   logout: () => api.post('/auth/logout'),

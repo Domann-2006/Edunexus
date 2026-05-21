@@ -179,9 +179,25 @@ export default function Messages({ user }: { user: any }) {
     setUploading(true);
     setUploadProgress(10); // Start visual tracker
     
+    let fileToUpload = file;
+    if (type === 'image') {
+      try {
+        const imageCompression = (await import('browser-image-compression')).default;
+        const options = {
+          maxSizeMB: 0.8,
+          maxWidthOrHeight: 1200,
+          useWebWorker: true,
+        };
+        fileToUpload = await imageCompression(file, options) as File;
+        console.log(`[COMPRESSION] Reduced size from ${(file.size / 1024).toFixed(1)}KB to ${(fileToUpload.size / 1024).toFixed(1)}KB`);
+      } catch (compressionError) {
+        console.warn('[COMPRESSION] Skipping image compression, using original:', compressionError);
+      }
+    }
+
     try {
       // 1. Attempt upload to Cloudinary using services helper
-      const res = await fileService.upload(file, 'chats', (progress) => {
+      const res = await fileService.upload(fileToUpload, 'chats', (progress) => {
         setUploadProgress(progress);
       });
       
@@ -189,7 +205,7 @@ export default function Messages({ user }: { user: any }) {
         url: res.data.url,
         name: file.name,
         type: type,
-        size: formatBytes(file.size)
+        size: formatBytes(fileToUpload.size)
       });
     } catch (err: any) {
       console.warn('Cloudinary upload connection unsuccessful, switching to instant secure base64 sandbox fallback:', err);
@@ -201,10 +217,10 @@ export default function Messages({ user }: { user: any }) {
           url: reader.result as string,
           name: file.name,
           type: type,
-          size: formatBytes(file.size)
+          size: formatBytes(fileToUpload.size)
         });
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(fileToUpload);
     } finally {
       setUploading(false);
       setUploadProgress(null);

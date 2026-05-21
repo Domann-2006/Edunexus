@@ -7,6 +7,80 @@ import { LEVEL_CLASSES, DEFAULT_SUBJECTS } from '../lib/curriculum.js';
 
 const router = express.Router();
 
+// --- BACKEND MEMORY CACHING SYSTEM FOR FIRESTORE READ OPTIMIZATION ---
+const teacherProfileCache = new Map(); // userId -> { data, expires }
+const schoolCollectionCache = new Map(); // `${schoolId}:${collectionName}` -> { data, expires }
+const dashboardStatsCache = new Map(); // `${schoolId}:${isSuper}` -> { data, expires }
+
+export const getCachedTeacherProfile = async (userId) => {
+  if (!userId) return null;
+  const now = Date.now();
+  const cached = teacherProfileCache.get(userId);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+  const teacherSnap = await db.collection('teachers').where('userId', '==', userId).limit(1).get();
+  if (teacherSnap.empty) {
+    teacherProfileCache.set(userId, { data: null, expires: now + 5000 });
+    return null;
+  }
+  const docObj = teacherSnap.docs[0];
+  const profile = { id: docObj.id, ...docObj.data() };
+  teacherProfileCache.set(userId, { data: profile, expires: now + 30000 }); // Cache for 30s
+  return profile;
+};
+
+export const clearTeacherProfileCache = (userId) => {
+  if (userId) {
+    teacherProfileCache.delete(userId);
+  } else {
+    teacherProfileCache.clear();
+  }
+};
+
+export const getCachedSchoolCollection = async (schoolId, collectionName) => {
+  const key = `${schoolId}:${collectionName}`;
+  const now = Date.now();
+  const cached = schoolCollectionCache.get(key);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+  let query = db.collection(collectionName);
+  if (schoolId && schoolId !== 'SUPER') {
+    query = query.where('schoolId', '==', schoolId);
+  }
+  const snapshot = await query.get();
+  const data = snapshot.docs.map(docObj => ({ id: docObj.id, ...docObj.data() }));
+  schoolCollectionCache.set(key, { data, expires: now + 30000 }); // Cache for 30s
+  return data;
+};
+
+export const clearSchoolCollectionCache = (schoolId, collectionName) => {
+  const key = `${schoolId}:${collectionName}`;
+  schoolCollectionCache.delete(key);
+  if (!schoolId) {
+    for (const k of schoolCollectionCache.keys()) {
+      if (k.endsWith(`:${collectionName}`)) {
+        schoolCollectionCache.delete(k);
+      }
+    }
+  }
+};
+
+export const invalidateAllCaches = (schoolId = null) => {
+  teacherProfileCache.clear();
+  dashboardStatsCache.clear();
+  if (schoolId) {
+    for (const key of schoolCollectionCache.keys()) {
+      if (key.startsWith(`${schoolId}:`)) {
+        schoolCollectionCache.delete(key);
+      }
+    }
+  } else {
+    schoolCollectionCache.clear();
+  }
+};
+
 // Helper to setup curriculum
 async function setupSchoolCurriculum(schoolId) {
   try {
@@ -123,9 +197,9 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 
       // Teacher-based filtering for students, classes, subjects, results, and attendance
       if (req.user?.role === 'TEACHER') {
-        const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-        if (!teacherSnap.empty) {
-          const teacherData = teacherSnap.docs[0].data();
+        const teacherProfile = await getCachedTeacherProfile(req.user.id);
+        if (teacherProfile) {
+          const teacherData = teacherProfile;
           // Clear up confusion: assignedClassIds stores class IDs; assignedSubjectIds stores subject Names.
           const assignedClassIds = teacherData.assignedClassIds || [];
           const assignedSubjectNames = teacherData.assignedSubjectIds || [];
@@ -133,12 +207,10 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           if (['students', 'classes', 'results', 'attendance', 'subjects'].includes(collectionName)) {
             if (assignedClassIds.length > 0) {
               // 1. Resolve Class Names for collections matching metadata names (like subjects)
-              const classesSnap = await db.collection('classes')
-                .where('schoolId', '==', req.user.schoolId)
-                .where('__name__', 'in', assignedClassIds.slice(0, 30))
-                .get();
-              
-              const assignedClassNames = classesSnap.docs.map(doc => doc.data().name);
+              const allSchoolClasses = await getCachedSchoolCollection(req.user.schoolId, 'classes');
+              const assignedClassNames = allSchoolClasses
+                .filter(c => assignedClassIds.includes(c.id))
+                .map(c => c.name);
 
               if (collectionName === 'classes') {
                 query = query.where('__name__', 'in', assignedClassIds.slice(0, 30));
@@ -178,9 +250,9 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 
       // If of type subjects or results, filter down to assigned subjects as well for TEACHERs
       if (req.user?.role === 'TEACHER' && (collectionName === 'subjects' || collectionName === 'results')) {
-        const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-        if (!teacherSnap.empty) {
-          const teacherData = teacherSnap.docs[0].data();
+        const teacherProfile = await getCachedTeacherProfile(req.user.id);
+        if (teacherProfile) {
+          const teacherData = teacherProfile;
           const roleType = teacherData.roleType || 'BOTH';
           const isClassOrBoth = roleType === 'CLASS' || roleType === 'BOTH';
           const isSubjectOrBoth = roleType === 'SUBJECT' || roleType === 'BOTH';
@@ -189,8 +261,7 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           const assignedSubjectNames = teacherData.assignedSubjectIds || [];
 
           // Pre-fetch class mappings
-          const classesSnapshot = await db.collection('classes').where('schoolId', '==', req.user.schoolId).get();
-          const allSchoolClasses = classesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          const allSchoolClasses = await getCachedSchoolCollection(req.user.schoolId, 'classes');
 
           if (collectionName === 'subjects') {
             docs = docs.filter(doc => {
@@ -241,10 +312,10 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         
         // Teacher validation: Can only create in assigned classes
         if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
-          const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-          if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
+          const teacherProfile = await getCachedTeacherProfile(req.user.id);
+          if (!teacherProfile) return res.status(403).json({ message: 'Teacher profile not found' });
           
-          const teacherData = teacherSnap.docs[0].data();
+          const teacherData = teacherProfile;
           const targetClassId = req.body.classId;
 
           if (collectionName === 'students') {
@@ -326,6 +397,13 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           console.error('Error logging creation:', logErr);
         }
 
+        // Invalidate caching scopes
+        if (req.user?.schoolId) {
+          clearSchoolCollectionCache(req.user.schoolId, collectionName);
+          dashboardStatsCache.delete(`${req.user.schoolId}:true`);
+          dashboardStatsCache.delete(`${req.user.schoolId}:false`);
+        }
+
         res.status(201).json({ id: ref.id, ...data });
       } catch (err) {
         console.error(`Error creating document in ${collectionName}:`, err);
@@ -364,10 +442,10 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 
         // Teacher validation: Can only update if in assigned class
         if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
-          const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-          if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
+          const teacherProfile = await getCachedTeacherProfile(req.user.id);
+          if (!teacherProfile) return res.status(403).json({ message: 'Teacher profile not found' });
           
-          const teacherData = teacherSnap.docs[0].data();
+          const teacherData = teacherProfile;
           const targetClassId = existingData.classId;
 
           if (collectionName === 'students') {
@@ -412,6 +490,13 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           console.error('Error logging update:', logErr);
         }
 
+        // Invalidate caching scopes
+        if (req.user?.schoolId) {
+          clearSchoolCollectionCache(req.user.schoolId, collectionName);
+          dashboardStatsCache.delete(`${req.user.schoolId}:true`);
+          dashboardStatsCache.delete(`${req.user.schoolId}:false`);
+        }
+
         res.json({ message: 'Updated successfully', data: { id: updatedDoc.id, ...updatedDoc.data() } });
       } catch (err) {
         res.status(500).json({ message: err.message });
@@ -438,10 +523,10 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 
         // Teacher validation output on DELETE: Can only delete in assigned classes
         if (req.user?.role === 'TEACHER' && (collectionName === 'students' || collectionName === 'attendance' || collectionName === 'results')) {
-          const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-          if (teacherSnap.empty) return res.status(403).json({ message: 'Teacher profile not found' });
+          const teacherProfile = await getCachedTeacherProfile(req.user.id);
+          if (!teacherProfile) return res.status(403).json({ message: 'Teacher profile not found' });
           
-          const teacherData = teacherSnap.docs[0].data();
+          const teacherData = teacherProfile;
           const targetClassId = existingData.classId;
 
           if (collectionName === 'students') {
@@ -470,6 +555,13 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           await logActivity(req, `DELETE_${entityName}`, details, existingData.schoolId);
         } catch (logErr) {
           console.error('Error logging deletion:', logErr);
+        }
+
+        // Invalidate caching scopes
+        if (req.user?.schoolId) {
+          clearSchoolCollectionCache(req.user.schoolId, collectionName);
+          dashboardStatsCache.delete(`${req.user.schoolId}:true`);
+          dashboardStatsCache.delete(`${req.user.schoolId}:false`);
         }
 
         res.json({ message: 'Deleted successfully' });
@@ -597,6 +689,14 @@ teacherRouter.put('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (req,
       await db.collection('users').doc(teacherData.userId).update(userUpdate);
     }
 
+    // Invalidate caching scopes
+    if (teacherData.userId) {
+      clearTeacherProfileCache(teacherData.userId);
+    }
+    clearSchoolCollectionCache(req.user.schoolId, 'teachers');
+    dashboardStatsCache.delete(`${req.user.schoolId}:true`);
+    dashboardStatsCache.delete(`${req.user.schoolId}:false`);
+
     res.json({ message: 'Teacher updated successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -622,6 +722,14 @@ teacherRouter.delete('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (r
     if (teacherData.userId) {
       await db.collection('users').doc(teacherData.userId).delete();
     }
+
+    // Invalidate caching scopes
+    if (teacherData.userId) {
+      clearTeacherProfileCache(teacherData.userId);
+    }
+    clearSchoolCollectionCache(req.user.schoolId, 'teachers');
+    dashboardStatsCache.delete(`${req.user.schoolId}:true`);
+    dashboardStatsCache.delete(`${req.user.schoolId}:false`);
 
     res.json({ message: 'Teacher deleted successfully' });
   } catch (err) {
@@ -888,11 +996,11 @@ resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) =
     };
 
     // Teacher assignment check
-    const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-    if (teacherSnap.empty) {
+    const teacherProfile = await getCachedTeacherProfile(req.user.id);
+    if (!teacherProfile) {
       return res.status(403).json({ message: 'Teacher profile not found' });
     }
-    const tData = teacherSnap.docs[0].data();
+    const tData = teacherProfile;
     
     // Secure subject check resolving subjectName
     let subjectName = data.subjectName;
@@ -947,11 +1055,11 @@ resultsRouter.put('/:id', authenticate, authorize(['SCHOOL_ADMIN', 'TEACHER']), 
     let updateData = { ...req.body, updatedAt: new Date().toISOString() };
 
     if (req.user.role === 'TEACHER') {
-      const teacherSnap = await db.collection('teachers').where('userId', '==', req.user.id).limit(1).get();
-      if (teacherSnap.empty) {
+      const teacherProfile = await getCachedTeacherProfile(req.user.id);
+      if (!teacherProfile) {
         return res.status(403).json({ message: 'Teacher profile not found' });
       }
-      const tData = teacherSnap.docs[0].data();
+      const tData = teacherProfile;
       const isSubjectTeacher = !tData.roleType || tData.roleType === 'SUBJECT' || tData.roleType === 'BOTH';
       if (!isSubjectTeacher) {
         return res.status(403).json({ message: 'Only Subject Teachers can edit results' });
@@ -1067,12 +1175,19 @@ router.get('/activity-logs', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADM
 // Dashboard Stats
 router.get('/dashboard-stats', authenticate, async (req, res) => {
   try {
-    const schoolId = req.user?.schoolId;
+    const schoolId = req.user?.role === 'SUPER_ADMIN' ? (req.query.schoolId || 'SUPER') : (req.user?.schoolId || 'NONE');
     const isSuper = req.user?.role === 'SUPER_ADMIN';
+    const cacheKey = `${schoolId}:${isSuper}`;
+    
+    // Check Cache
+    const now = Date.now();
+    const cached = dashboardStatsCache.get(cacheKey);
+    if (cached && cached.expires > now) {
+      return res.json(cached.data);
+    }
 
     const getCount = async (coll) => {
       let q = db.collection(coll);
-      const isSuper = req.user?.role === 'SUPER_ADMIN';
       const selectedSchoolId = isSuper ? req.query.schoolId : req.user?.schoolId;
 
       if (selectedSchoolId) {
@@ -1103,6 +1218,9 @@ router.get('/dashboard-stats', authenticate, async (req, res) => {
       // Calculate revenue
       stats.totalRevenue = schools.reduce((acc, s) => acc + (Number(s.amountPaid) || 0), 0);
     }
+
+    // Save to Cache (keep for 15 seconds)
+    dashboardStatsCache.set(cacheKey, { data: stats, expires: now + 15000 });
 
     res.json(stats);
   } catch (err) {
