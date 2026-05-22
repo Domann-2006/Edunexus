@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   Users, 
@@ -19,9 +19,13 @@ import {
   Megaphone,
   LifeBuoy,
   Monitor,
-  Activity
+  Activity,
+  WifiOff,
+  CloudUpload,
+  CloudLightning
 } from 'lucide-react';
 import ProfileImage from './ProfileImage';
+import { cacheEvents, offlineQueue } from '../services/api';
 
 interface SidebarProps {
   user: any;
@@ -32,6 +36,45 @@ interface SidebarProps {
 
 export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProps) {
   const role = user?.role;
+
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'completed' | 'offline_queued' | 'offline'>(() => {
+    return navigator.onLine ? 'idle' : 'offline';
+  });
+  const [queueCount, setQueueCount] = useState(offlineQueue.length);
+
+  useEffect(() => {
+    const handleSyncStatus = (data: any) => {
+      if (data && data.status) {
+        setSyncStatus(data.status);
+        setQueueCount(data.count || 0);
+      }
+    };
+
+    const unsubscribe = cacheEvents.subscribe((key, payload) => {
+      if (key === 'sync_status') {
+        handleSyncStatus(payload);
+      } else if (key === 'sync_completed') {
+        setSyncStatus('idle');
+        setQueueCount(0);
+      }
+    });
+
+    const handleOnline = () => {
+      setSyncStatus(offlineQueue.length > 0 ? 'syncing' : 'idle');
+    };
+    const handleOffline = () => {
+      setSyncStatus('offline');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Platform Management for SUPER_ADMIN
   const superAdminItems = [
@@ -147,6 +190,40 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
           </div>
         ))}
       </nav>
+
+      {/* Connection & Sync Hub Indicator */}
+      <div className="px-6 mb-3">
+        {syncStatus === 'offline' && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-2xl border border-amber-100/60 text-amber-700 text-xs font-semibold">
+            <WifiOff size={14} className="shrink-0 text-amber-500 animate-pulse" />
+            <span>Offline Mode</span>
+          </div>
+        )}
+        {syncStatus === 'offline_queued' && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 rounded-2xl border border-orange-100/60 text-orange-700 text-xs font-semibold">
+            <CloudLightning size={14} className="shrink-0 text-orange-500 animate-bounce" />
+            <span>{queueCount} change{queueCount > 1 ? 's' : ''} queued offline</span>
+          </div>
+        )}
+        {syncStatus === 'syncing' && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-2xl border border-blue-100/60 text-blue-700 text-xs font-bold">
+            <CloudUpload size={14} className="shrink-0 text-blue-500 animate-bounce" />
+            <span>Syncing changes ({queueCount})...</span>
+          </div>
+        )}
+        {syncStatus === 'completed' && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-2xl border border-green-100/60 text-green-700 text-xs font-bold animate-fade-in">
+            <ShieldCheck size={14} className="shrink-0 text-green-500" />
+            <span>Sync Completed!</span>
+          </div>
+        )}
+        {syncStatus === 'idle' && (
+          <div className="flex items-center gap-2 px-4 py-1.5 text-gray-400 text-[10px] font-black uppercase tracking-wider">
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping mr-1" />
+            <span>Cloud Synced</span>
+          </div>
+        )}
+      </div>
 
       <div id="profile-section" className="p-4 border-t border-gray-50">
         <div className="bg-gray-50/80 rounded-3xl p-4 mb-3 border border-gray-100 flex items-center gap-3">

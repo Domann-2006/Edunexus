@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { studentService, classService, schoolService, teacherService } from '../services/api';
+import { studentService, classService, schoolService, teacherService, cacheEvents } from '../services/api';
 import { Plus, Search, MoreVertical, Edit2, Trash2, X, Check, Loader2, User as UserIcon, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
@@ -53,6 +53,59 @@ export default function Students({ user }: { user: any }) {
     }
     fetchData();
   }, [selectedSchoolId, searchParams]);
+
+  const fetchDataSilently = async () => {
+    try {
+      const promises: Promise<any>[] = [
+        studentService.list({ schoolId: selectedSchoolId }),
+        classService.list({ schoolId: selectedSchoolId })
+      ];
+
+      if (user?.role === 'SUPER_ADMIN') {
+        promises.push(schoolService.list());
+      }
+
+      const results = await Promise.all(promises);
+      let fetchedStudents = results[0].data;
+      let fetchedClasses = results[1].data;
+
+      if (user?.role === 'TEACHER') {
+        const profileRes = await teacherService.list({ userId: user.id });
+        if (profileRes.data.length > 0) {
+          const profile = profileRes.data[0];
+          const classIdentifiers = profile.assignedClassIds || [];
+          
+          if (classIdentifiers.length > 0) {
+            fetchedClasses = fetchedClasses.filter((c: any) => 
+              classIdentifiers.includes(c.id) || 
+              classIdentifiers.includes(c.name)
+            );
+            const resolvedIds = fetchedClasses.map((c: any) => c.id);
+            fetchedStudents = fetchedStudents.filter((s: any) => resolvedIds.includes(s.classId));
+          } else {
+            fetchedClasses = [];
+            fetchedStudents = [];
+          }
+        }
+      }
+
+      setStudents(fetchedStudents);
+      setClasses(fetchedClasses);
+      if (results[2]) setSchools(results[2].data);
+    } catch (err) {
+      console.debug('Background silent student fetch skipped:', err);
+    }
+  };
+
+  useEffect(() => {
+    // Import cacheEvents dynamically or reference it from custom imports
+    const unsubscribe = cacheEvents.subscribe((eventKey) => {
+      if (eventKey === 'cache_updated' || eventKey === 'sync_completed' || eventKey.includes('/v1/students') || eventKey.includes('/v1/classes')) {
+        fetchDataSilently();
+      }
+    });
+    return unsubscribe;
+  }, [selectedSchoolId]);
 
   const fetchData = async () => {
     setLoading(true);

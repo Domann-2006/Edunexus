@@ -163,8 +163,12 @@ export default function Messages({ user }: { user: any }) {
       limit(150)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+      const msgs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        isPending: doc.metadata.hasPendingWrites
+      })) as any[];
       setMessages(msgs);
       scrollToBottom();
       
@@ -786,12 +790,14 @@ export default function Messages({ user }: { user: any }) {
                                </span>
                                {isMine && !isFailed && (
                                  <span className="shrink-0 flex items-center ml-0.5">
-                                   {msg.isRead ? (
-                                     <CheckCheck size={13} className="text-[#53bdeb]" />
+                                   {msg.isPending ? (
+                                     <span title="Sending..."><Check size={13} className="text-gray-300/60 animate-pulse" /></span>
+                                   ) : msg.isRead ? (
+                                     <span title="Read"><CheckCheck size={13} className="text-[#53bdeb]" /></span>
                                    ) : msg.isDelivered ? (
-                                     <CheckCheck size={13} className="text-gray-400" />
+                                     <span title="Delivered"><CheckCheck size={13} className="text-gray-400" /></span>
                                    ) : (
-                                     <Check size={13} className="text-gray-400" />
+                                     <span title="Sent"><Check size={13} className="text-gray-400" /></span>
                                    )}
                                  </span>
                                )}
