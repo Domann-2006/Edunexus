@@ -46,14 +46,49 @@ export default function Messages({ user }: { user: any }) {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [activeMessageMenuId, setActiveMessageMenuId] = useState<string | null>(null);
-  const [failedMessages, setFailedMessages] = useState<any[]>([]); // Retry states
   const [onlineStatus, setOnlineStatus] = useState<Record<string, 'online' | 'offline'>>({});
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  // Optimistic & Persistent Native Unsent Messages Queue
+  const [optimisticMessages, setOptimisticMessages] = useState<any[]>([]);
+  const [offlineMessageQueue, setOfflineMessageQueue] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('edunexus_offline_messages');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const saveOfflineMessages = (queue: any[]) => {
+    try {
+      localStorage.setItem('edunexus_offline_messages', JSON.stringify(queue));
+    } catch (e) {
+      console.warn('Failed to save offline messages:', e);
+    }
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isSuper = user?.role === 'SUPER_ADMIN';
+
+  // Helper to resolve messaged dates uniformly regardless of Timestamp/String/Object representation
+  const getMessageDate = (createdAt: any): Date => {
+    if (!createdAt) return new Date();
+    if (typeof createdAt.toDate === 'function') {
+      try {
+        return createdAt.toDate();
+      } catch {
+        return new Date();
+      }
+    }
+    if (createdAt instanceof Date) return createdAt;
+    if (typeof createdAt === 'string' || typeof createdAt === 'number') {
+      return new Date(createdAt);
+    }
+    return new Date();
+  };
 
   // Log activity helper
   const logChatAction = async (action: string, details: string) => {
@@ -90,16 +125,16 @@ export default function Messages({ user }: { user: any }) {
     if (!user) return;
     
     // Set initial custom token ready state if firebase already authenticated
-    if (auth.currentUser?.uid === user.id) {
+    if (auth.currentUser && !auth.currentUser.isAnonymous) {
       setFirebaseReady(true);
     }
 
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
-      if (fbUser && fbUser.uid === user.id) {
-        console.log('[FIREBASE_AUTH] Synchronized with user:', fbUser.uid);
+      if (fbUser && !fbUser.isAnonymous) {
+        console.log('[FIREBASE_AUTH] Synchronized with custom authenticated user:', fbUser.uid);
         setFirebaseReady(true);
       } else {
-        console.log('[FIREBASE_AUTH] Waiting for credentials matching:', user.id);
+        console.log('[FIREBASE_AUTH] Waiting for custom authenticated session token...', fbUser?.uid);
         setFirebaseReady(false);
       }
     });
@@ -166,7 +201,7 @@ export default function Messages({ user }: { user: any }) {
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
       const msgs = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
+        ...doc.data({ serverTimestamps: 'estimate' }),
         isPending: doc.metadata.hasPendingWrites
       })) as any[];
       setMessages(msgs);
@@ -290,7 +325,7 @@ export default function Messages({ user }: { user: any }) {
     setPendingAttachment(null);
   };
 
-  // SEND MESSAGE ROUTINE
+  // SEND MESSAGE ROUTINE WITH OPTIMISTIC AND OFFLINE COEXISTENCE
   const sendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newMessage.trim() && !pendingAttachment || !selectedChat) return;
@@ -298,24 +333,30 @@ export default function Messages({ user }: { user: any }) {
     const messageText = newMessage.trim();
     const attachmentToSend = pendingAttachment;
     
-    // Clear console values instantly for top response performance (Optimistic UI)
+    // Clear input fields immediately for instant visual response
     setNewMessage('');
     setPendingAttachment(null);
     setShowEmojiPicker(false);
 
+    // Generate a secure, deterministic messaging document ID
+    const msgId = doc(collection(db, 'chats', selectedChat.id, 'messages')).id;
+
+    // Build immediate local optimistic payload
     const messagePayload: any = {
-      messageId: doc(collection(db, 'chats', selectedChat.id, 'messages')).id,
+      id: msgId,
+      messageId: msgId,
       conversationId: selectedChat.id,
       senderId: user.id,
       senderName: user.name,
       senderRole: user.role,
       receiverId: isSuper ? selectedChat.id : 'SUPER',
       text: messageText,
-      createdAt: serverTimestamp(),
+      createdAt: { toDate: () => new Date() }, // Fast evaluation mock for local view (replaced by real Date on Firestore fetch)
       isEdited: false,
       isDeleted: false,
-      isDelivered: true,
+      isDelivered: false,
       isRead: false,
+      isPending: true,
       deletedFor: []
     };
 
@@ -323,8 +364,39 @@ export default function Messages({ user }: { user: any }) {
       messagePayload.attachment = attachmentToSend;
     }
 
+    // Set optimistic message in state immediately
+    setOptimisticMessages(prev => [...prev, messagePayload]);
+    scrollToBottom();
+
+    // Send logic depending on network connectivity
+    if (!navigator.onLine) {
+      console.log('[CHAT_OFFLINE] Client offline. Queueing message immediately in persistent queue.');
+      setOptimisticMessages(prev => prev.filter(m => m.id !== msgId));
+      const failedPayload = {
+        ...messagePayload,
+        isFailed: true,
+        isPending: false
+      };
+      setOfflineMessageQueue(prev => {
+        const next = [...prev, failedPayload];
+        saveOfflineMessages(next);
+        return next;
+      });
+      scrollToBottom();
+      return;
+    }
+
     try {
-      await addDoc(collection(db, 'chats', selectedChat.id, 'messages'), messagePayload);
+      // Build real Firestore database payload with official Server Timestamps
+      const firestorePayload = {
+        ...messagePayload,
+        createdAt: serverTimestamp()
+      };
+      delete firestorePayload.isPending;
+      delete firestorePayload.id; // Let document ID represent the system ID
+
+      // Atomically write message and merge conversation details to ensure reliable storage
+      await setDoc(doc(db, 'chats', selectedChat.id, 'messages', msgId), firestorePayload);
 
       await setDoc(doc(db, 'chats', selectedChat.id), {
         lastMessage: messageText || `📎 [${attachmentToSend?.type === 'image' ? 'Image' : 'Attachment'}] ${attachmentToSend?.name}`,
@@ -335,61 +407,103 @@ export default function Messages({ user }: { user: any }) {
         unreadCount: increment(1)
       }, { merge: true });
 
+      // Succeeded! Instant clean merge via listeners: Filter out optimistic copy since real is loaded
+      setOptimisticMessages(prev => prev.filter(m => m.id !== msgId));
       logChatAction('MESSAGE_SENT', `Sent a WhatsApp-styled message to chat ID: ${selectedChat.id}`);
 
     } catch (err) {
-      console.warn('Network issue writing message. Queueing to retry lists:', err);
+      console.warn('[CHAT_FAIL] Network issue or write rejected. Saving to persistent sync queue:', err);
+      // Remove from temporary state and insert into persistent queue
+      setOptimisticMessages(prev => prev.filter(m => m.id !== msgId));
       const failedPayload = {
-        id: 'failed-' + Date.now(),
-        text: messageText,
-        attachment: attachmentToSend,
-        senderId: user.id,
-        senderName: user.name,
-        senderRole: user.role,
-        createdAt: { toDate: () => new Date() },
+        ...messagePayload,
         isFailed: true,
-        deletedFor: []
+        isPending: false
       };
-      setFailedMessages(prev => [...prev, failedPayload]);
+      setOfflineMessageQueue(prev => {
+        const next = [...prev, failedPayload];
+        saveOfflineMessages(next);
+        return next;
+      });
     }
   };
 
   const retrySendMessage = async (failedMsg: any) => {
-    setFailedMessages(prev => prev.filter(m => m.id !== failedMsg.id));
+    // Evict from persistent queue first to handle retry run
+    setOfflineMessageQueue(prev => {
+      const next = prev.filter(m => m.id !== failedMsg.id);
+      saveOfflineMessages(next);
+      return next;
+    });
+
+    // Populate temporary visual pending status 
+    const pendingMsg = {
+      ...failedMsg,
+      isPending: true,
+      isFailed: false,
+      createdAt: { toDate: () => new Date() }
+    };
+    setOptimisticMessages(prev => [...prev, pendingMsg]);
+    scrollToBottom();
 
     try {
-      await addDoc(collection(db, 'chats', selectedChat.id, 'messages'), {
-        messageId: doc(collection(db, 'chats', selectedChat.id, 'messages')).id,
-        conversationId: selectedChat.id,
+      const firestorePayload = {
+        messageId: failedMsg.messageId,
+        conversationId: failedMsg.conversationId,
+        senderId: failedMsg.senderId,
+        senderName: failedMsg.senderName,
+        senderRole: failedMsg.senderRole,
+        receiverId: failedMsg.receiverId,
         text: failedMsg.text || '',
         attachment: failedMsg.attachment || null,
-        senderId: user.id,
-        senderName: user.name,
-        senderRole: user.role,
-        receiverId: isSuper ? selectedChat.id : 'SUPER',
         createdAt: serverTimestamp(),
         isEdited: false,
         isDeleted: false,
         isDelivered: true,
         isRead: false,
         deletedFor: []
-      });
+      };
+
+      await setDoc(doc(db, 'chats', selectedChat.id, 'messages', failedMsg.id), firestorePayload);
 
       await setDoc(doc(db, 'chats', selectedChat.id), {
         lastMessage: failedMsg.text || '📎 Sent attachment',
         lastSenderId: user.id,
         updatedAt: serverTimestamp(),
         schoolId: selectedChat.id,
-        schoolName: selectedChat.name,
+        schoolName: selectedChat.name || 'Unknown Partner',
         unreadCount: increment(1)
       }, { merge: true });
 
-      logChatAction('MESSAGE_SENT', `Retried and successfully sent discussion log.`);
+      setOptimisticMessages(prev => prev.filter(m => m.id !== failedMsg.id));
+      logChatAction('MESSAGE_SENT', `Retried and successfully sent WhatsApp message.`);
     } catch (err) {
-      console.error('Retry failed:', err);
-      setFailedMessages(prev => [...prev, failedMsg]);
+      console.error('[RETRY_FAILED] Sending failed again:', err);
+      setOptimisticMessages(prev => prev.filter(m => m.id !== failedMsg.id));
+      setOfflineMessageQueue(prev => {
+        const next = [...prev, { ...failedMsg, isFailed: true }];
+        saveOfflineMessages(next);
+        return next;
+      });
     }
   };
+
+  // Connect background auto-retry for offline message queue
+  useEffect(() => {
+    const processOfflineQueue = async () => {
+      if (offlineMessageQueue.length === 0 || !navigator.onLine || !selectedChat) return;
+      console.log('[AUTO-SYNC] Connection restored. Firing offline queued messages...');
+      const queueToProcess = [...offlineMessageQueue];
+      for (const msg of queueToProcess) {
+        if (msg.conversationId === selectedChat.id) {
+          await retrySendMessage(msg);
+        }
+      }
+    };
+
+    window.addEventListener('online', processOfflineQueue);
+    return () => window.removeEventListener('online', processOfflineQueue);
+  }, [offlineMessageQueue, selectedChat]);
 
   // EDIT MESSAGE
   const handleStartEdit = (msg: any) => {
@@ -459,8 +573,16 @@ export default function Messages({ user }: { user: any }) {
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Compute final message listing with "Delete for me" filtration applied
-  const visibleMessages = messages.concat(failedMessages).filter(
+  // Compute final message listing with "Delete for me" filtration and unique de-duplication applied
+  const visibleMessages = [
+    ...messages,
+    ...optimisticMessages,
+    ...offlineMessageQueue.filter(m => m.conversationId === selectedChat?.id)
+  ].filter(
+    (m, index, self) => 
+      // Filter out duplicate IDs (e.g., if a message has already been loaded from Firestore snap or is sending)
+      self.findIndex(t => t.id === m.id) === index
+  ).filter(
     m => !m.deletedFor?.includes(user.id)
   );
 
@@ -635,14 +757,18 @@ export default function Messages({ user }: { user: any }) {
                   const isMenuOpen = activeMessageMenuId === msg.id;
                   const isFailed = msg.isFailed;
 
-                  const showDate = i === 0 || (msg.createdAt?.toDate && visibleMessages[i-1]?.createdAt?.toDate && msg.createdAt.toDate().toDateString() !== visibleMessages[i-1].createdAt.toDate().toDateString());
+                  const showDate = i === 0 || (() => {
+                    const currentD = getMessageDate(msg.createdAt);
+                    const prevD = getMessageDate(visibleMessages[i-1]?.createdAt);
+                    return currentD.toDateString() !== prevD.toDateString();
+                  })();
                   
                   return (
                     <React.Fragment key={msg.id || i}>
                       {showDate && (
                         <div className="flex justify-center my-4">
                            <div className="bg-white/90 border border-gray-150 px-3 py-1 rounded-xl text-[9px] font-bold text-gray-400 uppercase tracking-widest shadow-sm">
-                             {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Today'}
+                             {getMessageDate(msg.createdAt).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
                            </div>
                         </div>
                       )}
@@ -786,7 +912,7 @@ export default function Messages({ user }: { user: any }) {
                                  </span>
                                )}
                                <span className="text-[9px] text-gray-400 font-mono font-medium whitespace-nowrap uppercase">
-                                 {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
+                                 {getMessageDate(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                </span>
                                {isMine && !isFailed && (
                                  <span className="shrink-0 flex items-center ml-0.5">

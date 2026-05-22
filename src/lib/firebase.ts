@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -12,8 +12,5 @@ export const db = initializeFirestore(app, {
     tabManager: persistentMultipleTabManager(),
   })
 });
-
-// Initialize anonymous auth for storage access if not using Firebase Auth elsewhere
-signInAnonymously(auth).catch((err) => console.error('Firebase Anonymous Auth failed:', err));
 
 export default app;
