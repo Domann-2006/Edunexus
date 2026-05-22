@@ -176,6 +176,51 @@
          "createdAt": { "type": "string", "format": "date-time" }
        },
        "required": ["name", "schoolId"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "A support communication channel between Super Admin and a School Admin.",
+      "type": "object",
+      "properties": {
+        "lastMessage": { "type": "string" },
+        "lastSenderId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "schoolId": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "unreadCount": { "type": "number" },
+        "typingStatus": { "type": "object" }
+      },
+      "required": ["schoolId", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A single chat message inside a chat's messages subcollection.",
+      "type": "object",
+      "properties": {
+        "messageId": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "text": { "type": "string" },
+        "attachment": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "name": { "type": "string" },
+            "type": { "type": "string" },
+            "size": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isEdited": { "type": "boolean" },
+        "isDeleted": { "type": "boolean" },
+        "isDelivered": { "type": "boolean" },
+        "isRead": { "type": "boolean" },
+        "deletedFor": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["senderId", "createdAt"]
     }
   },
   "firestore": {
@@ -186,6 +231,7 @@
     "classes": { "schema": "Class", "description": "Collection of classes." },
     "subjects": { "schema": "Subject", "description": "Collection of subjects." },
     "results": { "schema": "Result", "description": "Collection of student results." },
-    "sessions": { "schema": "Session", "description": "Academic years." }
+    "sessions": { "schema": "Session", "description": "Academic years." },
+    "chats": { "schema": "Chat", "description": "Collection of support conversations between Super Admin and School Admins." }
   }
 }

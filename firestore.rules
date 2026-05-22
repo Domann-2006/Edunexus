@@ -100,7 +100,7 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if isSuperAdmin() || isSchoolAdmin(chatId);
-        allow create: if isSuperAdmin() || isSchoolAdmin(chatId);
+        allow create, update: if isSuperAdmin() || isSchoolAdmin(chatId);
       }
     }
   }

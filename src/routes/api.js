@@ -865,6 +865,10 @@ router.get('/subscriptions/my', authenticate, authorize(['SCHOOL_ADMIN']), async
 // Get list of active conversations
 router.get('/chats', authenticate, async (req, res) => {
   try {
+    if (!['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Forbidden - Admins only' });
+    }
+
     let query = db.collection('chats');
     
     if (req.user.role === 'SUPER_ADMIN') {
@@ -872,8 +876,6 @@ router.get('/chats', authenticate, async (req, res) => {
     } else if (req.user.role === 'SCHOOL_ADMIN') {
       // School Admin only sees their chat with Super Admin
       query = query.where('schoolId', '==', req.user.schoolId);
-    } else {
-      return res.status(403).json({ message: 'Forbidden' });
     }
 
     const snap = await query.orderBy('updatedAt', 'desc').get();
@@ -887,9 +889,16 @@ router.get('/chats', authenticate, async (req, res) => {
 // Get messages for a chat
 router.get('/chats/:chatId/messages', authenticate, async (req, res) => {
   try {
+    if (!['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Forbidden - Admins only' });
+    }
+
     const chatId = req.params.chatId;
+    if (req.user.role !== 'SUPER_ADMIN' && chatId !== req.user.schoolId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
     const chatDoc = await db.collection('chats').doc(chatId).get();
-    
     if (!chatDoc.exists) return res.status(404).json({ message: 'Chat not found' });
     const chatData = chatDoc.data();
     
@@ -910,22 +919,37 @@ router.get('/chats/:chatId/messages', authenticate, async (req, res) => {
 // Send message
 router.post('/chats/:chatId/messages', authenticate, async (req, res) => {
   try {
-    const { text } = req.body;
+    if (!['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Forbidden - Admins only' });
+    }
+
     const chatId = req.params.chatId;
+    if (req.user.role !== 'SUPER_ADMIN' && chatId !== req.user.schoolId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
     const chatDoc = await db.collection('chats').doc(chatId).get();
 
     if (!chatDoc.exists) {
-      // If SUPER_ADMIN is starting chat with a school, or it's first message
-      if (req.user.role === 'SUPER_ADMIN' || req.user.role === 'SCHOOL_ADMIN') {
-         // We might need to auto-create chat if it doesn't exist?
-         // Convention: chatId is usually schoolId for school-super communication
-      } else {
-         return res.status(404).json({ message: 'Chat session not initialized' });
+      // Auto-create chat metadata if first message
+      let schoolName = 'Support Chat';
+      if (chatId !== 'SUPER') {
+        const sDoc = await db.collection('schools').doc(chatId).get();
+        if (sDoc.exists) {
+          schoolName = sDoc.data().name;
+        }
       }
+      await db.collection('chats').doc(chatId).set({
+        schoolId: chatId,
+        schoolName: schoolName,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        unreadCount: 0
+      });
     }
 
     const messageData = {
-      text,
+      text: req.body.text || '',
       senderId: req.user.id,
       senderName: req.user.name,
       senderRole: req.user.role,
@@ -936,12 +960,26 @@ router.post('/chats/:chatId/messages', authenticate, async (req, res) => {
     
     // Update chat metadata
     await db.collection('chats').doc(chatId).set({
-      lastMessage: text,
+      lastMessage: req.body.text || '',
       lastSenderId: req.user.id,
       updatedAt: new Date().toISOString()
     }, { merge: true });
 
     res.status(201).json({ id: msgRef.id, ...messageData });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Log Chat System Activity
+router.post('/chats/log-activity', authenticate, async (req, res) => {
+  try {
+    if (!['SUPER_ADMIN', 'SCHOOL_ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Forbidden - Admins only' });
+    }
+    const { action, details, schoolId } = req.body;
+    await logActivity(req, action, details, schoolId);
+    res.status(200).json({ success: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
