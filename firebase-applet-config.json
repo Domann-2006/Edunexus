@@ -3,7 +3,7 @@
   "appId": "1:954494779930:web:1cf649f673e1940b8e07a3",
   "apiKey": "AIzaSyAiz1MQALNv0-U3dmo-NrpQ_1kZUntTmGw",
   "authDomain": "gen-lang-client-0224106807.firebaseapp.com",
-  "firestoreDatabaseId": "edunexus-db-v1",
+  "firestoreDatabaseId": "",
   "storageBucket": "gen-lang-client-0224106807.firebasestorage.app",
   "messagingSenderId": "954494779930",
   "measurementId": ""
