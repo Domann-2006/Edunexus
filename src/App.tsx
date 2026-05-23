@@ -77,6 +77,10 @@ export default function App() {
             // If data differs or token refreshed, update state
             setUser(data.user);
             safeLocalStorage.setItem('user', JSON.stringify(data.user));
+            if (data.firebaseToken) {
+              safeLocalStorage.setItem('fireToken', data.firebaseToken);
+              signInWithCustomToken(auth, data.firebaseToken).catch(err => console.error('Firebase Re-auth background failed:', err));
+            }
           } catch (err: any) {
             console.error('Session validation failed in background:', err);
             if (err.response?.status === 401) {

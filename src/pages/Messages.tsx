@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, limit, updateDoc, increment } from 'firebase/firestore';
 import { Send, Search, CheckCheck, Loader2, ChevronLeft, MoreVertical, Paperclip, Smile, X, Image as ImageIcon, FileText, Trash2, Edit, AlertCircle, Check, Laptop, Sparkles, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import api, { schoolService, fileService } from '../services/api';
+import api, { schoolService, fileService, authService } from '../services/api';
 import { useLocation } from 'react-router-dom';
 
 const EMOJI_LIST = [
@@ -167,27 +167,71 @@ export default function Messages({ user }: { user: any }) {
     setOnlineStatus(prev => ({ ...prev, 'SUPER': 'online' }));
   }, []);
 
-  // Sync Firebase Auth status before subscribing to any collection
+  // Dynamic Self-Healing Firebase Auth Restorer & Sync Hub
   useEffect(() => {
     if (!user) return;
+    
+    let isMounted = true;
     
     // Set initial custom token ready state if firebase already authenticated
     if (auth.currentUser && !auth.currentUser.isAnonymous) {
       setFirebaseReady(true);
     }
 
+    const checkAndRestoreAuth = async () => {
+      // Check if we already have an active authenticated user
+      if (auth.currentUser && !auth.currentUser.isAnonymous) {
+        if (isMounted) setFirebaseReady(true);
+        return;
+      }
+      
+      console.log('[MESSAGES_AUTH_RESTORER] Checking/restoring Firebase auth session...');
+      try {
+        const { data } = await authService.getCurrentUser();
+        if (data.firebaseToken && isMounted) {
+          console.log('[MESSAGES_AUTH_RESTORER] Retrieved fresh Firebase token from session, authenticating...');
+          localStorage.setItem('fireToken', data.firebaseToken);
+          await signInWithCustomToken(auth, data.firebaseToken);
+          if (isMounted) {
+            setFirebaseReady(true);
+          }
+        }
+      } catch (err) {
+        console.error('[MESSAGES_AUTH_RESTORER] Failed to auto-restore Firebase auth:', err);
+      }
+    };
+
+    // Listen to Firebase Auth state changes
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
       if (fbUser && !fbUser.isAnonymous) {
         console.log('[FIREBASE_AUTH] Synchronized with custom authenticated user:', fbUser.uid);
-        setFirebaseReady(true);
+        if (isMounted) setFirebaseReady(true);
       } else {
         console.log('[FIREBASE_AUTH] Waiting for custom authenticated session token...', fbUser?.uid);
-        setFirebaseReady(false);
+        if (isMounted) {
+          setFirebaseReady(false);
+          // If unauthenticated or token expired, trigger background token restoration!
+          checkAndRestoreAuth();
+        }
       }
     });
 
-    return () => unsubscribe();
-  }, [user.id]);
+    // Run first-pass restoration checklist
+    checkAndRestoreAuth();
+    
+    // Periodic safety heartbeat (recheck every 15 seconds)
+    const interval = setInterval(() => {
+      if (!auth.currentUser || auth.currentUser.isAnonymous) {
+        checkAndRestoreAuth();
+      }
+    }, 15000);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, [user?.id]);
 
   // Deep linking support
   useEffect(() => {
