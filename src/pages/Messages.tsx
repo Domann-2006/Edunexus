@@ -24,6 +24,53 @@ interface Attachment {
   size?: string;
 }
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('[FIRESTORE_CRITICAL_ERROR]', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export default function Messages({ user }: { user: any }) {
   const location = useLocation();
   const [conversations, setConversations] = useState<any[]>([]);
@@ -183,17 +230,23 @@ export default function Messages({ user }: { user: any }) {
     }, (error) => {
       console.warn('[FIRESTORE_CONVOS] Snapshot security check fallback:', error);
       setLoading(false);
+      try {
+        handleFirestoreError(error, OperationType.LIST, 'chats');
+      } catch (err) {
+        // Log details but don't disrupt user loop
+      }
     });
 
     return () => unsubscribe();
-  }, [user, isSuper, firebaseReady]);
+  }, [user?.id, isSuper, firebaseReady]);
 
   // Real-time listener for current chat's discussions subcollection
   useEffect(() => {
-    if (!selectedChat || !firebaseReady) return;
+    const activeChatId = selectedChat?.id;
+    if (!activeChatId || !firebaseReady) return;
 
     const q = query(
-      collection(db, 'chats', selectedChat.id, 'messages'),
+      collection(db, 'chats', activeChatId, 'messages'),
       orderBy('createdAt', 'asc'),
       limit(150)
     );
@@ -204,13 +257,19 @@ export default function Messages({ user }: { user: any }) {
         ...doc.data({ serverTimestamps: 'estimate' }),
         isPending: doc.metadata.hasPendingWrites
       })) as any[];
+      
       setMessages(msgs);
+      
+      // Clear out confirmed optimistic messages to prevent layout blinks
+      const snapIds = new Set(msgs.map(m => m.id));
+      setOptimisticMessages(prev => prev.filter(m => !snapIds.has(m.id)));
+      
       scrollToBottom();
       
       // Update unread count to 0 when chat is opened and messages exist
       const lastMsg = msgs[msgs.length - 1];
       if (lastMsg && lastMsg.senderId !== user.id) {
-         updateDoc(doc(db, 'chats', selectedChat.id), {
+         updateDoc(doc(db, 'chats', activeChatId), {
            unreadCount: 0
          }).catch(() => {});
       }
@@ -220,7 +279,7 @@ export default function Messages({ user }: { user: any }) {
       msgs.forEach((msg) => {
         if (msg.senderId !== user.id && !msg.isRead) {
           updatedAnyStatus = true;
-          updateDoc(doc(db, 'chats', selectedChat.id, 'messages', msg.id), {
+          updateDoc(doc(db, 'chats', activeChatId, 'messages', msg.id), {
             isRead: true,
             isDelivered: true
           }).catch(() => {});
@@ -228,15 +287,20 @@ export default function Messages({ user }: { user: any }) {
       });
 
       if (updatedAnyStatus) {
-        logChatAction('MESSAGE_READ', `Marked latest incoming messages as read in chat with id: ${selectedChat.id}`);
+        logChatAction('MESSAGE_READ', `Marked latest incoming messages as read in chat with id: ${activeChatId}`);
       }
 
     }, (error) => {
       console.warn('[FIRESTORE_MESSAGES] Unauthorized subcollection lookup:', error);
+      try {
+        handleFirestoreError(error, OperationType.LIST, `chats/${activeChatId}/messages`);
+      } catch (err) {
+        // Fail-safe error tracking logged internally
+      }
     });
 
     return () => unsubscribe();
-  }, [selectedChat, user.id, firebaseReady]);
+  }, [selectedChat?.id, user?.id, firebaseReady]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -396,23 +460,31 @@ export default function Messages({ user }: { user: any }) {
       delete firestorePayload.id; // Let document ID represent the system ID
 
       // Atomically write message and merge conversation details to ensure reliable storage
-      await setDoc(doc(db, 'chats', selectedChat.id, 'messages', msgId), firestorePayload);
+      try {
+        await setDoc(doc(db, 'chats', selectedChat.id, 'messages', msgId), firestorePayload);
+      } catch (writeErr) {
+        handleFirestoreError(writeErr, OperationType.WRITE, `chats/${selectedChat.id}/messages/${msgId}`);
+      }
 
-      await setDoc(doc(db, 'chats', selectedChat.id), {
-        lastMessage: messageText || `📎 [${attachmentToSend?.type === 'image' ? 'Image' : 'Attachment'}] ${attachmentToSend?.name}`,
-        lastSenderId: user.id,
-        updatedAt: serverTimestamp(),
-        schoolId: selectedChat.id,
-        schoolName: selectedChat.name || 'Unknown Partner',
-        unreadCount: increment(1)
-      }, { merge: true });
+      try {
+        await setDoc(doc(db, 'chats', selectedChat.id), {
+          lastMessage: messageText || `📎 [${attachmentToSend?.type === 'image' ? 'Image' : 'Attachment'}] ${attachmentToSend?.name}`,
+          lastSenderId: user.id,
+          updatedAt: serverTimestamp(),
+          schoolId: selectedChat.id,
+          schoolName: selectedChat.name || 'Unknown Partner',
+          unreadCount: increment(1)
+        }, { merge: true });
+      } catch (statusErr) {
+        handleFirestoreError(statusErr, OperationType.WRITE, `chats/${selectedChat.id}`);
+      }
 
-      // Succeeded! Instant clean merge via listeners: Filter out optimistic copy since real is loaded
-      setOptimisticMessages(prev => prev.filter(m => m.id !== msgId));
+      // Succeeded! Note: We DO NOT filter out optimistic messages here anymore, 
+      // they are safely filtered out in onSnapshot once received! This completely avoids the blink bug.
       logChatAction('MESSAGE_SENT', `Sent a WhatsApp-styled message to chat ID: ${selectedChat.id}`);
 
     } catch (err) {
-      console.warn('[CHAT_FAIL] Network issue or write rejected. Saving to persistent sync queue:', err);
+      console.error('[CHAT_FAIL_DETAILS]', err);
       // Remove from temporary state and insert into persistent queue
       setOptimisticMessages(prev => prev.filter(m => m.id !== msgId));
       const failedPayload = {
@@ -464,21 +536,29 @@ export default function Messages({ user }: { user: any }) {
         deletedFor: []
       };
 
-      await setDoc(doc(db, 'chats', selectedChat.id, 'messages', failedMsg.id), firestorePayload);
+      try {
+        await setDoc(doc(db, 'chats', selectedChat.id, 'messages', failedMsg.id), firestorePayload);
+      } catch (writeErr) {
+        handleFirestoreError(writeErr, OperationType.WRITE, `chats/${selectedChat.id}/messages/${failedMsg.id}`);
+      }
 
-      await setDoc(doc(db, 'chats', selectedChat.id), {
-        lastMessage: failedMsg.text || '📎 Sent attachment',
-        lastSenderId: user.id,
-        updatedAt: serverTimestamp(),
-        schoolId: selectedChat.id,
-        schoolName: selectedChat.name || 'Unknown Partner',
-        unreadCount: increment(1)
-      }, { merge: true });
+      try {
+        await setDoc(doc(db, 'chats', selectedChat.id), {
+          lastMessage: failedMsg.text || '📎 Sent attachment',
+          lastSenderId: user.id,
+          updatedAt: serverTimestamp(),
+          schoolId: selectedChat.id,
+          schoolName: selectedChat.name || 'Unknown Partner',
+          unreadCount: increment(1)
+        }, { merge: true });
+      } catch (statusErr) {
+        handleFirestoreError(statusErr, OperationType.WRITE, `chats/${selectedChat.id}`);
+      }
 
-      setOptimisticMessages(prev => prev.filter(m => m.id !== failedMsg.id));
+      // Succeeded! Defer cleanup to snapshot
       logChatAction('MESSAGE_SENT', `Retried and successfully sent WhatsApp message.`);
     } catch (err) {
-      console.error('[RETRY_FAILED] Sending failed again:', err);
+      console.error('[RETRY_FAILED_DETAILS]', err);
       setOptimisticMessages(prev => prev.filter(m => m.id !== failedMsg.id));
       setOfflineMessageQueue(prev => {
         const next = [...prev, { ...failedMsg, isFailed: true }];
