@@ -24,6 +24,10 @@ export default function Login({ onLogin }: LoginProps) {
     setError('');
     try {
       const { data } = await authService.login({ email, password, loginType });
+      // FIX: Bug 1 - Save firebaseToken to local storage at login so auth restorer can find it immediately
+      if (data && data.firebaseToken) {
+        localStorage.setItem('fireToken', data.firebaseToken);
+      }
       onLogin(data);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to login');

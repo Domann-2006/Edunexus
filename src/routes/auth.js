@@ -118,6 +118,7 @@ router.post('/logout', (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
+// FIX: Bug 4 - /me route is fully present and generates fresh Firebase Custom Token protected by authenticate middleware
 router.get('/me', authenticate, async (req, res) => {
   try {
     const userDoc = await db.collection('users').doc(req.user.id).get();

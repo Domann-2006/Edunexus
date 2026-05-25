@@ -50,6 +50,7 @@ interface FirestoreErrorInfo {
   }
 }
 
+// FIX: Bug 2 - Remove throw from handleFirestoreError. Let callers decide whether to rethrow or catch.
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -68,7 +69,6 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     path
   };
   console.error('[FIRESTORE_CRITICAL_ERROR]', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
 }
 
 export default function Messages({ user }: { user: any }) {
@@ -178,6 +178,7 @@ export default function Messages({ user }: { user: any }) {
       setFirebaseReady(true);
     }
 
+    // FIX: Bug 1 - checkAndRestoreAuth using cached localStorage token first
     const checkAndRestoreAuth = async () => {
       // Check if we already have an active authenticated user
       if (auth.currentUser && !auth.currentUser.isAnonymous) {
@@ -186,6 +187,21 @@ export default function Messages({ user }: { user: any }) {
       }
       
       console.log('[MESSAGES_AUTH_RESTORER] Checking/restoring Firebase auth session...');
+      const cachedToken = localStorage.getItem('fireToken');
+      if (cachedToken) {
+        try {
+          console.log('[MESSAGES_AUTH_RESTORER] Attempting authentication with cached token...');
+          await signInWithCustomToken(auth, cachedToken);
+          if (isMounted) {
+            setFirebaseReady(true);
+            return;
+          }
+        } catch (cacheErr) {
+          console.error('[MESSAGES_AUTH_RESTORER] Cached token invalid or expired. Cleaning up localStorage:', cacheErr);
+          localStorage.removeItem('fireToken');
+        }
+      }
+
       try {
         const { data } = await authService.getCurrentUser();
         if (data.firebaseToken && isMounted) {
@@ -508,8 +524,11 @@ export default function Messages({ user }: { user: any }) {
         await setDoc(doc(db, 'chats', selectedChat.id, 'messages', msgId), firestorePayload);
       } catch (writeErr) {
         handleFirestoreError(writeErr, OperationType.WRITE, `chats/${selectedChat.id}/messages/${msgId}`);
+        // FIX: Bug 2 - Re-throw message write error so the message send routine knows it failed and queues it offline.
+        throw writeErr;
       }
 
+      // FIX: Bug 2 - A failure writing the conversation metadata document does NOT abort the whole message send
       try {
         await setDoc(doc(db, 'chats', selectedChat.id), {
           lastMessage: messageText || `📎 [${attachmentToSend?.type === 'image' ? 'Image' : 'Attachment'}] ${attachmentToSend?.name}`,
@@ -520,6 +539,8 @@ export default function Messages({ user }: { user: any }) {
           unreadCount: increment(1)
         }, { merge: true });
       } catch (statusErr) {
+        // Only log and do not abort!
+        console.error('[MESSAGES] Conversation metadata write failed (ignored to keep message send intact):', statusErr);
         handleFirestoreError(statusErr, OperationType.WRITE, `chats/${selectedChat.id}`);
       }
 
@@ -584,8 +605,11 @@ export default function Messages({ user }: { user: any }) {
         await setDoc(doc(db, 'chats', selectedChat.id, 'messages', failedMsg.id), firestorePayload);
       } catch (writeErr) {
         handleFirestoreError(writeErr, OperationType.WRITE, `chats/${selectedChat.id}/messages/${failedMsg.id}`);
+        // FIX: Bug 2 - Re-throw message write error so retry knows it failed
+        throw writeErr;
       }
 
+      // FIX: Bug 2 - A failure writing the conversation metadata document does NOT abort the whole message retry
       try {
         await setDoc(doc(db, 'chats', selectedChat.id), {
           lastMessage: failedMsg.text || '📎 Sent attachment',
@@ -596,6 +620,8 @@ export default function Messages({ user }: { user: any }) {
           unreadCount: increment(1)
         }, { merge: true });
       } catch (statusErr) {
+        // Only log and do not abort!
+        console.error('[MESSAGES] Conversation metadata retry write failed (ignored to keep message send intact):', statusErr);
         handleFirestoreError(statusErr, OperationType.WRITE, `chats/${selectedChat.id}`);
       }
 

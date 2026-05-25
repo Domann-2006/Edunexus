@@ -94,13 +94,14 @@ service cloud.firestore {
     }
 
     // Chats & Messaging Uplink
+    // FIX: Bug 3 - Add isSignedIn() as a base helper to prevent silent evaluation failures during token refresh
     match /chats/{chatId} {
-      allow read: if isSuperAdmin() || isSchoolAdmin(chatId);
-      allow write: if isSuperAdmin() || isSchoolAdmin(chatId);
+      allow read: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
+      allow write: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
 
       match /messages/{messageId} {
-        allow read: if isSuperAdmin() || isSchoolAdmin(chatId);
-        allow create, update: if isSuperAdmin() || isSchoolAdmin(chatId);
+        allow read: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
+        allow create, update: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
       }
     }
   }
