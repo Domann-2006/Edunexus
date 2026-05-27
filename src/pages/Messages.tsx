@@ -453,8 +453,7 @@ export default function Messages({ user }: { user: any }) {
 
     // FIX 4: Validate that firebaseReady is truly ready before allowing sendMessage
     if (!firebaseReady) {
-      console.warn('Firebase auth not ready, please wait...');
-      alert('Firebase auth not ready, please wait...');
+      console.warn('Firebase not ready yet, skipping send');
       return;
     }
 

@@ -74,6 +74,9 @@ export default function App() {
 
             // Verify session in background
             const { data } = await authService.getCurrentUser();
+            if (data.firebaseToken) {
+              localStorage.setItem('fireToken', data.firebaseToken);
+            }
             // If data differs or token refreshed, update state
             setUser(data.user);
             safeLocalStorage.setItem('user', JSON.stringify(data.user));
@@ -103,6 +106,9 @@ export default function App() {
   }, []);
 
   const handleLogin = (userData: any) => {
+    if (userData.firebaseToken) {
+      localStorage.setItem('fireToken', userData.firebaseToken);
+    }
     const userToSave = userData.user || userData; 
     setUser(userToSave);
     safeLocalStorage.setItem('user', JSON.stringify(userToSave));
