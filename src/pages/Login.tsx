@@ -16,6 +16,13 @@ export default function Login({ onLogin }: LoginProps) {
   const [loginType, setLoginType] = useState<'teacher' | 'admin' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
+  // FIX: Secure custom first-time setup input states
+  const [setupName, setSetupName] = useState('');
+  const [setupEmail, setSetupEmail] = useState('');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupError, setSetupError] = useState('');
+  const [setupSuccess, setSetupSuccess] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginType) return;
@@ -36,21 +43,30 @@ export default function Login({ onLogin }: LoginProps) {
     }
   };
 
-  const handleSetup = async () => {
+  // FIX: Secure custom first-time setup logic without hardcoded credentials
+  const handleSetup = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!setupName.trim() || !setupEmail.trim() || !setupPassword.trim()) {
+      setSetupError('All fields are required.');
+      return;
+    }
+    
     setLoading(true);
+    setSetupError('');
     try {
-      const { data } = await authService.setupInitial({
-        name: 'Super Admin',
-        email: 'admin@edunexus.com',
-        password: 'password123',
+      await authService.setupInitial({
+        name: setupName.trim(),
+        email: setupEmail.trim().toLowerCase(),
+        password: setupPassword,
         role: 'SUPER_ADMIN'
       });
-      alert('Initial admin created: admin@edunexus.com / password123');
-      setEmail('admin@edunexus.com');
-      setPassword('password123');
-      setLoginType('admin');
+      setSetupSuccess(true);
+      // Reset inputs on success for security
+      setSetupName('');
+      setSetupEmail('');
+      setSetupPassword('');
     } catch (err: any) {
-      setError('Setup failed: ' + (err.response?.data?.message || err.message));
+      setSetupError('Setup failed: ' + (err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
     }
@@ -137,24 +153,84 @@ export default function Login({ onLogin }: LoginProps) {
       {type === 'admin' && (
         <div className="mt-8 pt-8 border-t border-gray-50 text-center">
           <button 
-            onClick={() => setShowSetup(!showSetup)}
+            onClick={() => {
+              setShowSetup(!showSetup);
+              setSetupError('');
+              setSetupSuccess(false);
+            }}
             className="text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors uppercase tracking-widest"
+            type="button"
           >
-            First time here?
+            {showSetup ? 'Hide Setup' : 'First time here? Set up Admin'}
           </button>
           {showSetup && (
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="mt-4 p-6 bg-blue-50 rounded-2xl border border-blue-100"
+              className="mt-4 p-6 bg-blue-50 rounded-2xl border border-blue-100 text-left space-y-4"
             >
-              <p className="text-xs text-blue-700 font-bold mb-3 uppercase tracking-wider">Create a Super Admin account.</p>
-              <button 
-                onClick={handleSetup}
-                className="text-xs font-black text-blue-600 uppercase tracking-[0.2em] px-6 py-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95"
-              >
-                Setup Account
-              </button>
+              <p className="text-xs text-blue-700 font-bold uppercase tracking-wider text-center">Create Super Admin Account</p>
+              
+              {setupError && (
+                <div id="setup-error-alert" className="p-3 bg-red-100 text-red-700 text-xs rounded-xl border border-red-200 font-medium">
+                  {setupError}
+                </div>
+              )}
+              {setupSuccess && (
+                <div id="setup-success-alert" className="p-3 bg-green-100 text-green-700 text-xs rounded-xl border border-green-200 font-medium">
+                  Account created successfully! You can now log in above with your credentials.
+                </div>
+              )}
+
+              {!setupSuccess && (
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-blue-500 uppercase tracking-widest pl-1">Name</label>
+                    <input
+                      id="setup-name-input"
+                      type="text"
+                      value={setupName}
+                      onChange={(e) => setSetupName(e.target.value)}
+                      placeholder="e.g. Administrator"
+                      className="w-full px-4 py-2.5 bg-white border border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-medium text-gray-800"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-blue-500 uppercase tracking-widest pl-1">Email</label>
+                    <input
+                      id="setup-email-input"
+                      type="email"
+                      value={setupEmail}
+                      onChange={(e) => setSetupEmail(e.target.value)}
+                      placeholder="e.g. admin@school.com"
+                      className="w-full px-4 py-2.5 bg-white border border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-medium text-gray-800"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-blue-500 uppercase tracking-widest pl-1">Password</label>
+                    <input
+                      id="setup-password-input"
+                      type="password"
+                      value={setupPassword}
+                      onChange={(e) => setSetupPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-4 py-2.5 bg-white border border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-medium text-gray-800"
+                      required
+                    />
+                  </div>
+                  <button 
+                    id="setup-submit-btn"
+                    onClick={handleSetup}
+                    disabled={loading}
+                    className="w-full text-xs font-black text-blue-600 uppercase tracking-[0.2em] py-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-50"
+                    type="button"
+                  >
+                    {loading ? 'Setting up...' : 'Create Admin'}
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
         </div>
