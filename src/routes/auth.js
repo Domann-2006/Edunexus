@@ -197,11 +197,30 @@ router.put('/profile', authenticate, async (req, res) => {
   }
 });
 
+// Check if the initial Super Admin setup has been completed
+router.get('/setup-status', async (req, res) => {
+  try {
+    const superAdminQuery = await db.collection('users').where('role', '==', 'SUPER_ADMIN').limit(1).get();
+    res.json({
+      setupCompleted: !superAdminQuery.empty
+    });
+  } catch (err) {
+    console.error('Failed to check setup status:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Setup Initial User (Development tool)
 router.post('/setup-initial', async (req, res) => {
   const { name, email, password, role, schoolId } = req.body;
   
   try {
+    // FIX: Require database validation. Ensure only ONE initial Super Admin can be created publicly.
+    const superAdminQuery = await db.collection('users').where('role', '==', 'SUPER_ADMIN').limit(1).get();
+    if (!superAdminQuery.empty) {
+      return res.status(403).json({ message: 'Setup is locked. A Super Admin already exists.' });
+    }
+
     const existing = await findUserByEmail(email);
     if (existing) return res.status(400).json({ message: 'User already exists' });
 

@@ -483,6 +483,7 @@ export const authService = {
   getCurrentUser: () => api.get('/auth/me'),
   updateProfile: (data: any) => api.put('/auth/profile', data),
   setupInitial: (data: any) => api.post('/auth/setup-initial', data),
+  getSetupStatus: () => api.get('/auth/setup-status'),
 };
 
 export const schoolService = {

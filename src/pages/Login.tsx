@@ -16,6 +16,30 @@ export default function Login({ onLogin }: LoginProps) {
   const [loginType, setLoginType] = useState<'teacher' | 'admin' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Check if first-time Super Admin setup is complete
+  const [isSetupCompleted, setIsSetupCompleted] = useState<boolean>(true); // Default to locked/true to avoid flickering
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchSetupStatus = async () => {
+      try {
+        const { data } = await authService.getSetupStatus();
+        if (isMounted) {
+          setIsSetupCompleted(data.setupCompleted);
+        }
+      } catch (err) {
+        console.error('Failed to get setup status, defaulting to lock:', err);
+        if (isMounted) {
+          setIsSetupCompleted(true); // Default to true on error for security
+        }
+      }
+    };
+    fetchSetupStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // FIX: Secure custom first-time setup input states
   const [setupName, setSetupName] = useState('');
   const [setupEmail, setSetupEmail] = useState('');
@@ -61,6 +85,7 @@ export default function Login({ onLogin }: LoginProps) {
         role: 'SUPER_ADMIN'
       });
       setSetupSuccess(true);
+      setIsSetupCompleted(true); // Immediately lock setup
       // Reset inputs on success for security
       setSetupName('');
       setSetupEmail('');
@@ -150,7 +175,7 @@ export default function Login({ onLogin }: LoginProps) {
         </button>
       </form>
 
-      {type === 'admin' && (
+      {type === 'admin' && !isSetupCompleted && (
         <div className="mt-8 pt-8 border-t border-gray-50 text-center">
           <button 
             onClick={() => {
