@@ -180,13 +180,25 @@ export default function Messages({ user }: { user: any }) {
 
     // FIX: Bug 1 - checkAndRestoreAuth using cached localStorage token first
     const checkAndRestoreAuth = async () => {
-      // Check if we already have an active authenticated user
-      if (auth.currentUser && !auth.currentUser.isAnonymous) {
-        if (isMounted) setFirebaseReady(true);
-        return;
-      }
-      
       console.log('[MESSAGES_AUTH_RESTORER] Checking/restoring Firebase auth session...');
+      
+      // FIX 1: Always try to get a fresh token from the `/me` endpoint on mount first
+      try {
+        const { data } = await authService.getCurrentUser();
+        if (data && data.firebaseToken && isMounted) {
+          console.log('[MESSAGES_AUTH_RESTORER] Retrieved fresh Firebase token from session, authenticating...');
+          localStorage.setItem('fireToken', data.firebaseToken);
+          await signInWithCustomToken(auth, data.firebaseToken);
+          if (isMounted) {
+            setFirebaseReady(true);
+          }
+          return;
+        }
+      } catch (err) {
+        console.error('[MESSAGES_AUTH_RESTORER] Failed to fetch fresh token from server, attempting cached fallback:', err);
+      }
+
+      // Keep the cached-token fallback as a secondary attempt only if the network/fetch call fails
       const cachedToken = localStorage.getItem('fireToken');
       if (cachedToken) {
         try {
@@ -200,20 +212,6 @@ export default function Messages({ user }: { user: any }) {
           console.error('[MESSAGES_AUTH_RESTORER] Cached token invalid or expired. Cleaning up localStorage:', cacheErr);
           localStorage.removeItem('fireToken');
         }
-      }
-
-      try {
-        const { data } = await authService.getCurrentUser();
-        if (data.firebaseToken && isMounted) {
-          console.log('[MESSAGES_AUTH_RESTORER] Retrieved fresh Firebase token from session, authenticating...');
-          localStorage.setItem('fireToken', data.firebaseToken);
-          await signInWithCustomToken(auth, data.firebaseToken);
-          if (isMounted) {
-            setFirebaseReady(true);
-          }
-        }
-      } catch (err) {
-        console.error('[MESSAGES_AUTH_RESTORER] Failed to auto-restore Firebase auth:', err);
       }
     };
 
@@ -452,6 +450,14 @@ export default function Messages({ user }: { user: any }) {
   // SEND MESSAGE ROUTINE WITH OPTIMISTIC AND OFFLINE COEXISTENCE
   const sendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    // FIX 4: Validate that firebaseReady is truly ready before allowing sendMessage
+    if (!firebaseReady) {
+      console.warn('Firebase auth not ready, please wait...');
+      alert('Firebase auth not ready, please wait...');
+      return;
+    }
+
     if (!newMessage.trim() && !pendingAttachment || !selectedChat) return;
 
     const messageText = newMessage.trim();
@@ -522,7 +528,13 @@ export default function Messages({ user }: { user: any }) {
       // Atomically write message and merge conversation details to ensure reliable storage
       try {
         await setDoc(doc(db, 'chats', selectedChat.id, 'messages', msgId), firestorePayload);
-      } catch (writeErr) {
+      } catch (writeErr: any) {
+        // FIX 3: Add a console.error with the actual Firestore permission error message and code when sendMessage fails
+        console.error('[FIRESTORE_WRITE_ERROR_DETAILS] Failed to write message to Firestore:', {
+          code: writeErr?.code,
+          message: writeErr?.message,
+          error: writeErr
+        });
         handleFirestoreError(writeErr, OperationType.WRITE, `chats/${selectedChat.id}/messages/${msgId}`);
         // FIX: Bug 2 - Re-throw message write error so the message send routine knows it failed and queues it offline.
         throw writeErr;
@@ -639,21 +651,28 @@ export default function Messages({ user }: { user: any }) {
   };
 
   // Connect background auto-retry for offline message queue
-  useEffect(() => {
-    const processOfflineQueue = async () => {
-      if (offlineMessageQueue.length === 0 || !navigator.onLine || !selectedChat) return;
-      console.log('[AUTO-SYNC] Connection restored. Firing offline queued messages...');
-      const queueToProcess = [...offlineMessageQueue];
-      for (const msg of queueToProcess) {
-        if (msg.conversationId === selectedChat.id) {
-          await retrySendMessage(msg);
-        }
+  const processOfflineQueue = async () => {
+    if (offlineMessageQueue.length === 0 || !navigator.onLine || !selectedChat) return;
+    console.log('[AUTO-SYNC] Processing offline queued messages...');
+    const queueToProcess = [...offlineMessageQueue];
+    for (const msg of queueToProcess) {
+      if (msg.conversationId === selectedChat.id) {
+        await retrySendMessage(msg);
       }
-    };
+    }
+  };
 
+  useEffect(() => {
     window.addEventListener('online', processOfflineQueue);
     return () => window.removeEventListener('online', processOfflineQueue);
   }, [offlineMessageQueue, selectedChat]);
+
+  // FIX 2: Retry offline queue on page load when firebase becomes ready, not just on online event
+  useEffect(() => {
+    if (firebaseReady && selectedChat?.id) {
+      processOfflineQueue();
+    }
+  }, [firebaseReady, selectedChat?.id]);
 
   // EDIT MESSAGE
   const handleStartEdit = (msg: any) => {
@@ -1137,6 +1156,16 @@ export default function Messages({ user }: { user: any }) {
                     <div className="bg-blue-600 h-full transition-all duration-300" style={{ width: `${uploadProgress || 15}%` }} />
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* FIX 5: Show small yellow warning banner when firebaseReady is false */}
+            {!firebaseReady && (
+              <div id="reconnecting-warning-banner" className="px-5 py-3 bg-amber-50 border-t border-amber-200/60 flex items-center gap-2.5 relative z-20 text-amber-800 animate-pulse">
+                <Loader2 className="animate-spin text-amber-600 shrink-0" size={14} />
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  Reconnecting to messaging server...
+                </span>
               </div>
             )}
 
