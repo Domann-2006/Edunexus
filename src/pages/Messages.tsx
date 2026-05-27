@@ -180,25 +180,13 @@ export default function Messages({ user }: { user: any }) {
 
     // FIX: Bug 1 - checkAndRestoreAuth using cached localStorage token first
     const checkAndRestoreAuth = async () => {
-      console.log('[MESSAGES_AUTH_RESTORER] Checking/restoring Firebase auth session...');
-      
-      // FIX 1: Always try to get a fresh token from the `/me` endpoint on mount first
-      try {
-        const { data } = await authService.getCurrentUser();
-        if (data && data.firebaseToken && isMounted) {
-          console.log('[MESSAGES_AUTH_RESTORER] Retrieved fresh Firebase token from session, authenticating...');
-          localStorage.setItem('fireToken', data.firebaseToken);
-          await signInWithCustomToken(auth, data.firebaseToken);
-          if (isMounted) {
-            setFirebaseReady(true);
-          }
-          return;
-        }
-      } catch (err) {
-        console.error('[MESSAGES_AUTH_RESTORER] Failed to fetch fresh token from server, attempting cached fallback:', err);
+      // If Firebase already has a valid authenticated user, we are done immediately
+      if (auth.currentUser && !auth.currentUser.isAnonymous) {
+        if (isMounted) setFirebaseReady(true);
+        return;
       }
 
-      // Keep the cached-token fallback as a secondary attempt only if the network/fetch call fails
+      // Step 1: Try cached token FIRST (instant, no network needed)
       const cachedToken = localStorage.getItem('fireToken');
       if (cachedToken) {
         try {
@@ -209,9 +197,25 @@ export default function Messages({ user }: { user: any }) {
             return;
           }
         } catch (cacheErr) {
-          console.error('[MESSAGES_AUTH_RESTORER] Cached token invalid or expired. Cleaning up localStorage:', cacheErr);
+          console.warn('[MESSAGES_AUTH_RESTORER] Cached token invalid or expired. Cleaning up localStorage:', cacheErr);
           localStorage.removeItem('fireToken');
         }
+      }
+
+      // Step 2: Only call /auth/me if cached token failed or didn't exist
+      try {
+        console.log('[MESSAGES_AUTH_RESTORER] Fetching fresh Firebase token from session...');
+        const { data } = await authService.getCurrentUser();
+        if (data && data.firebaseToken && isMounted) {
+          console.log('[MESSAGES_AUTH_RESTORER] Retrieved fresh Firebase token from session, authenticating...');
+          localStorage.setItem('fireToken', data.firebaseToken);
+          await signInWithCustomToken(auth, data.firebaseToken);
+          if (isMounted) {
+            setFirebaseReady(true);
+          }
+        }
+      } catch (err) {
+        console.error('[MESSAGES_AUTH_RESTORER] Failed to restore Firebase auth:', err);
       }
     };
 
@@ -221,11 +225,11 @@ export default function Messages({ user }: { user: any }) {
         console.log('[FIREBASE_AUTH] Synchronized with custom authenticated user:', fbUser.uid);
         if (isMounted) setFirebaseReady(true);
       } else {
-        console.log('[FIREBASE_AUTH] Waiting for custom authenticated session token...', fbUser?.uid);
+        console.log('[FIREBASE_AUTH] Waiting for custom authenticated session token...');
         if (isMounted) {
           setFirebaseReady(false);
-          // If unauthenticated or token expired, trigger background token restoration!
-          checkAndRestoreAuth();
+          // Only re-trigger restoration if firebase was previously ready (genuine expiry)
+          // NOT on initial mount (checkAndRestoreAuth already runs below)
         }
       }
     });
