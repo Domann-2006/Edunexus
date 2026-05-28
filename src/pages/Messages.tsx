@@ -86,6 +86,7 @@ export default function Messages({ user }: { user: any }) {
   const [firebaseReady, setFirebaseReady] = useState(false);
   const [firebaseTimeout, setFirebaseTimeout] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [debugError, setDebugError] = useState('');
   
   // Custom interactive extensions
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -227,9 +228,17 @@ export default function Messages({ user }: { user: any }) {
           if (data && data.firebaseToken && isMounted) {
             console.log('[MESSAGES_AUTH_RESTORER] Retrieved fresh Firebase token from session, authenticating...');
             localStorage.setItem('fireToken', data.firebaseToken);
-            await signInWithCustomToken(auth, data.firebaseToken);
-            if (isMounted) {
-              setFirebaseReady(true);
+            try {
+              await signInWithCustomToken(auth, data.firebaseToken);
+              if (isMounted) {
+                setFirebaseReady(true);
+              }
+            } catch (signInErr: any) {
+              console.error('[MESSAGES_AUTH_RESTORER] Custom token sign-in failed:', signInErr);
+              if (isMounted) {
+                setFirebaseTimeout(true);
+                setDebugError((signInErr?.message || '') + ' code: ' + (signInErr?.code || ''));
+              }
             }
           }
         } catch (err) {
@@ -1188,18 +1197,25 @@ export default function Messages({ user }: { user: any }) {
 
             {/* FIX 5: Show small yellow warning banner when firebaseReady is false */}
             {!firebaseReady && (
-              <div id="reconnecting-warning-banner" className="px-5 py-3 bg-amber-50 border-t border-amber-200/60 flex items-center gap-2.5 relative z-20 text-amber-800 animate-pulse">
-                {firebaseTimeout ? (
-                  <span className="text-xs font-bold uppercase tracking-wider text-red-700">
-                    Could not connect to messaging server. Please refresh.
-                  </span>
-                ) : (
-                  <>
-                    <Loader2 className="animate-spin text-amber-600 shrink-0" size={14} />
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      Reconnecting to messaging server...
+              <div id="reconnecting-warning-banner" className="px-5 py-3 bg-amber-50 border-t border-amber-200/60 flex flex-col gap-1 relative z-20 text-amber-800 animate-pulse">
+                <div className="flex items-center gap-2.5">
+                  {firebaseTimeout ? (
+                    <span className="text-xs font-bold uppercase tracking-wider text-red-700">
+                      Could not connect to messaging server. Please refresh.
                     </span>
-                  </>
+                  ) : (
+                    <>
+                      <Loader2 className="animate-spin text-amber-600 shrink-0" size={14} />
+                      <span className="text-xs font-bold uppercase tracking-wider">
+                        Reconnecting to messaging server...
+                      </span>
+                    </>
+                  )}
+                </div>
+                {debugError && (
+                  <div className="text-red-600 text-[10px] font-mono break-all pl-6">
+                    {debugError}
+                  </div>
                 )}
               </div>
             )}
