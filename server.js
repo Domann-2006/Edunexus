@@ -2,14 +2,35 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 
 // Routes
 import authRoutes from './src/routes/auth.js';
 import apiRoutes from './src/routes/api.js';
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many auth requests from this IP, please try again after 15 minutes' }
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.originalUrl && req.originalUrl.startsWith('/api/auth'),
+  message: { message: 'Too many requests from this IP, please try again after a minute' }
+});
+
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
+
+  app.use(compression());
 
   // Allow multiple origins in production, or just use origin: true to reflect request origin
   // If the user provides VITE_FRONTEND_URL, we should prioritize it.
@@ -39,6 +60,9 @@ async function startServer() {
   }));
   app.use(express.json());
   app.use(cookieParser());
+
+  app.use('/api/auth', authLimiter);
+  app.use('/api', apiLimiter);
 
   // API Routes
   const apiRouter = express.Router();

@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'edunexus_super_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set');
 
 export const authenticate = (req, res, next) => {
   const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
