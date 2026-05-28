@@ -1,9 +1,10 @@
 {
-  "projectId": "gen-lang-client-0224106807",
-  "appId": "1:954494779930:web:1cf649f673e1940b8e07a3",
-  "apiKey": "AIzaSyAiz1MQALNv0-U3dmo-NrpQ_1kZUntTmGw",
-  "authDomain": "gen-lang-client-0224106807.firebaseapp.com",
-  "storageBucket": "gen-lang-client-0224106807.firebasestorage.app",
-  "messagingSenderId": "954494779930",
-  "measurementId": ""
+  "apiKey": "AIzaSyAtg3LeI4Zgh3vQRdIwz_n2ioHCCcB4fl8",
+  "authDomain": "edunexus-ae0af.firebaseapp.com",
+  "databaseURL": "https://edunexus-ae0af-default-rtdb.firebaseio.com",
+  "projectId": "edunexus-ae0af",
+  "storageBucket": "edunexus-ae0af.firebasestorage.app",
+  "messagingSenderId": "334527196718",
+  "appId": "1:334527196718:web:b0a034ab4f2e0753a979bf",
+  "measurementId": "G-FBKSHS2436"
 }
