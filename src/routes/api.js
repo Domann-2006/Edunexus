@@ -140,9 +140,10 @@ async function setupSchoolCurriculum(schoolId) {
 
 // SaaS Limits
 const PLAN_LIMITS = {
-  BASIC: { users: 50, classes: 5 },
-  PRO: { users: 500, classes: 20 },
-  PREMIUM: { users: 5000, classes: 100 },
+  BASIC: { users: 200, classes: 15 },
+  PRO: { users: 1000, classes: 50 },
+  PREMIUM: { users: 10000, classes: 200 },
+  ENTERPRISE: { users: Infinity, classes: Infinity },
 };
 
 // Helper to log activities
@@ -308,6 +309,17 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         // Only Super Admins can create schools
         if (collectionName === 'schools' && req.user?.role !== 'SUPER_ADMIN') {
           return res.status(403).json({ message: 'Only Super Admins can create schools' });
+        }
+
+        if (collectionName === 'classes') {
+          const schoolDoc = await db.collection('schools').doc(req.user.schoolId).get();
+          const plan = schoolDoc.exists ? (schoolDoc.data().plan || 'BASIC') : 'BASIC';
+          const classLimit = PLAN_LIMITS[plan]?.classes || 0;
+          const classCountSnap = await db.collection('classes').where('schoolId', '==', req.user.schoolId).count().get();
+          const currentClassCount = classCountSnap.data().count;
+          if (currentClassCount >= classLimit) {
+            return res.status(403).json({ message: 'Class limit reached for your plan. Please upgrade to add more classes.' });
+          }
         }
         
         // Teacher validation: Can only create in assigned classes
@@ -603,6 +615,15 @@ teacherRouter.post('/', authenticate, authorize(['SCHOOL_ADMIN']), async (req, r
     const userSnapshot = await db.collection('users').where('email', '==', email).get();
     if (!userSnapshot.empty) {
       return res.status(400).json({ message: 'User with this email already exists' });
+    }
+
+    const schoolDoc = await db.collection('schools').doc(schoolId).get();
+    const plan = schoolDoc.exists ? (schoolDoc.data().plan || 'BASIC') : 'BASIC';
+    const userLimit = PLAN_LIMITS[plan]?.users || 0;
+    const userCountSnap = await db.collection('users').where('schoolId', '==', schoolId).count().get();
+    const currentUserCount = userCountSnap.data().count;
+    if (currentUserCount >= userLimit) {
+      return res.status(403).json({ message: 'User limit reached for your plan. Please upgrade to add more users.' });
     }
 
     // Hash password (use provided or auto-generate)
