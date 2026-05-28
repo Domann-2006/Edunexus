@@ -75,6 +75,7 @@ router.post('/login', async (req, res) => {
     let firebaseToken = null;
     try {
       const { auth: adminAuth } = await import('../lib/firebase-admin.js');
+      console.log(`[FIREBASE_CUSTOM_TOKEN] Generating custom token for user ID (Firestore doc ID): ${user.id}`);
       firebaseToken = await adminAuth.createCustomToken(user.id);
     } catch (fbErr) {
       console.error('Failed to generate Firebase token:', fbErr);
@@ -141,6 +142,7 @@ router.get('/me', authenticate, async (req, res) => {
     let firebaseToken = null;
     try {
       const { auth: adminAuth } = await import('../lib/firebase-admin.js');
+      console.log(`[FIREBASE_CUSTOM_TOKEN_ME] Generating custom token during session check for user ID (Firestore doc ID): ${userDoc.id}`);
       firebaseToken = await adminAuth.createCustomToken(userDoc.id);
     } catch (fbErr) {
       console.error('Failed to generate Firebase token during session check:', fbErr);

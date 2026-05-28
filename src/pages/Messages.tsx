@@ -84,6 +84,8 @@ export default function Messages({ user }: { user: any }) {
   
   // Firebase Auth sync checkpoint
   const [firebaseReady, setFirebaseReady] = useState(false);
+  const [firebaseTimeout, setFirebaseTimeout] = useState(false);
+  const [sendError, setSendError] = useState('');
   
   // Custom interactive extensions
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -167,6 +169,20 @@ export default function Messages({ user }: { user: any }) {
     setOnlineStatus(prev => ({ ...prev, 'SUPER': 'online' }));
   }, []);
 
+  // Timeout handler for firebase auth connection
+  useEffect(() => {
+    if (firebaseReady) {
+      setFirebaseTimeout(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (!firebaseReady) {
+        setFirebaseTimeout(true);
+      }
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [firebaseReady]);
+
   // Dynamic Self-Healing Firebase Auth Restorer & Sync Hub
   useEffect(() => {
     if (!user) return;
@@ -186,36 +202,39 @@ export default function Messages({ user }: { user: any }) {
         return;
       }
 
-      // Step 1: Try cached token FIRST (instant, no network needed)
-      const cachedToken = localStorage.getItem('fireToken');
-      if (cachedToken) {
-        try {
-          console.log('[MESSAGES_AUTH_RESTORER] Attempting authentication with cached token...');
-          await signInWithCustomToken(auth, cachedToken);
-          if (isMounted) {
-            setFirebaseReady(true);
-            return;
+      // Only fall back to cached token or fetch if auth.currentUser is null
+      if (auth.currentUser === null) {
+        // Step 1: Try cached token FIRST (instant, no network needed)
+        const cachedToken = localStorage.getItem('fireToken');
+        if (cachedToken) {
+          try {
+            console.log('[MESSAGES_AUTH_RESTORER] Attempting authentication with cached token...');
+            await signInWithCustomToken(auth, cachedToken);
+            if (isMounted) {
+              setFirebaseReady(true);
+              return;
+            }
+          } catch (cacheErr) {
+            console.warn('[MESSAGES_AUTH_RESTORER] Cached token invalid or expired. Cleaning up localStorage:', cacheErr);
+            localStorage.removeItem('fireToken');
           }
-        } catch (cacheErr) {
-          console.warn('[MESSAGES_AUTH_RESTORER] Cached token invalid or expired. Cleaning up localStorage:', cacheErr);
-          localStorage.removeItem('fireToken');
         }
-      }
 
-      // Step 2: Only call /auth/me if cached token failed or didn't exist
-      try {
-        console.log('[MESSAGES_AUTH_RESTORER] Fetching fresh Firebase token from session...');
-        const { data } = await authService.getCurrentUser();
-        if (data && data.firebaseToken && isMounted) {
-          console.log('[MESSAGES_AUTH_RESTORER] Retrieved fresh Firebase token from session, authenticating...');
-          localStorage.setItem('fireToken', data.firebaseToken);
-          await signInWithCustomToken(auth, data.firebaseToken);
-          if (isMounted) {
-            setFirebaseReady(true);
+        // Step 2: Only call /auth/me if cached token failed or didn't exist
+        try {
+          console.log('[MESSAGES_AUTH_RESTORER] Fetching fresh Firebase token from session...');
+          const { data } = await authService.getCurrentUser();
+          if (data && data.firebaseToken && isMounted) {
+            console.log('[MESSAGES_AUTH_RESTORER] Retrieved fresh Firebase token from session, authenticating...');
+            localStorage.setItem('fireToken', data.firebaseToken);
+            await signInWithCustomToken(auth, data.firebaseToken);
+            if (isMounted) {
+              setFirebaseReady(true);
+            }
           }
+        } catch (err) {
+          console.error('[MESSAGES_AUTH_RESTORER] Failed to restore Firebase auth:', err);
         }
-      } catch (err) {
-        console.error('[MESSAGES_AUTH_RESTORER] Failed to restore Firebase auth:', err);
       }
     };
 
@@ -454,6 +473,7 @@ export default function Messages({ user }: { user: any }) {
   // SEND MESSAGE ROUTINE WITH OPTIMISTIC AND OFFLINE COEXISTENCE
   const sendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    setSendError('');
 
     // FIX 4: Validate that firebaseReady is truly ready before allowing sendMessage
     if (!firebaseReady) {
@@ -563,20 +583,24 @@ export default function Messages({ user }: { user: any }) {
       // they are safely filtered out in onSnapshot once received! This completely avoids the blink bug.
       logChatAction('MESSAGE_SENT', `Sent a WhatsApp-styled message to chat ID: ${selectedChat.id}`);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('[CHAT_FAIL_DETAILS]', err);
       // Remove from temporary state and insert into persistent queue
       setOptimisticMessages(prev => prev.filter(m => m.id !== msgId));
-      const failedPayload = {
-        ...messagePayload,
-        isFailed: true,
-        isPending: false
-      };
-      setOfflineMessageQueue(prev => {
-        const next = [...prev, failedPayload];
-        saveOfflineMessages(next);
-        return next;
-      });
+      if (err?.code === 'permission-denied') {
+        setSendError('Message failed: permission denied. Please refresh the page.');
+      } else {
+        const failedPayload = {
+          ...messagePayload,
+          isFailed: true,
+          isPending: false
+        };
+        setOfflineMessageQueue(prev => {
+          const next = [...prev, failedPayload];
+          saveOfflineMessages(next);
+          return next;
+        });
+      }
     }
   };
 
@@ -1165,10 +1189,18 @@ export default function Messages({ user }: { user: any }) {
             {/* FIX 5: Show small yellow warning banner when firebaseReady is false */}
             {!firebaseReady && (
               <div id="reconnecting-warning-banner" className="px-5 py-3 bg-amber-50 border-t border-amber-200/60 flex items-center gap-2.5 relative z-20 text-amber-800 animate-pulse">
-                <Loader2 className="animate-spin text-amber-600 shrink-0" size={14} />
-                <span className="text-xs font-bold uppercase tracking-wider">
-                  Reconnecting to messaging server...
-                </span>
+                {firebaseTimeout ? (
+                  <span className="text-xs font-bold uppercase tracking-wider text-red-700">
+                    Could not connect to messaging server. Please refresh.
+                  </span>
+                ) : (
+                  <>
+                    <Loader2 className="animate-spin text-amber-600 shrink-0" size={14} />
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      Reconnecting to messaging server...
+                    </span>
+                  </>
+                )}
               </div>
             )}
 
@@ -1261,6 +1293,11 @@ export default function Messages({ user }: { user: any }) {
                     <Send size={15} />
                   </button>
                </form>
+               {sendError && (
+                 <p className="text-red-600 text-[10px] mt-1.5 font-bold animate-pulse px-1">
+                   {sendError}
+                 </p>
+               )}
             </div>
           </>
         )}

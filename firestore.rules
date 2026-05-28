@@ -15,11 +15,11 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return isSignedIn() && getUserData().role == 'SUPER_ADMIN';
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'SUPER_ADMIN';
     }
 
     function isSchoolAdmin(schoolId) {
-      return isSignedIn() && (getUserData().role == 'SCHOOL_ADMIN' && getUserData().schoolId == schoolId);
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (getUserData().role == 'SCHOOL_ADMIN' && getUserData().schoolId == schoolId);
     }
 
     function isTeacher(schoolId) {
