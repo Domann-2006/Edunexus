@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { Bell, Users, Megaphone, FileSpreadsheet, CheckCheck, Loader2, Inbox } from 'lucide-react';
@@ -82,7 +83,19 @@ function getRelativeTime(dateString: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+const getNotificationLink = (type: string): string => {
+  switch (type) {
+    case 'message': return '/messages';
+    case 'student': return '/students';
+    case 'teacher': return '/teachers';
+    case 'announcement': return '/super-admin/announcements';
+    case 'result': return '/results';
+    default: return '/notifications';
+  }
+};
+
 export default function Notifications({ user }: { user: any }) {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState<string | null>(null);
@@ -122,14 +135,15 @@ export default function Notifications({ user }: { user: any }) {
     return () => unsubscribe();
   }, [user]);
 
-  const handleMarkAsRead = async (id: string, currentlyRead: boolean) => {
-    if (currentlyRead) return;
+  const handleMarkAsRead = async (id: string, currentlyRead: boolean, type: string) => {
     try {
-      // Optimistic update
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
-      );
-      await api.put(`/notifications/${id}/read`);
+      if (!currentlyRead) {
+        setNotifications(prev =>
+          prev.map(n => n.id === id ? { ...n, read: true } : n)
+        );
+        await api.put(`/notifications/${id}/read`);
+      }
+      navigate(getNotificationLink(type));
     } catch (err: any) {
       console.error('Failed to mark notification as read:', err);
     }
@@ -226,7 +240,7 @@ export default function Notifications({ user }: { user: any }) {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.03, duration: 0.2 }}
-              onClick={() => handleMarkAsRead(notification.id, notification.read)}
+              onClick={() => handleMarkAsRead(notification.id, notification.read, notification.type)}
               className={`
                 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 
                 flex items-start gap-4 transition-all hover:shadow-md cursor-pointer relative overflow-hidden
