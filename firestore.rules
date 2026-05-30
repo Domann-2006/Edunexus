@@ -102,6 +102,7 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
         allow create, update: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
       }
     }
   }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../lib/firebase';
 import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, limit, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, limit, updateDoc, increment, deleteDoc } from 'firebase/firestore';
 import { Send, Search, CheckCheck, Loader2, ChevronLeft, MoreVertical, Paperclip, Smile, X, Image as ImageIcon, FileText, Trash2, Edit, AlertCircle, Check, Laptop, Sparkles, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import api, { schoolService, fileService, authService } from '../services/api';
@@ -98,6 +98,7 @@ export default function Messages({ user }: { user: any }) {
   const [activeMessageMenuId, setActiveMessageMenuId] = useState<string | null>(null);
   const [onlineStatus, setOnlineStatus] = useState<Record<string, 'online' | 'offline'>>({});
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Optimistic & Persistent Native Unsent Messages Queue
   const [optimisticMessages, setOptimisticMessages] = useState<any[]>([]);
@@ -760,6 +761,28 @@ export default function Messages({ user }: { user: any }) {
     }
   };
 
+  // PHYSICAL/HARD DELETE MESSAGE
+  const deleteMessage = async (messageId: string) => {
+    if (!messageId) return;
+    const msg = [
+      ...messages,
+      ...optimisticMessages,
+      ...offlineMessageQueue
+    ].find(m => m.id === messageId);
+
+    if (!msg || msg.senderId !== user?.id) {
+      console.error('Only the sender can delete this message.');
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'chats', selectedChat.id, 'messages', messageId));
+      logChatAction('MESSAGE_HARD_DELETE', `Hard deleted message ID: ${messageId}`);
+    } catch (err) {
+      console.error('Failed to delete message:', err);
+    }
+  };
+
   const appendEmoji = (emoji: string) => {
     setNewMessage(prev => prev + emoji);
   };
@@ -986,6 +1009,19 @@ export default function Messages({ user }: { user: any }) {
                         )}
 
                         <div className="relative group max-w-[75%] md:max-w-[65%]">
+                          {isMine && !isFailed && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(msg.id);
+                              }}
+                              className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 bg-white hover:bg-rose-50 hover:text-rose-600 rounded-lg text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-sm border border-gray-150 transition-all cursor-pointer"
+                              title="Delete message"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                           {/* Chat Options Context Menu */}
                           {!isFailed && (
                             <div className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -1106,6 +1142,33 @@ export default function Messages({ user }: { user: any }) {
                                 <p className={`leading-relaxed whitespace-pre-wrap pr-4 text-xs font-semibold ${msg.isDeleted ? 'italic text-gray-400' : 'text-gray-950'}`}>
                                   {msg.text}
                                 </p>
+
+                                {confirmDeleteId === msg.id && (
+                                  <div className="mt-2 pt-2 border-t border-black/10 flex flex-wrap items-center justify-end gap-2 text-[10px]">
+                                    <span className="text-red-600 font-bold mr-auto">Delete this message?</span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setConfirmDeleteId(null);
+                                      }}
+                                      className="px-2 py-1 bg-gray-105 hover:bg-gray-200 text-gray-700 font-bold rounded transition-colors cursor-pointer"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteMessage(confirmDeleteId);
+                                        setConfirmDeleteId(null);
+                                      }}
+                                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors cursor-pointer"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
                               </>
                             )}
 
