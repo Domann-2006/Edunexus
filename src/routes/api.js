@@ -7,6 +7,26 @@ import { LEVEL_CLASSES, DEFAULT_SUBJECTS } from '../lib/curriculum.js';
 
 const router = express.Router();
 
+async function createNotification({ recipientId, recipientRole, schoolId, title, message, type }) {
+  try {
+    if (!recipientId) return;
+    const notificationData = {
+      recipientId,
+      recipientRole,
+      schoolId: schoolId || 'SUPER',
+      title,
+      message,
+      type,
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+    await db.collection('notifications').add(notificationData);
+    console.log(`[NOTIFICATION CREATED] For ${recipientId} (${recipientRole}): ${title}`);
+  } catch (err) {
+    console.error('Failed to create notification:', err);
+  }
+}
+
 // --- BACKEND MEMORY CACHING SYSTEM FOR FIRESTORE READ OPTIMIZATION ---
 const teacherProfileCache = new Map(); // userId -> { data, expires }
 const schoolCollectionCache = new Map(); // `${schoolId}:${collectionName}` -> { data, expires }
@@ -397,6 +417,79 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
 
         const ref = await db.collection(collectionName).add(data);
         console.log(`Document created with ID: ${ref.id}`);
+
+        // Trigger notifications in fire-and-forget fashion
+        if (collectionName === 'students') {
+          (async () => {
+            try {
+              const teachersSnap = await db.collection('users')
+                .where('schoolId', '==', data.schoolId)
+                .where('role', '==', 'TEACHER')
+                .get();
+              teachersSnap.forEach(tDoc => {
+                createNotification({
+                  recipientId: tDoc.id,
+                  recipientRole: 'TEACHER',
+                  schoolId: data.schoolId,
+                  title: 'New Student Added',
+                  message: 'A new student has been added to your school',
+                  type: 'student'
+                });
+              });
+
+              const adminsSnap = await db.collection('users')
+                .where('schoolId', '==', data.schoolId)
+                .where('role', '==', 'SCHOOL_ADMIN')
+                .get();
+              adminsSnap.forEach(aDoc => {
+                createNotification({
+                  recipientId: aDoc.id,
+                  recipientRole: 'SCHOOL_ADMIN',
+                  schoolId: data.schoolId,
+                  title: 'New Student Added',
+                  message: 'A new student has been added to your school',
+                  type: 'student'
+                });
+              });
+            } catch (err) {
+              console.error('Failed to trigger student added notification:', err);
+            }
+          })();
+        } else if (collectionName === 'announcements') {
+          (async () => {
+            try {
+              const teachersSnap = await db.collection('users')
+                .where('role', '==', 'TEACHER')
+                .get();
+              teachersSnap.forEach(tDoc => {
+                createNotification({
+                  recipientId: tDoc.id,
+                  recipientRole: 'TEACHER',
+                  schoolId: tDoc.data().schoolId || data.schoolId,
+                  title: 'New Announcement',
+                  message: `New announcement: ${data.title || 'Check the announcements page'}`,
+                  type: 'announcement'
+                });
+              });
+
+              const adminsSnap = await db.collection('users')
+                .where('role', '==', 'SCHOOL_ADMIN')
+                .get();
+              adminsSnap.forEach(aDoc => {
+                createNotification({
+                  recipientId: aDoc.id,
+                  recipientRole: 'SCHOOL_ADMIN',
+                  schoolId: aDoc.data().schoolId || data.schoolId,
+                  title: 'New Announcement',
+                  message: `New announcement: ${data.title || 'Check the announcements page'}`,
+                  type: 'announcement'
+                });
+              });
+            } catch (err) {
+              console.error('Failed to trigger announcement notification:', err);
+            }
+          })();
+        }
 
         // Log Activity for all roles
         try {
@@ -986,6 +1079,44 @@ router.post('/chats/:chatId/messages', authenticate, async (req, res) => {
       updatedAt: new Date().toISOString()
     }, { merge: true });
 
+    // Trigger message notifications in fire-and-forget fashion
+    (async () => {
+      try {
+        if (req.user.role === 'SUPER_ADMIN') {
+          const schoolAdminsSnap = await db.collection('users')
+            .where('schoolId', '==', chatId)
+            .where('role', '==', 'SCHOOL_ADMIN')
+            .get();
+          schoolAdminsSnap.forEach(docObj => {
+            createNotification({
+              recipientId: docObj.id,
+              recipientRole: 'SCHOOL_ADMIN',
+              schoolId: chatId,
+              title: 'New Message',
+              message: 'You have a new message from EduNexus Support',
+              type: 'message'
+            });
+          });
+        } else if (req.user.role === 'SCHOOL_ADMIN') {
+          const superAdminsSnap = await db.collection('users')
+            .where('role', '==', 'SUPER_ADMIN')
+            .get();
+          superAdminsSnap.forEach(docObj => {
+            createNotification({
+              recipientId: docObj.id,
+              recipientRole: 'SUPER_ADMIN',
+              schoolId: 'SUPER',
+              title: 'New Message',
+              message: `${req.user.name} (${req.user.schoolName || 'Your school'}) sent you a message`,
+              type: 'message'
+            });
+          });
+        }
+      } catch (err) {
+        console.error('Failed to trigger message notifications:', err);
+      }
+    })();
+
     res.status(201).json({ id: msgRef.id, ...messageData });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -1094,6 +1225,28 @@ resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) =
     const ref = await db.collection('results').add(transformed);
     
     await logActivity(req, 'CREATE_RESULT', `Teacher uploaded result for student ${data.studentId} in ${subjectName}`, req.user.schoolId);
+
+    // Trigger result submitted notifications in fire-and-forget fashion
+    (async () => {
+      try {
+        const adminsSnap = await db.collection('users')
+          .where('schoolId', '==', req.user.schoolId)
+          .where('role', '==', 'SCHOOL_ADMIN')
+          .get();
+        adminsSnap.forEach(aDoc => {
+          createNotification({
+            recipientId: aDoc.id,
+            recipientRole: 'SCHOOL_ADMIN',
+            schoolId: req.user.schoolId,
+            title: 'New Result Submitted',
+            message: 'A teacher has submitted a new result for review',
+            type: 'result'
+          });
+        });
+      } catch (err) {
+        console.error('Failed to trigger result submitted notification:', err);
+      }
+    })();
 
     res.status(201).json({ id: ref.id, ...transformed });
   } catch (err) {
@@ -1282,6 +1435,61 @@ router.get('/dashboard-stats', authenticate, async (req, res) => {
     dashboardStatsCache.set(cacheKey, { data: stats, expires: now + 15000 });
 
     res.json(stats);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Notifications routes
+router.get('/notifications', authenticate, async (req, res) => {
+  try {
+    const snapshot = await db.collection('notifications')
+      .where('recipientId', '==', req.user.id)
+      .orderBy('createdAt', 'desc')
+      .limit(50)
+      .get();
+    const list = snapshot.docs.map(docObj => ({ id: docObj.id, ...docObj.data() }));
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/notifications/mark-all-read', authenticate, async (req, res) => {
+  try {
+    const snapshot = await db.collection('notifications')
+      .where('recipientId', '==', req.user.id)
+      .where('read', '==', false)
+      .get();
+    
+    if (snapshot.empty) {
+      return res.json({ success: true, count: 0 });
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach(docObj => {
+      batch.update(docObj.ref, { read: true });
+    });
+    await batch.commit();
+
+    res.json({ success: true, count: snapshot.size });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put('/notifications/:id/read', authenticate, async (req, res) => {
+  try {
+    const docRef = db.collection('notifications').doc(req.params.id);
+    const docSnap = await docRef.get();
+    if (!docSnap.exists) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+    if (docSnap.data().recipientId !== req.user.id) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+    await docRef.update({ read: true });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -20,6 +20,7 @@ import SupportTickets from './pages/SupportTickets';
 import PlatformSettings from './pages/PlatformSettings';
 import Messages from './pages/Messages';
 import SubscriptionDetails from './pages/SubscriptionDetails';
+import Notifications from './pages/Notifications';
 import Layout from './components/Layout';
 import InstallPWA from './components/InstallPWA';
 import { authService } from './services/api';
@@ -234,6 +235,14 @@ export default function App() {
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
               <Profile user={user} updateUser={updateUser} refreshUser={refreshUser} />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/notifications" element={
+          <ProtectedRoute>
+            <Layout user={user} onLogout={handleLogout}>
+              <Notifications user={user} />
             </Layout>
           </ProtectedRoute>
         } />

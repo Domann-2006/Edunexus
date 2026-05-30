@@ -105,5 +105,11 @@ service cloud.firestore {
         allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
       }
     }
+
+    // Notifications security rules
+    match /notifications/{notificationId} {
+      allow read, update, delete: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+      allow create: if false;
+    }
   }
 }

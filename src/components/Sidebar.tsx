@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   Users, 
   UserPlus, 
@@ -22,10 +22,13 @@ import {
   Activity,
   WifiOff,
   CloudUpload,
-  CloudLightning
+  CloudLightning,
+  Bell
 } from 'lucide-react';
 import ProfileImage from './ProfileImage';
 import { cacheEvents, offlineQueue } from '../services/api';
+import { db } from '../lib/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 interface SidebarProps {
   user: any;
@@ -36,6 +39,23 @@ interface SidebarProps {
 
 export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProps) {
   const role = user?.role;
+  const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const q = query(
+      collection(db, 'notifications'),
+      where('recipientId', '==', user.id),
+      where('read', '==', false)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setUnreadCount(snapshot.size);
+    }, (error) => {
+      console.error('Failed to stream unread notifications count in Sidebar:', error);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'completed' | 'offline_queued' | 'offline'>(() => {
     return navigator.onLine ? 'idle' : 'offline';
@@ -235,9 +255,28 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
             </div>
           </div>
         </div>
+        
+        <button
+          onClick={() => {
+            navigate('/notifications');
+            onClose();
+          }}
+          className="w-full flex items-center justify-between px-5 py-3.5 text-gray-700 hover:bg-gray-50 rounded-2xl transition-all font-bold text-xs mb-1 relative cursor-pointer font-sans"
+        >
+          <div className="flex items-center gap-3">
+            <Bell size={16} />
+            <span>Notifications</span>
+          </div>
+          {unreadCount > 0 && (
+            <span className="w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-5 py-3.5 text-red-500 hover:bg-red-50 rounded-2xl transition-all font-bold text-xs"
+          className="w-full flex items-center gap-3 px-5 py-3.5 text-red-500 hover:bg-red-50 rounded-2xl transition-all font-bold text-xs font-sans"
         >
           <LogOut size={16} />
           <span>Logout</span>
