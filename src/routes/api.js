@@ -1123,6 +1123,46 @@ router.post('/chats/:chatId/messages', authenticate, async (req, res) => {
   }
 });
 
+// Trigger chat notifications
+router.post('/chats/:chatId/notify', authenticate, async (req, res) => {
+  try {
+    const chatId = req.params.chatId;
+    if (req.user.role === 'SUPER_ADMIN') {
+      const schoolAdminsSnap = await db.collection('users')
+        .where('schoolId', '==', chatId)
+        .where('role', '==', 'SCHOOL_ADMIN')
+        .get();
+      schoolAdminsSnap.forEach(docObj => {
+        createNotification({
+          recipientId: docObj.id,
+          recipientRole: 'SCHOOL_ADMIN',
+          schoolId: chatId,
+          title: 'New Message',
+          message: 'You have a new message from EduNexus Support',
+          type: 'message'
+        });
+      });
+    } else if (req.user.role === 'SCHOOL_ADMIN') {
+      const superAdminsSnap = await db.collection('users')
+        .where('role', '==', 'SUPER_ADMIN')
+        .get();
+      superAdminsSnap.forEach(docObj => {
+        createNotification({
+          recipientId: docObj.id,
+          recipientRole: 'SUPER_ADMIN',
+          schoolId: 'SUPER',
+          title: 'New Message',
+          message: `${req.user.name} (${req.user.schoolName || 'Your school'}) sent you a message`,
+          type: 'message'
+        });
+      });
+    }
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Log Chat System Activity
 router.post('/chats/log-activity', authenticate, async (req, res) => {
   try {

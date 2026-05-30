@@ -561,6 +561,13 @@ export default function Messages({ user }: { user: any }) {
       // Atomically write message and merge conversation details to ensure reliable storage
       try {
         await setDoc(doc(db, 'chats', selectedChat.id, 'messages', msgId), firestorePayload);
+
+        // Fire-and-forget notification trigger
+        api.post(`/v1/chats/${selectedChat.id}/notify`, {
+          senderName: user?.name,
+          senderRole: user?.role,
+          text: newMessage
+        }).catch(() => {});
       } catch (writeErr: any) {
         // FIX 3: Add a console.error with the actual Firestore permission error message and code when sendMessage fails
         console.error('[FIRESTORE_WRITE_ERROR_DETAILS] Failed to write message to Firestore:', {

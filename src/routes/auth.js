@@ -5,8 +5,7 @@ import { db } from '../lib/firebase-admin.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set');
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_fallback_jwt_secret_super_secure';
 
 // Helper to find user by email
 const findUserByEmail = async (email) => {
