@@ -11,7 +11,7 @@ import apiRoutes from './src/routes/api.js';
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Too many auth requests from this IP, please try again after 15 minutes' }
