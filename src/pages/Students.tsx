@@ -237,12 +237,12 @@ export default function Students({ user }: { user: any }) {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Students</h1>
           <p className="text-gray-500">Manage student records and directory.</p>
         </div>
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col md:flex-row flex-wrap gap-4">
           {user?.role === 'SUPER_ADMIN' && (
             <select
               value={selectedSchoolId}
               onChange={(e) => setSelectedSchoolId(e.target.value)}
-              className="px-6 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
+              className="px-3 py-2.5 md:px-6 md:py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
             >
               <option value="">All Schools</option>
               {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -251,7 +251,7 @@ export default function Students({ user }: { user: any }) {
           {canManage && (
             <button 
               onClick={() => openModal()}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
+              className="flex items-center justify-center gap-2 px-3 py-2.5 md:px-6 md:py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
             >
               <Plus size={20} />
               <span>Add Student</span>
@@ -275,7 +275,7 @@ export default function Students({ user }: { user: any }) {
           <select
             value={selectedClassIdFilter}
             onChange={(e) => setSelectedClassIdFilter(e.target.value)}
-            className="w-full sm:w-auto px-6 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-[10px] font-black tracking-widest uppercase appearance-none"
+            className="w-full sm:w-auto px-3 py-2.5 md:px-6 md:py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-[10px] font-black tracking-widest uppercase appearance-none"
           >
             <option value="">All Classes</option>
             {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -286,11 +286,11 @@ export default function Students({ user }: { user: any }) {
           <table className="w-full text-left">
             <thead className="bg-gray-50/50 text-gray-400 text-xs font-bold tracking-widest border-b border-gray-50">
               <tr>
-                <th className="px-6 py-4">Student</th>
-                <th className="px-6 py-4 text-gray-500 font-mono">Admission #</th>
-                <th className="px-6 py-4">Class & Level</th>
-                <th className="px-6 py-4">Guardian</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-3 py-3 md:px-6 md:py-4">Student</th>
+                <th className="px-3 py-3 md:px-6 md:py-4 text-gray-500 font-mono">Admission #</th>
+                <th className="px-3 py-3 md:px-6 md:py-4">Class & Level</th>
+                <th className="px-3 py-3 md:px-6 md:py-4">Guardian</th>
+                <th className="px-3 py-3 md:px-6 md:py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -312,7 +312,7 @@ export default function Students({ user }: { user: any }) {
                   const studentClass = classes.find(c => c.id === student.classId);
                   return (
                     <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-3 md:px-6 md:py-4">
                         <div className="flex items-center gap-3">
                           <ProfileImage url={student.avatarUrl} size="sm" />
                           <div>
@@ -323,8 +323,8 @@ export default function Students({ user }: { user: any }) {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-500 font-mono">{student.admissionNumber}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-3 md:px-6 md:py-4 text-gray-500 font-mono">{student.admissionNumber}</td>
+                      <td className="px-3 py-3 md:px-6 md:py-4">
                         <div className="flex flex-col gap-1">
                           <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full font-bold text-[10px] w-fit">
                             {studentClass?.name || 'Unassigned'}
@@ -332,8 +332,8 @@ export default function Students({ user }: { user: any }) {
                           <span className="text-[9px] text-gray-400 font-bold ml-1">{studentClass?.level || '-'}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-500">{student.guardianName}</td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-3 py-3 md:px-6 md:py-4 text-gray-500">{student.guardianName}</td>
+                      <td className="px-3 py-3 md:px-6 md:py-4 text-right">
                         {canManage ? (
                           <div className="flex justify-end gap-2 text-xs">
                             <button 

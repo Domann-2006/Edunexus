@@ -141,7 +141,7 @@ export default function Dashboard({ user }: { user: any }) {
         </div>
       </header>
 
-      <div id="stat-cards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div id="stat-cards" className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         {loading ? (
           Array(4).fill(0).map((_, i) => (
             <div key={i} className="h-40 bg-gray-100 animate-pulse rounded-[2.5rem]" />
@@ -153,7 +153,7 @@ export default function Dashboard({ user }: { user: any }) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-gray-100 transition-all group relative overflow-hidden"
+              className="bg-white p-4 md:p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-gray-100 transition-all group relative overflow-hidden"
             >
               <div className="flex items-center justify-between mb-8 relative z-10">
                 <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">

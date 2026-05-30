@@ -141,7 +141,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
         w-64 bg-white border-r border-gray-100 flex flex-col h-[100dvh] fixed left-0 top-0 z-40 transition-all duration-300
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-      <div className="p-8 flex items-center justify-between">
+      <div className="p-5 lg:p-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {user?.schoolLogo ? (
             <img src={user.schoolLogo} alt="Logo" className="w-10 h-10 rounded-xl object-contain shadow-sm" />

@@ -358,7 +358,7 @@ export default function Results({ user }: { user: any }) {
                   </div>
 
                   {/* Student Info Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-12 bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-12 bg-gray-50/50 p-4 md:p-8 rounded-[2rem] border border-gray-100">
                     <div className="flex gap-5">
                       <div className="w-24 h-24 bg-gray-200 rounded-2xl flex items-center justify-center text-gray-400 overflow-hidden ring-4 ring-white shadow-sm shrink-0">
                          {selectedStudent.avatarUrl ? <img src={selectedStudent.avatarUrl} className="w-full h-full object-cover" /> : <User size={40} />}
@@ -405,28 +405,28 @@ export default function Results({ user }: { user: any }) {
                     <table className="w-full text-left">
                       <thead className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
                         <tr>
-                          <th className="px-8 py-5">Subject</th>
-                          <th className="px-4 py-5 text-center">CA 1 (10)</th>
-                          <th className="px-4 py-5 text-center">CA 2 (10)</th>
-                          <th className="px-4 py-5 text-center">ASS (10)</th>
-                          <th className="px-4 py-5 text-center">TST (10)</th>
-                          <th className="px-4 py-5 text-center">EXM (60)</th>
-                          <th className="px-4 py-5 text-center">Total</th>
-                          <th className="px-8 py-5 text-center">Grade</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4">Subject</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">CA 1 (10)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">CA 2 (10)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">ASS (10)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">TST (10)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">EXM (60)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">Total</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">Grade</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 uppercase tracking-tight text-sm font-bold">
                         {studentResults.filter(r => r.status === 'APPROVED' || user.role === 'SCHOOL_ADMIN').length > 0 ? 
                           studentResults.map(r => (
                             <tr key={r.id} className="hover:bg-gray-50/50">
-                              <td className="px-8 py-5 font-black text-gray-900 italic border-r border-gray-50">{r.subjectName || subjects.find(s => s.id === r.subjectId)?.name || 'Unknown'}</td>
-                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.ca1}</td>
-                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.ca2}</td>
-                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.assignment || 0}</td>
-                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.test || 0}</td>
-                              <td className="px-4 py-5 text-center text-gray-400 border-r border-gray-50">{r.exam}</td>
-                              <td className="px-4 py-5 text-center font-black text-gray-900 text-lg border-r border-gray-50">{r.total}</td>
-                              <td className="px-8 py-5 text-center whitespace-nowrap">
+                              <td className="px-3 py-3 md:px-6 md:py-4 font-black text-gray-900 italic border-r border-gray-50">{r.subjectName || subjects.find(s => s.id === r.subjectId)?.name || 'Unknown'}</td>
+                              <td className="px-3 py-3 md:px-6 md:py-4 text-center text-gray-400 border-r border-gray-50">{r.ca1}</td>
+                              <td className="px-3 py-3 md:px-6 md:py-4 text-center text-gray-400 border-r border-gray-50">{r.ca2}</td>
+                              <td className="px-3 py-3 md:px-6 md:py-4 text-center text-gray-400 border-r border-gray-50">{r.assignment || 0}</td>
+                              <td className="px-3 py-3 md:px-6 md:py-4 text-center text-gray-400 border-r border-gray-50">{r.test || 0}</td>
+                              <td className="px-3 py-3 md:px-6 md:py-4 text-center text-gray-400 border-r border-gray-50">{r.exam}</td>
+                              <td className="px-3 py-3 md:px-6 md:py-4 text-center font-black text-gray-900 text-lg border-r border-gray-50">{r.total}</td>
+                              <td className="px-3 py-3 md:px-6 md:py-4 text-center whitespace-nowrap">
                                 <span className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest border-2 ${
                                   r.total >= 70 ? 'bg-emerald-50 border-emerald-500/10 text-emerald-600' :
                                   r.total >= 50 ? 'bg-blue-50 border-blue-500/10 text-blue-600' :
@@ -444,11 +444,11 @@ export default function Results({ user }: { user: any }) {
                       </tbody>
                       <tfoot className="bg-gray-900 text-white border-t-4 border-white">
                         <tr>
-                          <td colSpan={6} className="px-8 py-5 font-black uppercase text-[10px] tracking-[0.3em]">Aggregate Analysis</td>
-                          <td className="px-4 py-5 text-center font-black text-2xl italic">
+                          <td colSpan={6} className="px-3 py-3 md:px-6 md:py-4 font-black uppercase text-[10px] tracking-[0.3em]">Aggregate Analysis</td>
+                          <td className="px-3 py-3 md:px-6 md:py-4 text-center font-black text-2xl italic">
                             {studentResults.reduce((acc, r) => acc + r.total, 0)}
                           </td>
-                          <td className="px-8 py-5 text-center font-black text-sm italic">
+                          <td className="px-3 py-3 md:px-6 md:py-4 text-center font-black text-sm italic">
                             Avg: {studentResults.length > 0 ? (studentResults.reduce((acc, r) => acc + r.total, 0) / studentResults.length).toFixed(1) : 0}%
                           </td>
                         </tr>
@@ -458,7 +458,7 @@ export default function Results({ user }: { user: any }) {
 
                   {/* Remarks Section */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-16">
-                     <div className="bg-blue-50/30 p-8 rounded-[2rem] border border-blue-100 flex flex-col justify-between">
+                     <div className="bg-blue-50/30 p-4 md:p-8 rounded-[2rem] border border-blue-100 flex flex-col justify-between">
                         <div>
                           <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-4 flex items-center gap-2">
                              <Trophy size={14} /> TEACHER'S ASSESSMENT
@@ -473,7 +473,7 @@ export default function Results({ user }: { user: any }) {
                         </div>
                      </div>
 
-                     <div className="bg-emerald-50/30 p-8 rounded-[2rem] border border-emerald-100 flex flex-col justify-between">
+                     <div className="bg-emerald-50/30 p-4 md:p-8 rounded-[2rem] border border-emerald-100 flex flex-col justify-between">
                         <div>
                            <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-4 flex items-center gap-2">
                               <ShieldCheck size={14} /> PRINCIPAL'S COMMENT
@@ -620,15 +620,15 @@ export default function Results({ user }: { user: any }) {
             <table className="w-full text-left">
               <thead className="bg-gray-50/80 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
                 <tr>
-                  <th className="px-8 py-6">Student Basis</th>
-                  <th className="px-4 py-6 text-center">CA 1 (10)</th>
-                  <th className="px-4 py-6 text-center">CA 2 (10)</th>
-                  <th className="px-4 py-6 text-center">ASS (10)</th>
-                  <th className="px-4 py-6 text-center">TST (10)</th>
-                  <th className="px-4 py-6 text-center">EXM (60)</th>
-                  <th className="px-4 py-6 text-center">TOT</th>
-                  <th className="px-6 py-6 text-center">Grade</th>
-                  <th className="px-8 py-6 text-center">Workflow</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4">Student Basis</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">CA 1 (10)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">CA 2 (10)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">ASS (10)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">TST (10)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">EXM (60)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">TOT</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Grade</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Workflow</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -641,7 +641,7 @@ export default function Results({ user }: { user: any }) {
                   
                   return (
                     <tr key={student.id} className="hover:bg-gray-50/50 transition-colors group">
-                      <td className="px-8 py-6">
+                      <td className="px-3 py-3 md:px-6 md:py-4">
                         <div className="flex items-center gap-4">
                           <div className="flex flex-col">
                             <div className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{student.name}</div>
@@ -652,7 +652,7 @@ export default function Results({ user }: { user: any }) {
                         </div>
                       </td>
                       {['ca1', 'ca2', 'assignment', 'test', 'exam'].map(field => (
-                        <td key={field} className="px-3 py-6 text-center">
+                        <td key={field} className="px-3 py-3 md:px-6 md:py-4 text-center">
                           <input 
                             type="number" 
                             disabled={isLocked || user.role === 'SCHOOL_ADMIN'}
@@ -662,19 +662,19 @@ export default function Results({ user }: { user: any }) {
                           />
                         </td>
                       ))}
-                      <td className="px-4 py-6 text-center">
+                      <td className="px-3 py-3 md:px-6 md:py-4 text-center">
                         <span className="text-lg font-black text-blue-600 italic leading-none">{res?.total || total}</span>
                       </td>
-                      <td className="px-6 py-6 text-center">
+                      <td className="px-3 py-3 md:px-6 md:py-4 text-center">
                          <span className={`px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest ${
                             (res?.total || total) >= 70 ? 'bg-emerald-50 text-emerald-600' :
-                            (res?.total || total) >= 50 ? 'bg-blue-50 text-blue-600' :
+                             (res?.total || total) >= 50 ? 'bg-blue-50 text-blue-600' :
                             'bg-rose-50 text-rose-600'
                           }`}>
                             {res?.grade || '-'}
                           </span>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-3 py-3 md:px-6 md:py-4">
                          <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button 
                                onClick={() => openReportCard(student)}

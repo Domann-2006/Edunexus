@@ -179,12 +179,12 @@ export default function Teachers({ user }: { user: any }) {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Teachers</h1>
           <p className="text-gray-500">Manage faculty and academic staff.</p>
         </div>
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col md:flex-row flex-wrap gap-4">
           {user?.role === 'SUPER_ADMIN' && (
             <select
               value={selectedSchoolId}
               onChange={(e) => setSelectedSchoolId(e.target.value)}
-              className="px-6 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
+              className="px-3 py-2.5 md:px-6 md:py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
             >
               <option value="">All Schools</option>
               {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -192,7 +192,7 @@ export default function Teachers({ user }: { user: any }) {
           )}
           <button 
             onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all font-bold uppercase tracking-widest text-xs"
+            className="flex items-center justify-center gap-2 px-3 py-2.5 md:px-6 md:py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all font-bold uppercase tracking-widest text-xs"
           >
             <Plus size={18} />
             <span>Add Teacher</span>
@@ -216,10 +216,10 @@ export default function Teachers({ user }: { user: any }) {
           <table className="w-full text-left">
             <thead className="bg-gray-50/50 text-gray-400 text-xs font-bold tracking-widest border-b border-gray-50">
               <tr>
-                <th className="px-6 py-4">Teacher</th>
-                <th className="px-6 py-4">Employee ID / Role</th>
-                <th className="px-6 py-4">Assignments Summary</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-3 py-3 md:px-6 md:py-4">Teacher</th>
+                <th className="px-3 py-3 md:px-6 md:py-4">Employee ID / Role</th>
+                <th className="px-3 py-3 md:px-6 md:py-4">Assignments Summary</th>
+                <th className="px-3 py-3 md:px-6 md:py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 uppercase tracking-tight">
@@ -239,7 +239,7 @@ export default function Teachers({ user }: { user: any }) {
               ) : (
                 filtered.map((teacher) => (
                   <tr key={teacher.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 md:px-6 md:py-4">
                       <div className="flex items-center gap-3">
                         <ProfileImage url={teacher.avatarUrl} size="sm" />
                         <div>
@@ -256,7 +256,7 @@ export default function Teachers({ user }: { user: any }) {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 md:px-6 md:py-4">
                       <div className="space-y-1.5">
                         <div className="text-gray-500 font-mono text-xs">{teacher.employeeId}</div>
                         <div>
@@ -278,7 +278,7 @@ export default function Teachers({ user }: { user: any }) {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 md:px-6 md:py-4">
                       <div className="space-y-1.5 max-w-xs text-[10px] uppercase font-bold text-gray-400">
                         {(!teacher.roleType || teacher.roleType === 'CLASS' || teacher.roleType === 'BOTH') && (
                           <div className="flex flex-wrap gap-1 items-center">
@@ -321,7 +321,7 @@ export default function Teachers({ user }: { user: any }) {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-3 py-3 md:px-6 md:py-4 text-right">
                       <div className="flex justify-end gap-2 text-xs">
                         <button 
                           onClick={() => openModal(teacher)}
