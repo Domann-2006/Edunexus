@@ -113,13 +113,19 @@ export default function Results({ user }: { user: any }) {
         term: filters.term
       });
       
-      let classStudents = allStudents.filter((s: any) => s.classId === filters.classId);
+      const selectedClassObj = classes.find((c: any) => c.id === filters.classId);
+      let classStudents = allStudents.filter((s: any) => 
+        s.classId === filters.classId || 
+        s.classId === selectedClassObj?.name ||
+        s.className === selectedClassObj?.name
+      );
       
       if (selectedClass?.level === 'SSS' && selectedSubject?.stream !== 'GENERAL') {
         classStudents = classStudents.filter(s => s.stream === selectedSubject.stream);
       }
 
       setStudents(classStudents);
+      console.log('[RESULTS_DEBUG] classStudents:', classStudents.length, 'filters:', filters, 'allStudents sample:', allStudents.slice(0, 2));
       setResults(resRes.data);
 
       const initialScores: any = {};
