@@ -1016,7 +1016,7 @@ export default function Messages({ user }: { user: any }) {
                                 e.stopPropagation();
                                 setConfirmDeleteId(msg.id);
                               }}
-                              className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 bg-white hover:bg-rose-50 hover:text-rose-600 rounded-lg text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity z-20 shadow-sm border border-gray-150 transition-all cursor-pointer"
+                              className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 bg-white hover:bg-rose-50 hover:text-rose-600 rounded-lg text-gray-400 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20 shadow-sm border border-gray-150 transition-all cursor-pointer"
                               title="Delete message"
                             >
                               <Trash2 size={13} />
@@ -1024,7 +1024,7 @@ export default function Messages({ user }: { user: any }) {
                           )}
                           {/* Chat Options Context Menu */}
                           {!isFailed && (
-                            <div className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                            <div className="absolute top-1 right-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20">
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
