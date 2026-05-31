@@ -141,7 +141,7 @@ export default function Notifications({ user }: { user: any }) {
         setNotifications(prev =>
           prev.map(n => n.id === id ? { ...n, read: true } : n)
         );
-        await api.put(`/notifications/${id}/read`);
+        await api.put(`/v1/notifications/${id}/read`);
       }
       navigate(getNotificationLink(type));
     } catch (err: any) {
@@ -157,7 +157,7 @@ export default function Notifications({ user }: { user: any }) {
       setNotifications(prev =>
         prev.map(n => ({ ...n, read: true }))
       );
-      await api.put('/notifications/mark-all-read');
+      await api.put('/v1/notifications/mark-all-read');
     } catch (err: any) {
       console.error('Failed to mark all notifications as read:', err);
     }
