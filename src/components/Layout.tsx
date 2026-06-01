@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { Menu, X, BookOpen, Bell } from 'lucide-react';
 import OnboardingTour from './OnboardingTour';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
@@ -15,7 +15,10 @@ interface LayoutProps {
 export default function Layout({ children, user, onLogout }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const isMessages = location.pathname.includes('messages');
 
   useEffect(() => {
     if (!user?.id) return;
@@ -79,8 +82,8 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
-      <main className="flex-1 lg:ml-64 p-3 md:p-8">
-        <div className="max-w-7xl mx-auto">
+      <main className={isMessages ? 'flex-1 overflow-hidden' : 'flex-1 lg:ml-64 p-3 md:p-8'}>
+        <div className={isMessages ? '' : 'max-w-7xl mx-auto'}>
           {children}
         </div>
       </main>

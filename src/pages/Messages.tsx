@@ -550,11 +550,10 @@ export default function Messages({ user }: { user: any }) {
     const messageText = newMessage.trim();
     const attachmentToSend = pendingAttachment;
     
-    const replyContext = replyingTo;
-    setReplyingTo(null);
-    
     // Clear input fields immediately for instant visual response
     setNewMessage('');
+    const replyContext = replyingTo;
+    setReplyingTo(null);
     setPendingAttachment(null);
     setShowEmojiPicker(false);
 
