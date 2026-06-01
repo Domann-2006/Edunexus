@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
+
     match /{document=**} {
       allow read, write: if false;
     }
@@ -23,11 +23,11 @@ service cloud.firestore {
     }
 
     function isTeacher(schoolId) {
-       return isSignedIn() && (getUserData().role == 'TEACHER' && getUserData().schoolId == schoolId);
+      return isSignedIn() && (getUserData().role == 'TEACHER' && getUserData().schoolId == schoolId);
     }
 
     function isStudent(schoolId) {
-       return isSignedIn() && (getUserData().role == 'STUDENT' && getUserData().schoolId == schoolId);
+      return isSignedIn() && (getUserData().role == 'STUDENT' && getUserData().schoolId == schoolId);
     }
 
     function isValidId(id) {
@@ -93,23 +93,94 @@ service cloud.firestore {
       allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
     }
 
-    // Chats & Messaging Uplink
-    // FIX: Bug 3 - Add isSignedIn() as a base helper to prevent silent evaluation failures during token refresh
-    match /chats/{chatId} {
-      allow read: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
-      allow write: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
-
-      match /messages/{messageId} {
-        allow read: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
-        allow create, update: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
-        allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
-      }
-    }
-
-    // Notifications security rules
+    // Notifications
     match /notifications/{notificationId} {
       allow read, update, delete: if isSignedIn() && resource.data.recipientId == request.auth.uid;
       allow create: if false;
+    }
+
+    // ── CHATS ──────────────────────────────────────────────────────────────
+
+    // 1. Super Admin <-> School Admin support chats (chatId === schoolId)
+    match /chats/{chatId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() ||
+        isSchoolAdmin(chatId) ||
+        (resource.data.type == 'dm' && resource.data.schoolId != null && (
+          isSchoolAdmin(resource.data.schoolId) ||
+          (isTeacher(resource.data.schoolId) && (
+            request.auth.uid == resource.data.teacherId ||
+            request.auth.uid == resource.data.adminId
+          ))
+        )) ||
+        (resource.data.type == 'group' && resource.data.schoolId != null && (
+          isSchoolAdmin(resource.data.schoolId) ||
+          (isTeacher(resource.data.schoolId) && request.auth.uid in resource.data.memberIds)
+        ))
+      );
+
+      allow write: if isSignedIn() && (
+        isSuperAdmin() ||
+        isSchoolAdmin(chatId) ||
+        (resource.data.type == 'dm' && resource.data.schoolId != null && (
+          isSchoolAdmin(resource.data.schoolId) ||
+          (isTeacher(resource.data.schoolId) && (
+            request.auth.uid == resource.data.teacherId ||
+            request.auth.uid == resource.data.adminId
+          ))
+        )) ||
+        (resource.data.type == 'group' && resource.data.schoolId != null && (
+          isSchoolAdmin(resource.data.schoolId) ||
+          (isTeacher(resource.data.schoolId) && request.auth.uid in resource.data.memberIds)
+        ))
+      );
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (
+          isSuperAdmin() ||
+          isSchoolAdmin(chatId) ||
+          (get(/databases/$(database)/documents/chats/$(chatId)).data.type == 'dm' &&
+            get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId != null && (
+              isSchoolAdmin(get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId) ||
+              (isTeacher(get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId) && (
+                request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.teacherId ||
+                request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.adminId
+              ))
+            )
+          ) ||
+          (get(/databases/$(database)/documents/chats/$(chatId)).data.type == 'group' &&
+            get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId != null && (
+              isSchoolAdmin(get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId) ||
+              (isTeacher(get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId) &&
+                request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.memberIds)
+            )
+          )
+        );
+
+        allow create, update: if isSignedIn() && (
+          isSuperAdmin() ||
+          isSchoolAdmin(chatId) ||
+          (get(/databases/$(database)/documents/chats/$(chatId)).data.type == 'dm' &&
+            get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId != null && (
+              isSchoolAdmin(get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId) ||
+              (isTeacher(get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId) && (
+                request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.teacherId ||
+                request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.adminId
+              ))
+            )
+          ) ||
+          (get(/databases/$(database)/documents/chats/$(chatId)).data.type == 'group' &&
+            get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId != null && (
+              isSchoolAdmin(get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId) ||
+              (isTeacher(get(/databases/$(database)/documents/chats/$(chatId)).data.schoolId) &&
+                request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.memberIds &&
+                get(/databases/$(database)/documents/chats/$(chatId)).data.isOpen == true)
+            )
+          )
+        );
+
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
+      }
     }
   }
 }
