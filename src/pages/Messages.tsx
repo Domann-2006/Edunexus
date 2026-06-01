@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../lib/firebase';
 import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, limit, updateDoc, increment, deleteDoc } from 'firebase/firestore';
-import { Send, Search, CheckCheck, Loader2, ChevronLeft, MoreVertical, Paperclip, Smile, X, Image as ImageIcon, FileText, Trash2, Edit, AlertCircle, Check, Laptop, Sparkles, MessageSquare } from 'lucide-react';
+import { Send, Search, CheckCheck, Loader2, ChevronLeft, MoreVertical, Paperclip, Smile, X, Image as ImageIcon, FileText, Trash2, Edit, AlertCircle, Check, Laptop, Sparkles, MessageSquare, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import api, { schoolService, fileService, authService } from '../services/api';
 import { useLocation } from 'react-router-dom';
@@ -116,6 +116,30 @@ export default function Messages({ user }: { user: any }) {
       localStorage.setItem('edunexus_offline_messages', JSON.stringify(queue));
     } catch (e) {
       console.warn('Failed to save offline messages:', e);
+    }
+  };
+
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+  const [downloadingUrls, setDownloadingUrls] = useState<Record<string, boolean>>({});
+
+  const handleFileDownload = async (url: string, name: string) => {
+    if (downloadingUrls[url]) return;
+    setDownloadingUrls(prev => ({ ...prev, [url]: true }));
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+    } finally {
+      setDownloadingUrls(prev => ({ ...prev, [url]: false }));
     }
   };
 
@@ -1103,7 +1127,10 @@ export default function Messages({ user }: { user: any }) {
                                 {msg.attachment && (
                                   <div className="mb-2 rounded-xl overflow-hidden border border-black/5 bg-black/[0.01] p-1">
                                     {msg.attachment.type === 'image' ? (
-                                      <div className="relative group/att cursor-pointer">
+                                      <div 
+                                        onClick={() => setPreviewImage({ url: msg.attachment.url, name: msg.attachment.name })}
+                                        className="relative group/att cursor-pointer"
+                                      >
                                         <img 
                                           src={msg.attachment.url} 
                                           alt={msg.attachment.name} 
@@ -1116,20 +1143,26 @@ export default function Messages({ user }: { user: any }) {
                                         </div>
                                       </div>
                                     ) : (
-                                      <a 
-                                        href={msg.attachment.url} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-3 p-2 hover:bg-white rounded-lg transition-colors"
+                                      <button 
+                                        type="button"
+                                        onClick={() => handleFileDownload(msg.attachment.url, msg.attachment.name)}
+                                        className="w-full flex items-center gap-3 p-2 hover:bg-white rounded-lg transition-colors text-left"
+                                        disabled={downloadingUrls[msg.attachment.url]}
                                       >
                                         <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
-                                          <FileText size={16} />
+                                          {downloadingUrls[msg.attachment.url] ? (
+                                            <Loader2 size={16} className="animate-spin text-blue-600" />
+                                          ) : (
+                                            <FileText size={16} />
+                                          )}
                                         </div>
                                         <div className="min-w-0 flex-1">
                                           <p className="text-[10px] font-semibold text-gray-800 truncate">{msg.attachment.name}</p>
-                                          <p className="text-[9px] text-gray-400 font-bold">{msg.attachment.size || 'Attachment'}</p>
+                                          <p className="text-[9px] text-gray-400 font-bold">
+                                            {downloadingUrls[msg.attachment.url] ? 'Downloading...' : (msg.attachment.size || 'Attachment')}
+                                          </p>
                                         </div>
-                                      </a>
+                                      </button>
                                     )}
                                   </div>
                                 )}
@@ -1376,6 +1409,53 @@ export default function Messages({ user }: { user: any }) {
           </>
         )}
       </div>
+
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 p-4 backdrop-blur-sm">
+          {/* Top-right close button */}
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors cursor-pointer z-51 focus:outline-none"
+            title="Close"
+          >
+            <X size={24} />
+          </button>
+
+          {/* Centered image container */}
+          <div className="relative max-w-full max-h-[80vh] flex items-center justify-center">
+            <img
+              src={previewImage.url}
+              alt={previewImage.name}
+              className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl transition-transform"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
+          {/* Bottom-center download button and filename */}
+          <div className="absolute bottom-6 flex flex-col items-center gap-2">
+            <p className="text-white text-xs font-semibold max-w-[300px] truncate">{previewImage.name}</p>
+            <button
+              type="button"
+              onClick={() => handleFileDownload(previewImage.url, previewImage.name)}
+              disabled={downloadingUrls[previewImage.url]}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-lg transition-transform hover:scale-105"
+            >
+              {downloadingUrls[previewImage.url] ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={16} />
+                  <span>Save to phone / Download</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
