@@ -121,8 +121,26 @@ export default function Messages({ user }: { user: any }) {
 
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const [downloadingUrls, setDownloadingUrls] = useState<Record<string, boolean>>({});
+  const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [actionSheetMsg, setActionSheetMsg] = useState<any>(null);
   const [replyingTo, setReplyingTo] = useState<{ id: string; text: string; senderName: string; attachment?: any } | null>(null);
-  const [swipeState, setSwipeState] = useState<Record<string, number>>({});
+  const [swipeDelta, setSwipeDelta] = useState<Record<string, number>>({});
+  const [swipeStartX, setSwipeStartX] = useState<Record<string, number>>({});
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const [isSelectMode, setIsSelectMode] = useState(false);
+
+  const toggleSelectMessage = (id: string) => {
+    setSelectedMessageIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectMode = () => {
+    setIsSelectMode(false);
+    setSelectedMessageIds(new Set());
+  };
 
   const handleFileDownload = async (url: string, name: string) => {
     if (downloadingUrls[url]) return;
@@ -513,7 +531,7 @@ export default function Messages({ user }: { user: any }) {
       senderName: msg.senderId === user.id ? 'You' : msg.senderName || 'Them',
       attachment: msg.attachment || null,
     });
-    setActiveMessageMenuId(null);
+    setActionSheetMsg(null);
   };
 
   // SEND MESSAGE ROUTINE WITH OPTIMISTIC AND OFFLINE COEXISTENCE
@@ -866,6 +884,17 @@ export default function Messages({ user }: { user: any }) {
     m => !m.deletedFor?.includes(user.id)
   );
 
+  const getMessageGroup = (index: number) => {
+    const msg = visibleMessages[index];
+    const prev = visibleMessages[index - 1];
+    const next = visibleMessages[index + 1];
+    const isFirstInGroup = !prev || prev.senderId !== msg.senderId || 
+      getMessageDate(msg.createdAt).toDateString() !== getMessageDate(prev.createdAt).toDateString();
+    const isLastInGroup = !next || next.senderId !== msg.senderId ||
+      getMessageDate(next.createdAt).toDateString() !== getMessageDate(msg.createdAt).toDateString();
+    return { isFirstInGroup, isLastInGroup };
+  };
+
   return (
     <div className="h-screen w-screen fixed inset-0 flex bg-gray-100 overflow-hidden animate-in fade-in duration-500">
       
@@ -1024,7 +1053,7 @@ export default function Messages({ user }: { user: any }) {
             </div>
 
             {/* Bubble conversation display window */}
-            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 relative z-10 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-1 relative z-10 custom-scrollbar">
               {visibleMessages.length === 0 ? (
                 <div className="flex justify-center py-20">
                    <div className="bg-white/80 border border-gray-100 rounded-2xl p-4 max-w-xs text-center shadow-sm">
@@ -1036,6 +1065,7 @@ export default function Messages({ user }: { user: any }) {
                   const isMine = msg.senderId === user.id;
                   const isMenuOpen = activeMessageMenuId === msg.id;
                   const isFailed = msg.isFailed;
+                  const { isFirstInGroup, isLastInGroup } = getMessageGroup(i);
 
                   const showDate = i === 0 || (() => {
                     const currentD = getMessageDate(msg.createdAt);
@@ -1053,91 +1083,80 @@ export default function Messages({ user }: { user: any }) {
                         </div>
                       )}
 
-                      <div className={`flex items-start gap-2.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
-                        {!isMine && (
-                          <div className="w-7 h-7 bg-indigo-100 text-indigo-700 rounded-lg flex items-center justify-center font-bold text-[10px] shadow-sm uppercase shrink-0">
-                            {msg.senderName?.charAt(0) || 'A'}
-                          </div>
-                        )}
-
+                      <div className={isFirstInGroup ? 'mt-3' : 'mt-0.5'}>
                         <div
-                          onTouchStart={(e) => {
-                            setSwipeState(prev => ({ ...prev, [`${msg.id}_startX`]: e.touches[0].clientX }));
-                          }}
-                          onTouchMove={(e) => {
-                            const startX = swipeState[`${msg.id}_startX`] || 0;
-                            const diff = e.touches[0].clientX - startX;
-                            if (diff > 0 && diff < 80) {
-                              setSwipeState(prev => ({ ...prev, [msg.id]: diff }));
-                            }
-                          }}
-                          onTouchEnd={() => {
-                            const swipeDist = swipeState[msg.id] || 0;
-                            if (swipeDist > 45) handleReply(msg);
-                            setSwipeState(prev => ({ ...prev, [msg.id]: 0 }));
-                          }}
-                          style={{ transform: `translateX(${swipeState[msg.id] || 0}px)`, transition: swipeState[msg.id] ? 'none' : 'transform 0.2s ease' }}
+                          className={`relative transition-colors duration-150 ${isSelectMode && selectedMessageIds.has(msg.id) ? 'bg-blue-50/60' : ''}`}
+                          onClick={() => isSelectMode && toggleSelectMessage(msg.id)}
                         >
-                          <div className="relative group max-w-[75%] md:max-w-[65%]">
-
-                          {/* Chat Options Context Menu */}
-                          {!isFailed && (
-                            <div className="absolute top-1 right-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20">
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMessageMenuId(activeMessageMenuId === msg.id ? null : msg.id);
-                                }}
-                                className="p-1 bg-white hover:bg-gray-100 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 shadow-sm transition-all"
-                                title="Message controls"
-                              >
-                                <MoreVertical size={11} />
-                              </button>
-                              
-                              {isMenuOpen && (
-                                <div className="absolute top-5 right-0 w-36 bg-white rounded-xl shadow-lg ring-1 ring-black/5 p-1 text-left z-50 animate-in fade-in duration-100">
-                                  <button
-                                    onClick={() => handleReply(msg)}
-                                    className="w-full text-left px-3 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"
-                                  >
-                                    <MessageSquare size={11} className="text-blue-500" />
-                                    Reply
-                                  </button>
-                                  {isMine && !msg.isDeleted && (
-                                    <button 
-                                      onClick={() => handleStartEdit(msg)}
-                                      className="w-full text-left px-3 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"
-                                    >
-                                      <Edit size={11} className="text-amber-500" />
-                                      Edit
-                                    </button>
-                                  )}
-                                  {!msg.isDeleted && isMine && (
-                                    <button 
-                                      onClick={() => handleDeleteMessage(msg.id)}
-                                      className="w-full text-left px-3 py-1.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2"
-                                    >
-                                      <Trash2 size={11} />
-                                      Delete everyone
-                                    </button>
-                                  )}
-                                  <button 
-                                    onClick={() => handleDeleteForMe(msg)}
-                                    className="w-full text-left px-3 py-1.5 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 rounded-lg flex items-center gap-2"
-                                  >
-                                    <Trash2 size={11} />
-                                    Delete for me
-                                  </button>
-                                </div>
-                              )}
+                          {isSelectMode && (
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 z-30">
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                selectedMessageIds.has(msg.id) 
+                                  ? 'bg-blue-600 border-blue-600' 
+                                  : 'border-gray-400 bg-white'
+                              }`}>
+                                {selectedMessageIds.has(msg.id) && <Check size={11} className="text-white" />}
+                              </div>
                             </div>
                           )}
+                          <div className={`${isSelectMode ? 'pl-11 pr-2 pointer-events-none select-none' : ''}`}>
+                            <div
+                              onTouchStart={(e) => {
+                                if (isSelectMode) return;
+                                const x = e.touches[0].clientX;
+                                setSwipeStartX(prev => ({ ...prev, [msg.id]: x }));
+                                const timer = setTimeout(() => {
+                                  setActionSheetMsg(msg);
+                                }, 500);
+                                setLongPressTimer(timer);
+                              }}
+                              onTouchMove={(e) => {
+                                if (isSelectMode) return;
+                                if (longPressTimer) {
+                                  clearTimeout(longPressTimer);
+                                  setLongPressTimer(null);
+                                }
+                                const startX = swipeStartX[msg.id] || 0;
+                                const diff = e.touches[0].clientX - startX;
+                                if (diff > 0 && diff < 80) {
+                                  setSwipeDelta(prev => ({ ...prev, [msg.id]: diff }));
+                                }
+                              }}
+                              onTouchEnd={() => {
+                                if (isSelectMode) return;
+                                if (longPressTimer) {
+                                  clearTimeout(longPressTimer);
+                                  setLongPressTimer(null);
+                                }
+                                const delta = swipeDelta[msg.id] || 0;
+                                if (delta > 45) handleReply(msg);
+                                setSwipeDelta(prev => ({ ...prev, [msg.id]: 0 }));
+                              }}
+                              style={{
+                                transform: `translateX(${swipeDelta[msg.id] || 0}px)`,
+                                transition: swipeDelta[msg.id] ? 'none' : 'transform 0.2s ease'
+                              }}
+                            >
+                          <div className={`flex items-start gap-2.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            {!isMine && (
+                              isLastInGroup ? (
+                                <div className="w-7 h-7 bg-indigo-100 text-indigo-700 rounded-lg flex items-center justify-center font-bold text-[10px] shadow-sm uppercase shrink-0">
+                                  {msg.senderName?.charAt(0) || 'A'}
+                                </div>
+                              ) : (
+                                <div className="w-7 h-7 shrink-0" />
+                              )
+                            )}
+
+                            <div className="relative group max-w-[75%] md:max-w-[65%]">
 
                           {/* Chat bubble body card with authentic WhatsApp shades */}
-                          <div className={`px-3 py-2 rounded-2xl shadow-sm text-xs relative ${
+                          <div className={`px-3 py-2 shadow-sm text-xs relative inline-block max-w-full ${
                             isMine 
-                              ? isFailed ? 'bg-rose-100 border border-rose-200 text-rose-950' : 'bg-[#d9fdd3] border border-[#c4e9be] text-gray-900 rounded-tr-none' 
-                              : 'bg-white border border-gray-200/50 text-gray-900 rounded-tl-none'
+                              ? isFailed 
+                                ? 'bg-rose-100 border border-rose-200 text-rose-950 rounded-2xl' 
+                                : `bg-[#d9fdd3] border border-[#c4e9be] text-gray-900 rounded-2xl ${isFirstInGroup ? 'rounded-tr-none' : ''}`
+                              : `bg-white border border-gray-200/50 text-gray-900 rounded-2xl ${isFirstInGroup ? 'rounded-tl-none' : ''}`
                           }`}>
                             {msg.replyTo && (
                               <div className="mb-2 px-2 py-1.5 rounded-xl border-l-4 border-blue-500 bg-black/[0.04] text-[10px]">
@@ -1148,7 +1167,7 @@ export default function Messages({ user }: { user: any }) {
                               </div>
                             )}
 
-                            {!isMine && (
+                            {!isMine && isFirstInGroup && (
                               <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1">
                                 {msg.senderName}
                               </div>
@@ -1293,6 +1312,9 @@ export default function Messages({ user }: { user: any }) {
                         </div>
                         </div>
                       </div>
+                      </div>
+                      </div>
+                      </div>
                     </React.Fragment>
                   )
                 })
@@ -1369,118 +1391,154 @@ export default function Messages({ user }: { user: any }) {
 
             {/* Sticky Input Footer */}
             <div className="p-3 bg-white border-t border-gray-200/50 relative z-20">
-               {replyingTo && (
-                 <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100 rounded-t-xl mb-2">
-                   <div className="flex items-center gap-2 min-w-0">
-                     <div className="w-0.5 h-8 bg-blue-500 rounded-full shrink-0" />
-                     <div className="min-w-0">
-                       <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider text-left">↩ Replying to {replyingTo.senderName}</p>
-                       <p className="text-[11px] text-gray-500 truncate text-left">
-                         {replyingTo.attachment ? `📎 ${replyingTo.attachment.name}` : replyingTo.text}
-                       </p>
-                     </div>
-                   </div>
+               {isSelectMode ? (
+                 <div className="flex items-center justify-between px-4 py-3 bg-white border border-gray-150 rounded-2xl shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-250">
+                   <button onClick={exitSelectMode} type="button" className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors cursor-pointer">
+                     <X size={18} /> Cancel
+                   </button>
+                   <span className="text-xs font-bold text-gray-500 uppercase tracking-widest font-mono">
+                     {selectedMessageIds.size} selected
+                   </span>
                    <button
                      type="button"
-                     onClick={() => setReplyingTo(null)}
-                     className="p-1.5 text-gray-400 hover:text-gray-700 shrink-0 cursor-pointer"
+                     disabled={selectedMessageIds.size === 0}
+                     onClick={async () => {
+                       const allMsgs = [...messages, ...optimisticMessages, ...offlineMessageQueue];
+                       for (const id of selectedMessageIds) {
+                         const m = allMsgs.find(item => item.id === id);
+                         if (m) {
+                           await handleDeleteForMe(m);
+                         } else {
+                           await handleDeleteForMe({ id });
+                         }
+                       }
+                       exitSelectMode();
+                     }}
+                     className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer ${
+                       selectedMessageIds.size > 0
+                         ? 'bg-rose-600 text-white hover:bg-rose-700 shadow shadow-rose-100'
+                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                     }`}
                    >
-                     <X size={14} />
+                     <Trash2 size={16} /> Delete
                    </button>
                  </div>
-               )}
-
-               {showEmojiPicker && (
-                 <div className="absolute bottom-[72px] left-4 bg-white border border-gray-150 rounded-2xl shadow-xl p-3 z-50 w-72 animate-in slide-in-from-bottom-2 duration-200">
-                   <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
-                     <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Insert symbol</span>
-                     <button onClick={() => setShowEmojiPicker(false)} className="text-gray-400 hover:text-gray-600">
-                       <X size={13} />
-                     </button>
-                   </div>
-                   <div className="grid grid-cols-7 gap-2">
-                     {EMOJI_LIST.map(emoji => (
+               ) : (
+                 <>
+                   {replyingTo && (
+                     <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100 rounded-t-xl mb-2">
+                       <div className="flex items-center gap-2 min-w-0">
+                         <div className="w-0.5 h-8 bg-blue-500 rounded-full shrink-0" />
+                         <div className="min-w-0">
+                           <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider text-left">↩ Replying to {replyingTo.senderName}</p>
+                           <p className="text-[11px] text-gray-500 truncate text-left">
+                             {replyingTo.attachment ? `📎 ${replyingTo.attachment.name}` : replyingTo.text}
+                           </p>
+                         </div>
+                       </div>
                        <button
-                         key={emoji.name}
-                         onClick={() => appendEmoji(emoji.char)}
-                         className="text-lg p-1 hover:bg-gray-150 rounded-xl transition-all hover:scale-110"
                          type="button"
+                         onClick={() => setReplyingTo(null)}
+                         className="p-1.5 text-gray-400 hover:text-gray-700 shrink-0 cursor-pointer"
                        >
-                         {emoji.char}
+                         <X size={14} />
                        </button>
-                     ))}
-                   </div>
-                 </div>
-               )}
+                     </div>
+                   )}
 
-               <form onSubmit={sendMessage} className="flex items-center gap-3">
-                  <div className="flex items-center gap-1 text-gray-400 shrink-0">
-                     <button
-                       type="button" 
-                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                       className={`p-2 hover:bg-gray-100 rounded-xl hover:text-gray-900 transition-colors ${showEmojiPicker ? 'text-blue-600 bg-blue-50' : ''}`}
-                       title="Insert emoji"
-                     >
-                       <Smile size={19} />
-                     </button>
+                   {showEmojiPicker && (
+                     <div className="absolute bottom-[72px] left-4 bg-white border border-gray-150 rounded-2xl shadow-xl p-3 z-50 w-72 animate-in slide-in-from-bottom-2 duration-200">
+                       <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
+                         <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Insert symbol</span>
+                         <button onClick={() => setShowEmojiPicker(false)} className="text-gray-400 hover:text-gray-600">
+                           <X size={13} />
+                         </button>
+                       </div>
+                       <div className="grid grid-cols-7 gap-2">
+                         {EMOJI_LIST.map(emoji => (
+                           <button
+                             key={emoji.name}
+                             onClick={() => appendEmoji(emoji.char)}
+                             className="text-lg p-1 hover:bg-gray-150 rounded-xl transition-all hover:scale-110"
+                             type="button"
+                           >
+                             {emoji.char}
+                           </button>
+                         ))}
+                       </div>
+                     </div>
+                   )}
 
-                     <button
-                       type="button" 
-                       onClick={() => imageInputRef.current?.click()}
-                       className="p-2 hover:bg-gray-100 rounded-xl hover:text-gray-900 transition-colors"
-                       title="Attach image"
-                     >
-                        <ImageIcon size={19} />
-                     </button>
-                     <input 
-                       type="file" 
-                       ref={imageInputRef} 
-                       onChange={(e) => handleFileChange(e, 'image')} 
-                       accept="image/*" 
-                       className="hidden" 
-                     />
+                   <form onSubmit={sendMessage} className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 text-gray-400 shrink-0">
+                         <button
+                           type="button" 
+                           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                           className={`p-2 hover:bg-gray-100 rounded-xl hover:text-[#1a1c1e] transition-colors ${showEmojiPicker ? 'text-blue-600 bg-blue-50' : ''}`}
+                           title="Insert emoji"
+                         >
+                           <Smile size={19} />
+                         </button>
 
-                     <button
-                       type="button" 
-                       onClick={() => fileInputRef.current?.click()}
-                       className="p-2 hover:bg-gray-100 rounded-xl hover:text-gray-900 transition-colors"
-                       title="Attach PDF or document"
-                     >
-                       <Paperclip size={18} />
-                     </button>
-                     <input 
-                       type="file" 
-                       ref={fileInputRef} 
-                       onChange={(e) => handleFileChange(e, 'file')} 
-                       accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" 
-                       className="hidden" 
-                     />
-                  </div>
+                         <button
+                           type="button" 
+                           onClick={() => imageInputRef.current?.click()}
+                           className="p-2 hover:bg-gray-100 rounded-xl hover:text-[#1a1c1e] transition-colors"
+                           title="Attach image"
+                         >
+                            <ImageIcon size={19} />
+                         </button>
+                         <input 
+                           type="file" 
+                           ref={imageInputRef} 
+                           onChange={(e) => handleFileChange(e, 'image')} 
+                           accept="image/*" 
+                           className="hidden" 
+                         />
 
-                  <input 
-                    type="text" 
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    className="flex-1 px-4 py-2.5 bg-gray-100 border-transparent rounded-xl text-xs font-semibold text-gray-700 placeholder:text-gray-400 focus:bg-gray-100 focus:ring-1 focus:ring-blue-300 outline-none transition-colors"
-                  />
+                         <button
+                           type="button" 
+                           onClick={() => fileInputRef.current?.click()}
+                           className="p-2 hover:bg-gray-100 rounded-xl hover:text-[#1a1c1e] transition-colors"
+                           title="Attach PDF or document"
+                         >
+                           <Paperclip size={18} />
+                         </button>
+                         <input 
+                           type="file" 
+                           ref={fileInputRef} 
+                           onChange={(e) => handleFileChange(e, 'file')} 
+                           accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" 
+                           className="hidden" 
+                         />
+                      </div>
 
-                  <button 
-                    type="submit"
-                    disabled={!newMessage.trim() && !pendingAttachment}
-                    className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-xl transition-all ${
-                      newMessage.trim() || pendingAttachment 
-                        ? 'bg-blue-600 text-white shadow hover:bg-blue-700' 
-                        : 'bg-gray-150 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <Send size={15} />
-                  </button>
-               </form>
-               {sendError && (
-                 <p className="text-red-600 text-[10px] mt-1.5 font-bold animate-pulse px-1">
-                   {sendError}
-                 </p>
+                      <input 
+                        type="text" 
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Type a message..."
+                        className="flex-1 px-4 py-2.5 bg-gray-100 border-transparent rounded-xl text-xs font-semibold text-gray-700 placeholder:text-gray-400 focus:bg-gray-100 focus:ring-1 focus:ring-blue-300 outline-none transition-colors"
+                      />
+
+                      <button 
+                        type="submit"
+                        disabled={!newMessage.trim() && !pendingAttachment}
+                        className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-xl transition-all ${
+                          newMessage.trim() || pendingAttachment 
+                            ? 'bg-blue-600 text-white shadow hover:bg-blue-700' 
+                            : 'bg-gray-150 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        <Send size={15} />
+                      </button>
+                   </form>
+                   {sendError && (
+                     <p className="text-red-600 text-[10px] mt-1.5 font-bold animate-pulse px-1">
+                       {sendError}
+                     </p>
+                   )}
+                 </>
                )}
             </div>
           </>
@@ -1529,6 +1587,59 @@ export default function Messages({ user }: { user: any }) {
                   <span>Save to phone / Download</span>
                 </>
               )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {actionSheetMsg && (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/40"
+          onClick={() => setActionSheetMsg(null)}
+        >
+          <div
+            className="w-full bg-white rounded-t-3xl p-4 pb-8 space-y-1 animate-in slide-in-from-bottom-4 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-3 truncate">
+              {actionSheetMsg.text || 'Attachment'}
+            </p>
+
+            <button onClick={() => { setIsSelectMode(true); toggleSelectMessage(actionSheetMsg.id); setActionSheetMsg(null); }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-50 text-sm font-semibold text-gray-800">
+              <Check size={18} className="text-gray-500" /> Select message
+            </button>
+
+            <button onClick={() => handleReply(actionSheetMsg)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-50 text-sm font-semibold text-gray-800">
+              <MessageSquare size={18} className="text-blue-500" /> Reply
+            </button>
+
+            {actionSheetMsg.senderId === user.id && !actionSheetMsg.isDeleted && (
+              <button onClick={() => { handleStartEdit(actionSheetMsg); setActionSheetMsg(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-50 text-sm font-semibold text-gray-800">
+                <Edit size={18} className="text-amber-500" /> Edit
+              </button>
+            )}
+
+            {actionSheetMsg.text && (
+              <button onClick={() => { navigator.clipboard?.writeText(actionSheetMsg.text); setActionSheetMsg(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-50 text-sm font-semibold text-gray-800">
+                <Check size={18} className="text-gray-400" /> Copy text
+              </button>
+            )}
+
+            {actionSheetMsg.senderId === user.id && !actionSheetMsg.isDeleted && (
+              <button onClick={() => { handleDeleteMessage(actionSheetMsg.id); setActionSheetMsg(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-rose-50 text-sm font-semibold text-rose-600">
+                <Trash2 size={18} /> Delete for everyone
+              </button>
+            )}
+
+            <button onClick={() => { handleDeleteForMe(actionSheetMsg); setActionSheetMsg(null); }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-50 text-sm font-semibold text-gray-500">
+              <Trash2 size={18} /> Delete for me
             </button>
           </div>
         </div>
