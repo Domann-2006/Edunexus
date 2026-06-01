@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../lib/firebase';
 import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, limit, updateDoc, increment, deleteDoc } from 'firebase/firestore';
-import { Send, Search, CheckCheck, Loader2, ChevronLeft, MoreVertical, Paperclip, Smile, X, Image as ImageIcon, FileText, Trash2, Edit, AlertCircle, Check, Laptop, Sparkles, MessageSquare, Download } from 'lucide-react';
+import { Send, Search, CheckCheck, Loader2, ChevronLeft, MoreVertical, Paperclip, Smile, X, Image as ImageIcon, FileText, Trash2, Edit, AlertCircle, Check, Laptop, Sparkles, MessageSquare, Download, Lock, Users, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import api, { schoolService, fileService, authService } from '../services/api';
 import { useLocation } from 'react-router-dom';
@@ -81,6 +81,15 @@ export default function Messages({ user }: { user: any }) {
   const [schools, setSchools] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSidebar, setShowSidebar] = useState(true);
+  
+  const [myChats, setMyChats] = useState<{
+    group: any | null;
+    dms: any[];
+    support: any | null;
+  }>({ group: null, dms: [], support: null });
+  const [chatType, setChatType] = useState<'support' | 'group' | 'dm' | null>(null);
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showGroupSettings, setShowGroupSettings] = useState(false);
   
   // Firebase Auth sync checkpoint
   const [firebaseReady, setFirebaseReady] = useState(false);
@@ -199,21 +208,10 @@ export default function Messages({ user }: { user: any }) {
   };
 
   useEffect(() => {
-    if (isSuper) {
-      fetchSchools();
-    } else {
-      // School Admin: Fixed chat with Super Admin Support
-      setSelectedChat({
-        id: user.schoolId,
-        name: 'Super Admin Support',
-        isSupport: true
-      });
-      setShowSidebar(false);
-    }
-    
+    fetchMyChats();
     // Set static online status indicator for Super Admin support
     setOnlineStatus(prev => ({ ...prev, 'SUPER': 'online' }));
-  }, []);
+  }, [user?.id]);
 
   // Timeout handler for firebase auth connection
   useEffect(() => {
@@ -325,31 +323,81 @@ export default function Messages({ user }: { user: any }) {
   }, [user?.id]);
 
   // Deep linking support
-  useEffect(() => {
-    if (isSuper && location.state?.selectedChatId && schools.length > 0) {
-      const targetSchool = schools.find(s => s.id === location.state.selectedChatId);
-      setSelectedChat({
-        id: location.state.selectedChatId,
-        name: location.state.selectedSchoolName || targetSchool?.name || 'School Admin'
-      });
-      setShowSidebar(false);
-    }
-  }, [location.state, schools]);
-
-  const fetchSchools = async () => {
+  const fetchMyChats = async () => {
     try {
-      const res = await schoolService.list();
-      setSchools(res.data);
-      
-      const statusSeed: Record<string, 'online' | 'offline'> = {};
-      res.data.forEach((s: any) => {
-        statusSeed[s.id] = Math.random() > 0.35 ? 'online' : 'offline';
-      });
-      setOnlineStatus(prev => ({ ...prev, ...statusSeed }));
+      setLoading(true);
+      const res = await api.get('/v1/chats/my-chats');
+      if (isSuper) {
+        const dmsList = Array.isArray(res.data) ? res.data : [];
+        setMyChats({
+          group: null,
+          dms: dmsList,
+          support: null
+        });
+        setSchools(dmsList);
+        
+        const statusSeed: Record<string, 'online' | 'offline'> = {};
+        dmsList.forEach((s: any) => {
+          statusSeed[s.id] = Math.random() > 0.35 ? 'online' : 'offline';
+        });
+        setOnlineStatus(prev => ({ ...prev, ...statusSeed }));
+
+        if (location.state?.selectedChatId) {
+          const target = dmsList.find((c: any) => c.id === location.state.selectedChatId);
+          setSelectedChat(target || {
+            id: location.state.selectedChatId,
+            name: location.state.selectedSchoolName || 'School Admin'
+          });
+          setChatType('support');
+          setShowSidebar(false);
+        }
+      } else {
+        const data = res.data || {};
+        const parsedDms = data.dms || (data.dm ? [data.dm] : []);
+        setMyChats({
+          group: data.group || null,
+          dms: parsedDms,
+          support: data.support || null
+        });
+
+        const statusSeed: Record<string, 'online' | 'offline'> = {};
+        parsedDms.forEach((s: any) => {
+          statusSeed[s.id] = Math.random() > 0.35 ? 'online' : 'offline';
+        });
+        setOnlineStatus(prev => ({ ...prev, ...statusSeed }));
+      }
+      setLoading(false);
     } catch (err) {
-      console.error('Failed to pre-fetch schools for messaging:', err);
+      console.error('Failed to fetch my chats:', err);
+      setLoading(false);
     }
   };
+
+  // Synchronize real-time chats onSnapshot with myChats state
+  useEffect(() => {
+    if (conversations.length === 0) return;
+    
+    setMyChats(prev => {
+      const updatedGroup = prev.group
+        ? (conversations.find((c: any) => c.id === prev.group.id) || prev.group)
+        : null;
+
+      const updatedDms = prev.dms.map((dm: any) => {
+        const found = conversations.find((c: any) => c.id === dm.id);
+        return found ? { ...dm, ...found } : dm;
+      });
+
+      const updatedSupport = prev.support
+        ? (conversations.find((c: any) => c.id === prev.support.id) || prev.support)
+        : null;
+
+      return {
+        group: updatedGroup,
+        dms: updatedDms,
+        support: updatedSupport
+      };
+    });
+  }, [conversations]);
 
   // Real-time listener for discussions list (only runs when Firebase credentials match)
   useEffect(() => {
@@ -538,6 +586,11 @@ export default function Messages({ user }: { user: any }) {
   const sendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setSendError('');
+
+    if (chatType === 'group' && !selectedChat?.isOpen && user.id !== selectedChat?.adminId) {
+      setSendError('Only the admin can send messages while the group is locked.');
+      return;
+    }
 
     // FIX 4: Validate that firebaseReady is truly ready before allowing sendMessage
     if (!firebaseReady) {
@@ -894,11 +947,15 @@ export default function Messages({ user }: { user: any }) {
     return { isFirstInGroup, isLastInGroup };
   };
 
+  const chatDisplayName = selectedChat 
+    ? (selectedChat.name || selectedChat.teacherName || (chatType === 'support' ? 'Super Admin Support' : 'Chat')) 
+    : '';
+
   return (
     <div className="h-screen w-screen fixed inset-0 flex bg-gray-100 overflow-hidden animate-in fade-in duration-500">
       
       {/* Sidebar - Dynamically responsive */}
-      {(isSuper && (showSidebar || window.innerWidth >= 1024)) ? (
+      {(showSidebar || window.innerWidth >= 1024) ? (
         <div className={`w-full lg:w-[380px] border-r border-gray-200 flex flex-col bg-white overflow-hidden shrink-0 ${!showSidebar ? 'hidden lg:flex' : 'flex'}`}>
           
           {/* My Profile Section */}
@@ -941,65 +998,259 @@ export default function Messages({ user }: { user: any }) {
                   <Loader2 className="animate-spin text-blue-600 animate-duration-1000" size={24} />
                   <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Awaiting cloud connection...</span>
                 </div>
-             ) : filteredSchoolsList.length === 0 ? (
-                <div className="py-20 text-center px-4">
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">No conversations indexed</p>
-                </div>
+             ) : isSuper ? (
+                // SUPER ADMIN scenario
+                myChats.dms.length === 0 ? (
+                  <div className="py-20 text-center px-4">
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">No support chats found</p>
+                  </div>
+                ) : (
+                  myChats.dms
+                    .filter((chat: any) => 
+                      (chat.schoolName || chat.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (chat.lastMessage || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((chat: any) => {
+                      const isSelected = selectedChat?.id === chat.id;
+                      const status = getChatOnlineStatus(chat.id);
+                      const unreadCount = chat.unreadCountAdmin || chat.unreadCount || 0;
+                      return (
+                        <button 
+                          key={chat.id}
+                          onClick={() => {
+                             setSelectedChat(chat);
+                             setChatType('support');
+                             setShowSidebar(false);
+                          }}
+                          className={`w-full p-4 flex items-center gap-4 transition-all text-left ${
+                            isSelected ? 'bg-blue-50/50 hover:bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="relative shrink-0">
+                            <div className="w-11 h-11 bg-gradient-to-tr from-blue-50 to-indigo-100 text-blue-600 border border-indigo-200/50 rounded-2xl flex items-center justify-center font-bold text-sm shadow-sm">
+                              {(chat.schoolName || chat.name || '?').charAt(0)}
+                            </div>
+                            {status === 'online' && (
+                              <span className="absolute -bottom-1 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
+                            )}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center">
+                              <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">{chat.schoolName || chat.name}</span>
+                              {chat.updatedAt && (
+                                <span className="text-[8px] text-gray-400 font-semibold whitespace-nowrap uppercase">
+                                  {chat.updatedAt.toDate ? chat.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                               <div className="text-[11px] text-gray-400 truncate pr-4 font-normal">
+                                 {chat.lastMessage || 'No messages yet'}
+                               </div>
+                               {unreadCount > 0 && !isSelected && (
+                                 <div className="bg-blue-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg shrink-0">
+                                   {unreadCount}
+                                 </div>
+                               )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                )
              ) : (
-                filteredSchoolsList.map(school => {
-                  const convo = conversations.find(c => c.id === school.id);
-                  const isSelected = selectedChat?.id === school.id;
-                  const status = getChatOnlineStatus(school.id);
-                  return (
-                    <button 
-                      key={school.id}
-                      onClick={() => {
-                         setSelectedChat(school);
-                         setShowSidebar(false);
-                      }}
-                      className={`w-full p-4 flex items-center gap-4 transition-all text-left ${
-                        isSelected ? 'bg-blue-50/50 hover:bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="relative shrink-0">
-                        <div className="w-11 h-11 bg-gradient-to-tr from-blue-50 to-indigo-100 text-blue-600 border border-indigo-200/50 rounded-2xl flex items-center justify-center font-bold text-sm shadow-sm">
-                          {school.name.charAt(0)}
-                        </div>
-                        {status === 'online' && (
-                          <span className="absolute -bottom-1 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
-                        )}
+                // SCHOOL_ADMIN and TEACHER three sections sidebar
+                <div className="flex flex-col">
+                  {/* SECTION 1 - Support (SCHOOL_ADMIN only) */}
+                  {user.role === 'SCHOOL_ADMIN' && (
+                    <>
+                      <div className="px-4 py-2 bg-gray-50 border-y border-gray-100 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-[#1a1c1e] transition-colors">Support</span>
                       </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center">
-                          <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">{school.name}</span>
-                          {convo?.updatedAt && (
-                            <span className="text-[8px] text-gray-400 font-semibold whitespace-nowrap uppercase">
-                              {convo.updatedAt.toDate ? convo.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
-                            </span>
-                          )}
+                      {myChats.support ? (
+                        <button 
+                          onClick={() => {
+                             setSelectedChat(myChats.support);
+                             setChatType('support');
+                             setShowSidebar(false);
+                          }}
+                          className={`w-full p-4 flex items-center gap-4 transition-all text-left ${
+                            selectedChat?.id === myChats.support.id ? 'bg-blue-50/50 hover:bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="relative shrink-0">
+                            <div className="w-11 h-11 bg-gradient-to-tr from-orange-50 to-amber-100 text-orange-600 border border-amber-200/50 rounded-2xl flex items-center justify-center font-bold text-sm shadow-sm">
+                              🛡️
+                            </div>
+                            <span className="absolute -bottom-1 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center">
+                              <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">Super Admin Support</span>
+                              {myChats.support.updatedAt && (
+                                <span className="text-[8px] text-gray-400 font-semibold whitespace-nowrap uppercase">
+                                  {myChats.support.updatedAt.toDate ? myChats.support.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                               <div className="text-[11px] text-gray-400 truncate pr-4 font-normal">
+                                 {myChats.support.lastMessage || 'Contact system administrators'}
+                               </div>
+                               {myChats.support.unreadCount > 0 && selectedChat?.id !== myChats.support.id && (
+                                 <div className="bg-blue-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg shrink-0">
+                                   {myChats.support.unreadCount}
+                                 </div>
+                               )}
+                            </div>
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="p-4 text-center">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">No active support chat</span>
                         </div>
-                        <div className="flex items-center justify-between mt-1">
-                           <div className="text-[11px] text-gray-400 truncate pr-4 font-normal">
-                             {convo ? convo.lastMessage : 'No messages yet'}
-                           </div>
-                           {convo?.unreadCount > 0 && !isSelected && (
-                             <div className="bg-blue-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg shrink-0">
-                               {convo.unreadCount}
-                             </div>
-                           )}
-                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* SECTION 2 - Group Chat */}
+                  {(user.role === 'SCHOOL_ADMIN' || user.role === 'TEACHER') && (
+                    <>
+                      <div className="px-4 py-2 bg-gray-50 border-y border-gray-100 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-[#1a1c1e] transition-colors">Group Chat</span>
                       </div>
-                    </button>
-                  )
-                })
+                      {myChats.group ? (
+                        <button 
+                          onClick={() => {
+                             setSelectedChat(myChats.group);
+                             setChatType('group');
+                             setShowSidebar(false);
+                          }}
+                          className={`w-full p-4 flex items-center gap-4 transition-all text-left ${
+                            selectedChat?.id === myChats.group.id ? 'bg-blue-50/50 hover:bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="relative shrink-0">
+                            <div className="w-11 h-11 bg-gradient-to-tr from-purple-50 to-indigo-100 text-purple-600 border border-indigo-200/50 rounded-2xl flex items-center justify-center font-bold text-sm shadow-sm animate-in fade-in-50">
+                              👥
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">
+                                  {myChats.group.name || 'Staff Group'}
+                                </span>
+                                {myChats.group.isOpen === false && (
+                                  <span title="Locked: Admins only">
+                                    <Lock size={12} className="text-gray-400 shrink-0" />
+                                  </span>
+                                )}
+                                {myChats.group.adminId === user.id && (
+                                  <span className="text-[8px] font-extrabold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 border border-blue-200">
+                                    Admin
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[9px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-100 shrink-0 font-mono">
+                                {myChats.group.memberCount || myChats.group.memberIds?.length || 0} members
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                               <div className="text-[11px] text-gray-400 truncate pr-4 font-normal">
+                                 {myChats.group.lastMessage || 'No messages yet'}
+                               </div>
+                               {myChats.group.unreadCount > 0 && selectedChat?.id !== myChats.group.id && (
+                                 <div className="bg-blue-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg shrink-0">
+                                   {myChats.group.unreadCount}
+                                 </div>
+                               )}
+                            </div>
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="p-4 text-center">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">No active group chat</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* SECTION 3 - Direct Messages */}
+                  <>
+                    <div className="px-4 py-2 bg-gray-50 border-y border-gray-100 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-[#1a1c1e] transition-colors">Direct Messages</span>
+                    </div>
+                    {myChats.dms && myChats.dms.length > 0 ? (
+                      myChats.dms
+                        .filter((dm: any) => 
+                          (dm.teacherName || dm.name || 'Staff Member').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (dm.lastMessage || '').toLowerCase().includes(searchQuery.toLowerCase())
+                        )
+                        .map((dm: any) => {
+                          const isSelected = selectedChat?.id === dm.id;
+                          const status = getChatOnlineStatus(dm.id);
+                          const displayName = dm.teacherName || dm.name || 'Staff Member';
+                          const unreadCount = dm.unreadCount || 0;
+                          return (
+                            <button 
+                              key={dm.id}
+                              onClick={() => {
+                                 setSelectedChat(dm);
+                                 setChatType('dm');
+                                 setShowSidebar(false);
+                              }}
+                              className={`w-full p-4 flex items-center gap-4 transition-all text-left ${
+                                isSelected ? 'bg-blue-50/50 hover:bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="relative shrink-0">
+                                <div className="w-11 h-11 bg-gradient-to-tr from-emerald-50 to-teal-100 text-emerald-600 border border-teal-200/50 rounded-2xl flex items-center justify-center font-bold text-sm shadow-sm">
+                                  {displayName.charAt(0)}
+                                </div>
+                                {status === 'online' && (
+                                  <span className="absolute -bottom-1 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
+                                )}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">{displayName}</span>
+                                  {dm.updatedAt && (
+                                    <span className="text-[8px] text-gray-400 font-semibold whitespace-nowrap uppercase">
+                                      {dm.updatedAt.toDate ? dm.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between mt-1">
+                                   <div className="text-[11px] text-gray-400 truncate pr-4 font-normal">
+                                     {dm.lastMessage || 'Send a direct message'}
+                                   </div>
+                                   {unreadCount > 0 && !isSelected && (
+                                     <div className="bg-blue-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg shrink-0">
+                                       {unreadCount}
+                                     </div>
+                                   )}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })
+                    ) : (
+                      <div className="p-4 text-center">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">No direct messages</span>
+                      </div>
+                    )}
+                  </>
+                </div>
              )}
           </div>
         </div>
       ) : null}
 
       {/* Main Discussion Console */}
-      <div className={`flex-1 flex flex-col relative bg-[#efeae2] ${showSidebar && isSuper ? 'hidden lg:flex' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col relative bg-[#efeae2] ${showSidebar ? 'hidden lg:flex' : 'flex'}`}>
         
         {/* Ambient Subtle Diagonal Lines Pattern */}
         <div className="absolute inset-0 opacity-[0.06] pointer-events-none" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/dust.png")' }} />
@@ -1022,21 +1273,21 @@ export default function Messages({ user }: { user: any }) {
             {/* Header section */}
             <div className="p-3.5 bg-white border-b border-gray-150 flex items-center justify-between relative z-10 shadow-sm">
                <div className="flex items-center gap-3">
-                  {isSuper && (
+                  {!showSidebar && (
                     <button onClick={() => setShowSidebar(true)} className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">
                       <ChevronLeft size={18} />
                     </button>
                   )}
                   <div className="relative">
-                    <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold shadow text-xs">
-                      {selectedChat.name?.charAt(0)}
+                    <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold shadow text-xs uppercase">
+                      {chatDisplayName.charAt(0)}
                     </div>
                     {getChatOnlineStatus(selectedChat.id) === 'online' && (
                       <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
                     )}
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-[#1c1e21] text-xs leading-tight uppercase tracking-wider">{selectedChat.name}</h4>
+                    <h4 className="font-extrabold text-[#1c1e21] text-xs leading-tight uppercase tracking-wider">{chatDisplayName}</h4>
                     <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider block mt-0.5 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       {getChatOnlineStatus(selectedChat.id) === 'online' ? 'Online' : 'Offline'}
@@ -1044,10 +1295,54 @@ export default function Messages({ user }: { user: any }) {
                   </div>
                </div>
                
-               <div>
+               <div className="flex items-center gap-2">
+                  {chatType === 'group' && user.role === 'SCHOOL_ADMIN' && (
+                    <>
+                      {/* Lock / Unlock Toggle button */}
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await api.patch(`/v1/chats/group/${user.schoolId}/toggle-open`);
+                            setSelectedChat((prev: any) => ({ ...prev, isOpen: res.data.isOpen }));
+                            // Also refresh my-chats state
+                            fetchMyChats();
+                          } catch (err) {
+                            console.error('Failed to toggle open:', err);
+                          }
+                        }}
+                        className={`p-2 rounded-xl text-xs font-bold transition-all duration-150 flex items-center gap-1.5 shadow-sm hover:scale-105 active:scale-95 ${
+                          selectedChat.isOpen === false 
+                            ? 'bg-rose-50 border border-rose-150 text-rose-600 hover:bg-rose-100' 
+                            : 'bg-emerald-50 border border-emerald-150 text-emerald-600 hover:bg-emerald-100'
+                        }`}
+                        title={selectedChat.isOpen === false ? "Unlock Group (Allow anyone to send messages)" : "Lock Group (Admins only)"}
+                      >
+                        {selectedChat.isOpen === false ? '🔒 Locked' : '🌐 Open'}
+                      </button>
+
+                      {/* Manage Members Toggle Button */}
+                      <button
+                        onClick={() => {
+                          setShowMembersModal(!showMembersModal);
+                        }}
+                        className="p-2 bg-gray-50 hover:bg-gray-100 border border-gray-200/50 rounded-xl text-xs font-bold text-gray-600 transition-all duration-150 flex items-center gap-1 shadow-sm hover:scale-105 active:scale-95"
+                      >
+                        👥 Members ({selectedChat.memberCount || selectedChat.memberIds?.length || 0})
+                      </button>
+                    </>
+                  )}
                   <span className="text-[9px] font-bold px-2.5 py-1 bg-gray-100 rounded-full text-gray-500 uppercase tracking-wider font-mono border border-gray-200/50">
                     ID: {selectedChat.id.slice(0, 8)}
                   </span>
+                  {chatType === 'group' && user.id === selectedChat?.adminId && (
+                    <button
+                      onClick={() => setShowGroupSettings(true)}
+                      className="p-1.5 hover:bg-gray-100 rounded-xl text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+                      title="Group Settings"
+                    >
+                      <Settings size={16} />
+                    </button>
+                  )}
                </div>
             </div>
 
@@ -1424,7 +1719,13 @@ export default function Messages({ user }: { user: any }) {
                  </div>
                ) : (
                  <>
-                   {replyingTo && (
+                   {chatType === 'group' && !selectedChat?.isOpen && user.id !== selectedChat?.adminId ? (
+                     <div className="px-4 py-3 bg-gray-100 rounded-xl text-xs text-gray-450 font-semibold text-center">
+                       🔒 Only the admin can send messages
+                     </div>
+                   ) : (
+                     <>
+                       {replyingTo && (
                      <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100 rounded-t-xl mb-2">
                        <div className="flex items-center gap-2 min-w-0">
                          <div className="w-0.5 h-8 bg-blue-500 rounded-full shrink-0" />
@@ -1537,6 +1838,8 @@ export default function Messages({ user }: { user: any }) {
                        {sendError}
                      </p>
                    )}
+                     </>
+                   )}
                  </>
                )}
             </div>
@@ -1640,6 +1943,226 @@ export default function Messages({ user }: { user: any }) {
               className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-50 text-sm font-semibold text-gray-500">
               <Trash2 size={18} /> Delete for me
             </button>
+          </div>
+        </div>
+      )}
+
+      {showGroupSettings && selectedChat && (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/40 backdrop-blur-xs"
+          onClick={() => setShowGroupSettings(false)}
+        >
+          <div
+            className="w-full bg-white rounded-t-3xl p-5 pb-8 space-y-5 animate-in slide-in-from-bottom-4 duration-200 max-h-[80vh] overflow-y-auto custom-scrollbar flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto shrink-0" />
+            
+            {/* Header info */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">
+                  ⚙️ Group Settings
+                </h3>
+                <h2 className="text-sm font-extrabold text-[#1c1e21] uppercase tracking-wider mt-1.5">
+                  {selectedChat.name || selectedChat.teacherName || 'Staff Group'}
+                </h2>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mt-1">
+                  👥 {selectedChat.memberIds?.length || 0} Members
+                </span>
+              </div>
+              <button
+                onClick={() => setShowGroupSettings(false)}
+                className="p-1.5 hover:bg-gray-100 rounded-xl text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Toggle Switch row */}
+            <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between gap-4 shadow-xs">
+              <div>
+                <p className="text-xs font-bold text-gray-800">Allow members to send messages</p>
+                <p className="text-[10px] text-gray-500 mt-1 font-medium">
+                  {selectedChat.isOpen !== false 
+                    ? "Currently OPEN: Anyone in the group can post." 
+                    : "Currently LOCKED: Only you as administrator can post."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await api.patch(`/v1/chats/group/${user.schoolId}/toggle-open`);
+                    setSelectedChat((prev: any) => ({ ...prev, isOpen: res.data.isOpen }));
+                    setMyChats((prev: any) => {
+                      if (prev.group && prev.group.id === selectedChat.id) {
+                        return {
+                          ...prev,
+                          group: { ...prev.group, isOpen: res.data.isOpen }
+                        };
+                      }
+                      return prev;
+                    });
+                  } catch (err) {
+                    console.error('Failed to toggle open:', err);
+                  }
+                }}
+                className={`w-11 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 shrink-0 select-none ${
+                  selectedChat.isOpen !== false ? 'bg-emerald-500 justify-end' : 'bg-gray-300 justify-start'
+                }`}
+                aria-label="Toggle group public messaging permissions"
+              >
+                <span className="bg-white w-5 h-5 rounded-full shadow-md transform duration-200 ease-in-out" />
+              </button>
+            </div>
+
+            {/* Members Section */}
+            <div className="space-y-3 flex-1 flex flex-col min-h-0">
+              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Class Members List
+              </h4>
+              <div className="divide-y divide-gray-100 overflow-y-auto max-h-[250px] custom-scrollbar pr-1">
+                {selectedChat.memberIds && selectedChat.memberIds.length > 0 ? (
+                  selectedChat.memberIds.map((memberId: string) => {
+                    const memberInfo = myChats.dms.find((m: any) => (m.teacherId || m.id) === memberId);
+                    const isMe = memberId === user.id;
+                    const isAdmin = memberId === selectedChat.adminId;
+                    const displayName = isMe 
+                      ? `${user.name} (You)` 
+                      : (memberInfo ? (memberInfo.teacherName || memberInfo.name) : `Staff ${memberId.slice(0, 6)}`);
+
+                    return (
+                      <div key={memberId} className="py-2.5 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs uppercase shrink-0 ${
+                            isAdmin ? 'bg-indigo-50 border border-indigo-110 text-indigo-600' : 'bg-blue-50 border border-blue-105 text-blue-600'
+                          }`}>
+                            {displayName.charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-gray-800 truncate">{displayName}</p>
+                            <span className="text-[8px] font-mono text-gray-400 block uppercase tracking-wider">
+                              ID: {memberId.slice(0, 8)} {isAdmin && '• ADMIN 👑'}
+                            </span>
+                          </div>
+                        </div>
+                        {!isAdmin && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await api.patch(`/v1/chats/group/${user.schoolId}/remove-member`, { teacherId: memberId });
+                                setSelectedChat((prev: any) => {
+                                  const updatedIds = prev.memberIds?.filter((id: string) => id !== memberId) || [];
+                                  return {
+                                    ...prev,
+                                    memberIds: updatedIds,
+                                    memberCount: Math.max(0, (prev.memberCount || 1) - 1)
+                                  };
+                                });
+                                fetchMyChats();
+                              } catch (err) {
+                                console.error('Failed to remove member:', err);
+                              }
+                            }}
+                            className="px-2.5 py-1 text-[9px] font-black bg-rose-50 text-rose-600 border border-rose-100 rounded-lg hover:bg-rose-100 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest shrink-0"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="py-4 text-center text-xs text-gray-400 font-bold uppercase tracking-wider">
+                    No members in this group
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowGroupSettings(false)}
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold tracking-wider shadow-md hover:shadow-lg transition-all text-center uppercase shrink-0"
+            >
+              Save & Exit Settings
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showMembersModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="p-4 bg-gray-50 border-b border-gray-105 flex items-center justify-between">
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                👥 Manage Class Members
+              </h3>
+              <button
+                onClick={() => setShowMembersModal(false)}
+                className="p-1 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-4 max-h-[300px] overflow-y-auto divide-y divide-gray-100 custom-scrollbar">
+              {myChats.dms.length === 0 ? (
+                <p className="py-6 text-center text-xs text-gray-450 font-bold uppercase tracking-wider">No active users list available</p>
+              ) : (
+                myChats.dms.map((teacher: any) => {
+                  const isMember = selectedChat.memberIds?.includes(teacher.teacherId || teacher.id || '');
+                  return (
+                    <div key={teacher.id} className="py-3 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 bg-blue-50 border border-blue-105 text-blue-600 rounded-xl flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                          {(teacher.teacherName || teacher.name || 'T').charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-800 truncate">{teacher.teacherName || teacher.name}</p>
+                          <p className="text-[9px] text-gray-455 font-mono mt-0.5 uppercase tracking-wider">ID: {(teacher.teacherId || teacher.id || '').slice(0, 8)}</p>
+                        </div>
+                      </div>
+                      {isMember ? (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const tId = teacher.teacherId || teacher.id;
+                              await api.patch(`/v1/chats/group/${user.schoolId}/remove-member`, { teacherId: tId });
+                              setSelectedChat((prev: any) => {
+                                const newIds = prev.memberIds?.filter((id: string) => id !== tId) || [];
+                                return {
+                                  ...prev,
+                                  memberIds: newIds,
+                                  memberCount: Math.max(0, (prev.memberCount || 1) - 1)
+                                };
+                              });
+                              fetchMyChats();
+                            } catch (err) {
+                              console.error('Failed to remove member:', err);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-[9px] font-black bg-rose-50 text-rose-600 border border-rose-100 rounded-lg hover:bg-rose-100 transition-colors uppercase tracking-widest shrink-0"
+                        >
+                          Remove
+                        </button>
+                      ) : (
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest shrink-0 mr-1">Not in group</span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="p-3 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setShowMembersModal(false)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

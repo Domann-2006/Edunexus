@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import { db } from '../lib/firebase-admin.js';
+import admin, { db } from '../lib/firebase-admin.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { calculateGrade } from '../lib/grading.js';
 import { LEVEL_CLASSES, DEFAULT_SUBJECTS } from '../lib/curriculum.js';
@@ -695,6 +695,80 @@ const resultTransform = (data) => {
 router.use('/schools', createCRUD('schools', ['SUPER_ADMIN', 'SCHOOL_ADMIN']));
 router.use('/students', createCRUD('students', ['SCHOOL_ADMIN', 'TEACHER']));
 
+async function createTeacherChats(schoolId, teacherId, teacherName, adminId, adminName) {
+  const db = admin.firestore();
+
+  // Create DM
+  const dmId = `dm_${schoolId}_${teacherId}`;
+  const dmRef = db.collection('chats').doc(dmId);
+  const dmSnap = await dmRef.get();
+  if (!dmSnap.exists) {
+    await dmRef.set({
+      id: dmId,
+      type: 'dm',
+      schoolId,
+      adminId,
+      teacherId,
+      teacherName,
+      adminName,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastMessage: '',
+      lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+      unreadCountAdmin: 0,
+      unreadCountTeacher: 0,
+    });
+  }
+
+  // Add to group or create group
+  const groupId = `group_${schoolId}`;
+  const groupRef = db.collection('chats').doc(groupId);
+  const groupSnap = await groupRef.get();
+  if (groupSnap.exists) {
+    await groupRef.update({
+      memberIds: admin.firestore.FieldValue.arrayUnion(teacherId),
+      memberCount: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } else {
+    await groupRef.set({
+      id: groupId,
+      type: 'group',
+      schoolId,
+      adminId,
+      name: `${adminName} — Staff Group`,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastMessage: '',
+      lastMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+      isOpen: true,
+      memberIds: [adminId, teacherId],
+      memberCount: 2,
+    });
+  }
+}
+
+async function removeTeacherChats(schoolId, teacherId) {
+  const db = admin.firestore();
+
+  // Delete DM and its messages
+  const dmId = `dm_${schoolId}_${teacherId}`;
+  const dmRef = db.collection('chats').doc(dmId);
+  const messagesSnap = await dmRef.collection('messages').get();
+  const batch = db.batch();
+  messagesSnap.docs.forEach(d => batch.delete(d.ref));
+  batch.delete(dmRef);
+  await batch.commit();
+
+  // Remove from group
+  const groupRef = db.collection('chats').doc(`group_${schoolId}`);
+  await groupRef.update({
+    memberIds: admin.firestore.FieldValue.arrayRemove(teacherId),
+    memberCount: admin.firestore.FieldValue.increment(-1),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
 // Customized Teachers Creation to handle User account and Login Credentials
 const teacherRouter = createCRUD('teachers', ['SCHOOL_ADMIN'], null, { skipPost: true, skipPut: true, skipDelete: true });
 
@@ -751,6 +825,19 @@ teacherRouter.post('/', authenticate, authorize(['SCHOOL_ADMIN']), async (req, r
     };
     
     const teacherRef = await db.collection('teachers').add(teacherData);
+
+    // Automatically create chats
+    try {
+      await createTeacherChats(
+        schoolId, 
+        teacherRef.id, 
+        name, 
+        req.user?.id || 'SYSTEM', 
+        req.user?.name || 'School Admin'
+      );
+    } catch (chatErr) {
+      console.error('Failed to auto-create teacher chats in Firestore:', chatErr);
+    }
 
     // Log Activity
     await logActivity(req, 'CREATE_TEACHER', `School Admin created teacher ${name} (${email}). Credentials generated.`, schoolId);
@@ -835,6 +922,13 @@ teacherRouter.delete('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (r
     // Delete User Document
     if (teacherData.userId) {
       await db.collection('users').doc(teacherData.userId).delete();
+    }
+
+    // Automatically clean up chats
+    try {
+      await removeTeacherChats(teacherData.schoolId, req.params.id);
+    } catch (chatErr) {
+      console.error('Failed to auto-cleanup teacher chats in Firestore:', chatErr);
     }
 
     // Invalidate caching scopes
@@ -973,6 +1067,285 @@ router.get('/subscriptions/my', authenticate, authorize(['SCHOOL_ADMIN']), async
     res.status(500).json({ message: err.message });
   }
 });
+
+// --- Chats Migration & Advanced Group Management Controls ---
+
+// 1. POST /v1/chats/migrate
+const migrateChatsHandler = async (req, res) => {
+  try {
+    if (req.user?.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ message: 'Forbidden - Super Admins only' });
+    }
+
+    let schoolsProcessed = 0;
+    let dmsCreated = 0;
+    let groupsCreated = 0;
+
+    const schoolsSnap = await db.collection('schools').get();
+    for (const schoolDoc of schoolsSnap.docs) {
+      const schoolId = schoolDoc.id;
+      schoolsProcessed++;
+
+      // a. Find the school admin user (role === SCHOOL_ADMIN, schoolId matches)
+      const adminSnap = await db.collection('users')
+        .where('schoolId', '==', schoolId)
+        .where('role', '==', 'SCHOOL_ADMIN')
+        .limit(1)
+        .get();
+
+      if (adminSnap.empty) {
+        continue;
+      }
+
+      const adminDoc = adminSnap.docs[0];
+      const adminId = adminDoc.id;
+      const adminName = adminDoc.data().name || 'School Admin';
+
+      // b. Find all teachers (schoolId matches in teachers collection)
+      const teachersSnap = await db.collection('teachers')
+        .where('schoolId', '==', schoolId)
+        .get();
+
+      const teachers = [];
+      teachersSnap.forEach(doc => {
+        teachers.push({ id: doc.id, name: doc.data().name });
+      });
+
+      const teacherIds = teachers.map(t => t.id);
+
+      // Check if group of school already exists, if not, it will be created
+      const groupId = `group_${schoolId}`;
+      const groupRef = db.collection('chats').doc(groupId);
+      const groupSnap = await groupRef.get();
+      if (!groupSnap.exists) {
+        groupsCreated++;
+      }
+
+      // c. Call createTeacherChats for each teacher (checks existence first to avoid duplicates)
+      for (const teacher of teachers) {
+        const dmId = `dm_${schoolId}_${teacher.id}`;
+        const dmRef = db.collection('chats').doc(dmId);
+        const dmSnap = await dmRef.get();
+        if (!dmSnap.exists) {
+          dmsCreated++;
+        }
+
+        await createTeacherChats(schoolId, teacher.id, teacher.name, adminId, adminName);
+      }
+
+      // d. Ensure group document has ALL teachers in memberIds (use arrayUnion)
+      if (teacherIds.length > 0) {
+        const groupRefLatest = db.collection('chats').doc(groupId);
+        const groupSnapLatest = await groupRefLatest.get();
+        if (groupSnapLatest.exists) {
+          const currentMembers = groupSnapLatest.data().memberIds || [];
+          const missingMembers = teacherIds.filter(id => !currentMembers.includes(id));
+          if (missingMembers.length > 0) {
+            await groupRefLatest.update({
+              memberIds: admin.firestore.FieldValue.arrayUnion(...missingMembers),
+              memberCount: admin.firestore.FieldValue.increment(missingMembers.length),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+    }
+
+    res.json({ schoolsProcessed, dmsCreated, groupsCreated });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+router.post('/chats/migrate', authenticate, migrateChatsHandler);
+router.post('/v1/chats/migrate', authenticate, migrateChatsHandler);
+
+
+// 2. PATCH /v1/chats/group/:schoolId/toggle-open
+const toggleGroupOpenHandler = async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    if (req.user?.role !== 'SCHOOL_ADMIN' || req.user?.schoolId !== schoolId) {
+      return res.status(403).json({ message: 'Forbidden - School Admin of this school only' });
+    }
+
+    const groupId = `group_${schoolId}`;
+    const groupRef = db.collection('chats').doc(groupId);
+    const groupSnap = await groupRef.get();
+
+    if (!groupSnap.exists) {
+      return res.status(404).json({ message: 'Group chat not found' });
+    }
+
+    const currentIsOpen = groupSnap.data().isOpen === true;
+    const newValue = !currentIsOpen;
+
+    await groupRef.update({
+      isOpen: newValue,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ isOpen: newValue });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+router.patch('/chats/group/:schoolId/toggle-open', authenticate, toggleGroupOpenHandler);
+router.patch('/v1/chats/group/:schoolId/toggle-open', authenticate, toggleGroupOpenHandler);
+
+
+// 3. PATCH /v1/chats/group/:schoolId/remove-member
+const removeGroupMemberHandler = async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    const { teacherId } = req.body;
+
+    if (!teacherId) {
+      return res.status(400).json({ message: 'Missing teacherId in request body' });
+    }
+
+    if (req.user?.role !== 'SCHOOL_ADMIN' || req.user?.schoolId !== schoolId) {
+      return res.status(403).json({ message: 'Forbidden - School Admin of this school only' });
+    }
+
+    const groupId = `group_${schoolId}`;
+    const groupRef = db.collection('chats').doc(groupId);
+    const groupSnap = await groupRef.get();
+
+    if (!groupSnap.exists) {
+      return res.status(404).json({ message: 'Group chat not found' });
+    }
+
+    const groupData = groupSnap.data();
+    const currentMembers = groupData.memberIds || [];
+
+    if (currentMembers.includes(teacherId)) {
+      await groupRef.update({
+        memberIds: admin.firestore.FieldValue.arrayRemove(teacherId),
+        memberCount: admin.firestore.FieldValue.increment(-1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+router.patch('/chats/group/:schoolId/remove-member', authenticate, removeGroupMemberHandler);
+router.patch('/v1/chats/group/:schoolId/remove-member', authenticate, removeGroupMemberHandler);
+
+
+// --- Fetch My Chats Endpoint ---
+const getMyChatsHandler = async (req, res) => {
+  try {
+    const role = req.user?.role;
+    if (!role) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    if (role === 'SUPER_ADMIN') {
+      const snap = await db.collection('chats').get();
+      const chats = [];
+      snap.forEach(doc => {
+        const data = doc.data();
+        if (data.type === undefined || data.type === null) {
+          chats.push({ id: doc.id, ...data });
+        }
+      });
+      if (chats.length === 0) {
+        return res.status(404).json({ message: 'No chats found' });
+      }
+      return res.json(chats);
+    }
+
+    if (role === 'SCHOOL_ADMIN') {
+      const schoolId = req.user.schoolId;
+      if (!schoolId) {
+        return res.status(400).json({ message: 'Missing schoolId for School Admin' });
+      }
+
+      const groupPromise = db.collection('chats').doc(`group_${schoolId}`).get();
+      const dmsPromise = db.collection('chats')
+        .where('type', '==', 'dm')
+        .where('schoolId', '==', schoolId)
+        .get();
+      const supportPromise = db.collection('chats').doc(schoolId).get();
+
+      const [groupSnap, dmsSnap, supportSnap] = await Promise.all([
+        groupPromise,
+        dmsPromise,
+        supportPromise
+      ]);
+
+      const group = groupSnap.exists ? { id: groupSnap.id, ...groupSnap.data() } : null;
+      const dms = dmsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const support = supportSnap.exists ? { id: supportSnap.id, ...supportSnap.data() } : null;
+
+      if (!group && dms.length === 0 && !support) {
+        return res.status(404).json({ message: 'No chats found' });
+      }
+
+      return res.json({ group, dms, support });
+    }
+
+    if (role === 'TEACHER') {
+      const schoolId = req.user.schoolId;
+      const userId = req.user.id;
+      if (!schoolId || !userId) {
+        return res.status(400).json({ message: 'Missing schoolId or userId for Teacher' });
+      }
+
+      const teacherProfile = await getCachedTeacherProfile(userId);
+      const teacherId = teacherProfile?.id || userId;
+
+      const groupPromise = db.collection('chats').doc(`group_${schoolId}`).get();
+      const dmPromiseWithUserId = db.collection('chats').doc(`dm_${schoolId}_${userId}`).get();
+      const dmPromiseWithTeacherId = teacherProfile?.id 
+        ? db.collection('chats').doc(`dm_${schoolId}_${teacherId}`).get() 
+        : Promise.resolve(null);
+
+      const [groupSnap, dmSnapUser, dmSnapTeacher] = await Promise.all([
+        groupPromise,
+        dmPromiseWithUserId,
+        dmPromiseWithTeacherId
+      ]);
+
+      let group = null;
+      if (groupSnap.exists) {
+        const groupData = groupSnap.data();
+        const memberIds = groupData.memberIds || [];
+        if (memberIds.includes(userId) || (teacherId && memberIds.includes(teacherId))) {
+          group = { id: groupSnap.id, ...groupData };
+        }
+      }
+
+      let dm = null;
+      if (dmSnapUser && dmSnapUser.exists) {
+        dm = { id: dmSnapUser.id, ...dmSnapUser.data() };
+      } else if (dmSnapTeacher && dmSnapTeacher.exists) {
+        dm = { id: dmSnapTeacher.id, ...dmSnapTeacher.data() };
+      }
+
+      if (!group && !dm) {
+        return res.status(404).json({ message: 'No chats found' });
+      }
+
+      return res.json({ group, dm });
+    }
+
+    return res.status(400).json({ message: 'Invalid or unsupported user role' });
+  } catch (err) {
+    console.error('Error fetching chats:', err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+router.get('/chats/my-chats', authenticate, getMyChatsHandler);
+router.get('/v1/chats/my-chats', authenticate, getMyChatsHandler);
+
 
 // --- Private Messaging System (Super Admin <-> School Admin) ---
 
