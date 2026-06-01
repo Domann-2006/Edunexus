@@ -264,7 +264,7 @@ export default function App() {
         } />
 
         <Route path="/messages" element={
-          <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
+          <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']}>
             <Layout user={user} onLogout={handleLogout}>
               <Messages user={user} />
             </Layout>
