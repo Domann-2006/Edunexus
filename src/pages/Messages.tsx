@@ -121,6 +121,8 @@ export default function Messages({ user }: { user: any }) {
 
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const [downloadingUrls, setDownloadingUrls] = useState<Record<string, boolean>>({});
+  const [replyingTo, setReplyingTo] = useState<{ id: string; text: string; senderName: string; attachment?: any } | null>(null);
+  const [swipeState, setSwipeState] = useState<Record<string, number>>({});
 
   const handleFileDownload = async (url: string, name: string) => {
     if (downloadingUrls[url]) return;
@@ -504,6 +506,16 @@ export default function Messages({ user }: { user: any }) {
     setPendingAttachment(null);
   };
 
+  const handleReply = (msg: any) => {
+    setReplyingTo({
+      id: msg.id,
+      text: msg.text || '',
+      senderName: msg.senderId === user.id ? 'You' : msg.senderName || 'Them',
+      attachment: msg.attachment || null,
+    });
+    setActiveMessageMenuId(null);
+  };
+
   // SEND MESSAGE ROUTINE WITH OPTIMISTIC AND OFFLINE COEXISTENCE
   const sendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -519,6 +531,9 @@ export default function Messages({ user }: { user: any }) {
 
     const messageText = newMessage.trim();
     const attachmentToSend = pendingAttachment;
+    
+    const replyContext = replyingTo;
+    setReplyingTo(null);
     
     // Clear input fields immediately for instant visual response
     setNewMessage('');
@@ -538,6 +553,12 @@ export default function Messages({ user }: { user: any }) {
       senderRole: user.role,
       receiverId: isSuper ? selectedChat.id : 'SUPER',
       text: messageText,
+      replyTo: replyContext ? {
+        id: replyContext.id,
+        text: replyContext.text,
+        senderName: replyContext.senderName,
+        attachment: replyContext.attachment || null,
+      } : null,
       createdAt: { toDate: () => new Date() }, // Fast evaluation mock for local view (replaced by real Date on Firestore fetch)
       isEdited: false,
       isDeleted: false,
@@ -846,7 +867,7 @@ export default function Messages({ user }: { user: any }) {
   );
 
   return (
-    <div className="h-[calc(100vh-140px)] flex bg-gray-100 rounded-3xl border border-gray-100 shadow-xl overflow-hidden animate-in fade-in duration-500">
+    <div className="h-screen w-screen fixed inset-0 flex bg-gray-100 overflow-hidden animate-in fade-in duration-500">
       
       {/* Sidebar - Dynamically responsive */}
       {(isSuper && (showSidebar || window.innerWidth >= 1024)) ? (
@@ -1039,7 +1060,25 @@ export default function Messages({ user }: { user: any }) {
                           </div>
                         )}
 
-                        <div className="relative group max-w-[75%] md:max-w-[65%]">
+                        <div
+                          onTouchStart={(e) => {
+                            setSwipeState(prev => ({ ...prev, [`${msg.id}_startX`]: e.touches[0].clientX }));
+                          }}
+                          onTouchMove={(e) => {
+                            const startX = swipeState[`${msg.id}_startX`] || 0;
+                            const diff = e.touches[0].clientX - startX;
+                            if (diff > 0 && diff < 80) {
+                              setSwipeState(prev => ({ ...prev, [msg.id]: diff }));
+                            }
+                          }}
+                          onTouchEnd={() => {
+                            const swipeDist = swipeState[msg.id] || 0;
+                            if (swipeDist > 45) handleReply(msg);
+                            setSwipeState(prev => ({ ...prev, [msg.id]: 0 }));
+                          }}
+                          style={{ transform: `translateX(${swipeState[msg.id] || 0}px)`, transition: swipeState[msg.id] ? 'none' : 'transform 0.2s ease' }}
+                        >
+                          <div className="relative group max-w-[75%] md:max-w-[65%]">
 
                           {/* Chat Options Context Menu */}
                           {!isFailed && (
@@ -1057,6 +1096,13 @@ export default function Messages({ user }: { user: any }) {
                               
                               {isMenuOpen && (
                                 <div className="absolute top-5 right-0 w-36 bg-white rounded-xl shadow-lg ring-1 ring-black/5 p-1 text-left z-50 animate-in fade-in duration-100">
+                                  <button
+                                    onClick={() => handleReply(msg)}
+                                    className="w-full text-left px-3 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-2"
+                                  >
+                                    <MessageSquare size={11} className="text-blue-500" />
+                                    Reply
+                                  </button>
                                   {isMine && !msg.isDeleted && (
                                     <button 
                                       onClick={() => handleStartEdit(msg)}
@@ -1093,6 +1139,15 @@ export default function Messages({ user }: { user: any }) {
                               ? isFailed ? 'bg-rose-100 border border-rose-200 text-rose-950' : 'bg-[#d9fdd3] border border-[#c4e9be] text-gray-900 rounded-tr-none' 
                               : 'bg-white border border-gray-200/50 text-gray-900 rounded-tl-none'
                           }`}>
+                            {msg.replyTo && (
+                              <div className="mb-2 px-2 py-1.5 rounded-xl border-l-4 border-blue-500 bg-black/[0.04] text-[10px]">
+                                <p className="font-bold text-blue-600 uppercase tracking-wide">{msg.replyTo.senderName}</p>
+                                <p className="text-gray-600 truncate mt-0.5">
+                                  {msg.replyTo.attachment ? `📎 ${msg.replyTo.attachment.name}` : msg.replyTo.text}
+                                </p>
+                              </div>
+                            )}
+
                             {!isMine && (
                               <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1">
                                 {msg.senderName}
@@ -1236,6 +1291,7 @@ export default function Messages({ user }: { user: any }) {
                             </div>
                           </div>
                         </div>
+                        </div>
                       </div>
                     </React.Fragment>
                   )
@@ -1313,6 +1369,27 @@ export default function Messages({ user }: { user: any }) {
 
             {/* Sticky Input Footer */}
             <div className="p-3 bg-white border-t border-gray-200/50 relative z-20">
+               {replyingTo && (
+                 <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-100 rounded-t-xl mb-2">
+                   <div className="flex items-center gap-2 min-w-0">
+                     <div className="w-0.5 h-8 bg-blue-500 rounded-full shrink-0" />
+                     <div className="min-w-0">
+                       <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider text-left">↩ Replying to {replyingTo.senderName}</p>
+                       <p className="text-[11px] text-gray-500 truncate text-left">
+                         {replyingTo.attachment ? `📎 ${replyingTo.attachment.name}` : replyingTo.text}
+                       </p>
+                     </div>
+                   </div>
+                   <button
+                     type="button"
+                     onClick={() => setReplyingTo(null)}
+                     className="p-1.5 text-gray-400 hover:text-gray-700 shrink-0 cursor-pointer"
+                   >
+                     <X size={14} />
+                   </button>
+                 </div>
+               )}
+
                {showEmojiPicker && (
                  <div className="absolute bottom-[72px] left-4 bg-white border border-gray-150 rounded-2xl shadow-xl p-3 z-50 w-72 animate-in slide-in-from-bottom-2 duration-200">
                    <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-2">
