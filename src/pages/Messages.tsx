@@ -367,8 +367,11 @@ export default function Messages({ user }: { user: any }) {
         setOnlineStatus(prev => ({ ...prev, ...statusSeed }));
       }
       setLoading(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch my chats:', err);
+      if (err?.response?.status === 404) {
+        setMyChats({ group: null, dms: [], support: null });
+      }
       setLoading(false);
     }
   };
@@ -407,10 +410,18 @@ export default function Messages({ user }: { user: any }) {
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const convos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const filtered = isSuper ? convos : convos.filter((c: any) => c.id === user.schoolId);
+      const filtered = isSuper ? convos : convos.filter((c: any) =>
+        c.id === user.schoolId ||
+        c.id === `group_${user.schoolId}` ||
+        c.id.startsWith(`dm_${user.schoolId}_`)
+      );
       setConversations(filtered);
       setLoading(false);
-    }, (error) => {
+    }, (error: any) => {
+      if (error?.code === 'permission-denied') {
+        setLoading(false);
+        return;
+      }
       console.warn('[FIRESTORE_CONVOS] Snapshot security check fallback:', error);
       setLoading(false);
       try {
