@@ -387,6 +387,41 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           const schoolRef = await db.collection('schools').add(cleanSchoolData);
           const schoolId = schoolRef.id;
 
+          const newDoc = schoolRef;
+          const dataToSave = cleanSchoolData;
+
+          // Auto-initialize chat documents for new school
+          const newSchoolId = newDoc.id;
+          const chatBatch = db.batch();
+
+          // Support chat (school <-> super admin)
+          chatBatch.set(db.collection('chats').doc(newSchoolId), {
+            schoolId: newSchoolId,
+            schoolName: dataToSave.name,
+            type: 'support',
+            lastMessage: '',
+            unreadCount: 0,
+            unreadCountAdmin: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+
+          // Group chat
+          chatBatch.set(db.collection('chats').doc(`group_${newSchoolId}`), {
+            schoolId: newSchoolId,
+            name: `${dataToSave.name} Staff`,
+            type: 'group',
+            isOpen: true,
+            memberIds: [],
+            memberCount: 0,
+            lastMessage: '',
+            unreadCount: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+
+          await chatBatch.commit();
+
           // Create the SCHOOL_ADMIN user
           if (schoolData.adminEmail && adminPassword) {
             const passwordHash = await bcrypt.hash(adminPassword, 10);
@@ -826,6 +861,25 @@ teacherRouter.post('/', authenticate, authorize(['SCHOOL_ADMIN']), async (req, r
     
     const teacherRef = await db.collection('teachers').add(teacherData);
 
+    // Auto-initialize DM chat for new teacher
+    {
+      const newUser = userRef;
+      const schoolId = req.user.schoolId;
+      const teacherUserId = newUser.id;
+      const firstName = req.body.firstName || name.split(' ')[0] || '';
+      const lastName = req.body.lastName || name.split(' ').slice(1).join(' ') || '';
+      await db.collection('chats').doc(`dm_${schoolId}_${teacherUserId}`).set({
+        schoolId,
+        teacherId: teacherUserId,
+        teacherName: `${firstName} ${lastName}`,
+        type: 'dm',
+        lastMessage: '',
+        unreadCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
     // Automatically create chats
     try {
       await createTeacherChats(
@@ -1251,7 +1305,7 @@ const getMyChatsHandler = async (req, res) => {
       const chats = [];
       snap.forEach(doc => {
         const data = doc.data();
-        if (data.type === undefined || data.type === null) {
+        if (!doc.id.startsWith('group_') && !doc.id.startsWith('dm_')) {
           chats.push({ id: doc.id, ...data });
         }
       });
@@ -1345,6 +1399,74 @@ const getMyChatsHandler = async (req, res) => {
 
 router.get('/chats/my-chats', authenticate, getMyChatsHandler);
 router.get('/v1/chats/my-chats', authenticate, getMyChatsHandler);
+
+const backfillSchoolChatsHandler = async (req, res) => {
+  try {
+    if (req.user?.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ message: 'Forbidden - Super Admins only' });
+    }
+
+    let schoolsChecked = 0;
+    let supportChatsCreated = 0;
+    let groupChatsCreated = 0;
+
+    const schoolsSnap = await db.collection('schools').get();
+    for (const schoolDoc of schoolsSnap.docs) {
+      const schoolId = schoolDoc.id;
+      const schoolData = schoolDoc.data();
+      schoolsChecked++;
+
+      // Check support chat: chats/{schoolId}
+      const supportRef = db.collection('chats').doc(schoolId);
+      const supportSnap = await supportRef.get();
+      if (!supportSnap.exists) {
+        await supportRef.set({
+          schoolId: schoolId,
+          schoolName: schoolData.name || 'Unknown School',
+          type: 'support',
+          lastMessage: '',
+          unreadCount: 0,
+          unreadCountAdmin: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        supportChatsCreated++;
+      }
+
+      // Check group chat: chats/group_{schoolId}
+      const groupRef = db.collection('chats').doc(`group_${schoolId}`);
+      const groupSnap = await groupRef.get();
+      if (!groupSnap.exists) {
+        await groupRef.set({
+          schoolId: schoolId,
+          name: `${schoolData.name || 'Unknown School'} Staff`,
+          type: 'group',
+          isOpen: true,
+          memberIds: [],
+          memberCount: 0,
+          lastMessage: '',
+          unreadCount: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        groupChatsCreated++;
+      }
+    }
+
+    return res.json({
+      message: 'Backfill completed',
+      schoolsChecked,
+      supportChatsCreated,
+      groupChatsCreated,
+    });
+  } catch (err) {
+    console.error('Failed to backfill school chats:', err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+router.post('/chats/backfill-school-chats', authenticate, authorize(['SUPER_ADMIN']), backfillSchoolChatsHandler);
+router.post('/v1/chats/backfill-school-chats', authenticate, authorize(['SUPER_ADMIN']), backfillSchoolChatsHandler);
 
 
 // --- Private Messaging System (Super Admin <-> School Admin) ---
