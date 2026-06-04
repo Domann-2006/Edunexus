@@ -137,6 +137,7 @@ export default function Messages({ user }: { user: any }) {
   const [swipeStartX, setSwipeStartX] = useState<Record<string, number>>({});
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const [backfillDone, setBackfillDone] = useState(false);
 
   const toggleSelectMessage = (id: string) => {
     setSelectedMessageIds(prev => {
@@ -1011,65 +1012,83 @@ export default function Messages({ user }: { user: any }) {
                 </div>
              ) : isSuper ? (
                 // SUPER ADMIN scenario
-                myChats.dms.length === 0 ? (
-                  <div className="py-20 text-center px-4">
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">No support chats found</p>
-                  </div>
-                ) : (
-                  myChats.dms
-                    .filter((chat: any) => 
-                      (chat.schoolName || chat.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      (chat.lastMessage || '').toLowerCase().includes(searchQuery.toLowerCase())
-                    )
-                    .map((chat: any) => {
-                      const isSelected = selectedChat?.id === chat.id;
-                      const status = getChatOnlineStatus(chat.id);
-                      const unreadCount = chat.unreadCountAdmin || chat.unreadCount || 0;
-                      return (
-                        <button 
-                          key={chat.id}
-                          onClick={() => {
-                             setSelectedChat(chat);
-                             setChatType('support');
-                             setShowSidebar(false);
-                          }}
-                          className={`w-full p-4 flex items-center gap-4 transition-all text-left ${
-                            isSelected ? 'bg-blue-50/50 hover:bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="relative shrink-0">
-                            <div className="w-11 h-11 bg-gradient-to-tr from-blue-50 to-indigo-100 text-blue-600 border border-indigo-200/50 rounded-2xl flex items-center justify-center font-bold text-sm shadow-sm">
-                              {(chat.schoolName || chat.name || '?').charAt(0)}
-                            </div>
-                            {status === 'online' && (
-                              <span className="absolute -bottom-1 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
-                            )}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center">
-                              <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">{chat.schoolName || chat.name}</span>
-                              {chat.updatedAt && (
-                                <span className="text-[8px] text-gray-400 font-semibold whitespace-nowrap uppercase">
-                                  {chat.updatedAt.toDate ? chat.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
-                                </span>
+                <>
+                  {user.role === 'SUPER_ADMIN' && !backfillDone && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.post('/v1/chats/backfill-school-chats');
+                          setBackfillDone(true);
+                          window.location.reload();
+                        } catch (err) {
+                          console.error('Backfill failed:', err);
+                        }
+                      }}
+                      className="mx-4 mt-3 mb-1 w-full px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl"
+                    >
+                      Initialize School Chats
+                    </button>
+                  )}
+                  {myChats.dms.length === 0 ? (
+                    <div className="py-20 text-center px-4">
+                      <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">No support chats found</p>
+                    </div>
+                  ) : (
+                    myChats.dms
+                      .filter((chat: any) => 
+                        (chat.schoolName || chat.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (chat.lastMessage || '').toLowerCase().includes(searchQuery.toLowerCase())
+                      )
+                      .map((chat: any) => {
+                        const isSelected = selectedChat?.id === chat.id;
+                        const status = getChatOnlineStatus(chat.id);
+                        const unreadCount = chat.unreadCountAdmin || chat.unreadCount || 0;
+                        return (
+                          <button 
+                            key={chat.id}
+                            onClick={() => {
+                               setSelectedChat(chat);
+                               setChatType('support');
+                               setShowSidebar(false);
+                            }}
+                            className={`w-full p-4 flex items-center gap-4 transition-all text-left ${
+                              isSelected ? 'bg-blue-50/50 hover:bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="relative shrink-0">
+                              <div className="w-11 h-11 bg-gradient-to-tr from-blue-50 to-indigo-100 text-blue-600 border border-indigo-200/50 rounded-2xl flex items-center justify-center font-bold text-sm shadow-sm">
+                                {(chat.schoolName || chat.name || '?').charAt(0)}
+                              </div>
+                              {status === 'online' && (
+                                <span className="absolute -bottom-1 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
                               )}
                             </div>
-                            <div className="flex items-center justify-between mt-1">
-                               <div className="text-[11px] text-gray-400 truncate pr-4 font-normal">
-                                 {chat.lastMessage || 'No messages yet'}
-                               </div>
-                               {unreadCount > 0 && !isSelected && (
-                                 <div className="bg-blue-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg shrink-0">
-                                   {unreadCount}
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-center">
+                                <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">{chat.schoolName || chat.name}</span>
+                                {chat.updatedAt && (
+                                  <span className="text-[8px] text-gray-400 font-semibold whitespace-nowrap uppercase">
+                                    {chat.updatedAt.toDate ? chat.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-between mt-1">
+                                 <div className="text-[11px] text-gray-400 truncate pr-4 font-normal">
+                                   {chat.lastMessage || 'No messages yet'}
                                  </div>
-                               )}
+                                 {unreadCount > 0 && !isSelected && (
+                                   <div className="bg-blue-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg shrink-0">
+                                     {unreadCount}
+                                   </div>
+                                 )}
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      );
-                    })
-                )
+                          </button>
+                        );
+                      })
+                  )}
+                </>
              ) : (
                 // SCHOOL_ADMIN and TEACHER three sections sidebar
                 <div className="flex flex-col">
