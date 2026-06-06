@@ -23,6 +23,7 @@ import SubscriptionDetails from './pages/SubscriptionDetails';
 import Notifications from './pages/Notifications';
 import Layout from './components/Layout';
 import InstallPWA from './components/InstallPWA';
+import ErrorBoundary from './components/ErrorBoundary';
 import { authService } from './services/api';
 import { auth } from './lib/firebase.ts';
 import { signInWithCustomToken } from 'firebase/auth';
@@ -266,7 +267,9 @@ export default function App() {
         <Route path="/messages" element={
           <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']}>
             <Layout user={user} onLogout={handleLogout}>
-              <Messages user={user} />
+              <ErrorBoundary>
+                <Messages user={user} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />

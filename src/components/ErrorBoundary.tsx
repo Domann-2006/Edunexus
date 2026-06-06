@@ -26,26 +26,26 @@ export default class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-white flex items-center justify-center p-6">
-          <div className="max-w-md w-full text-center">
-            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div className="min-h-screen">
+          <div className="bg-red-50 border-b border-red-200 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-red-600 text-sm font-bold">⚠ A page error occurred.</span>
+              <span className="text-red-500 text-xs">{this.state.error?.message}</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h1>
-            <p className="text-gray-600 mb-8">
-              We encountered an unexpected error. Please try reloading the page.
-            </p>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="text-xs text-red-600 font-bold underline"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="p-4 text-center">
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all"
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl"
             >
               Reload Page
             </button>
-            {process.env.NODE_ENV !== 'production' && this.state.error && (
-              <pre className="mt-8 p-4 bg-gray-50 rounded-xl text-left text-xs text-red-500 overflow-auto max-h-48 font-mono">
-                {this.state.error.toString()}
-              </pre>
-            )}
           </div>
         </div>
       );
