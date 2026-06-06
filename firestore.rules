@@ -1,4 +1,4 @@
-rules_version = '2';
+    rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Default deny
@@ -32,6 +32,10 @@ service cloud.firestore {
 
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function getUserSchoolId() {
+      return getUserData().schoolId;
     }
 
     // Schools
@@ -93,15 +97,37 @@ service cloud.firestore {
       allow write: if isSuperAdmin() || isSchoolAdmin(resource.data.schoolId);
     }
 
-    // Chats & Messaging Uplink
-    // FIX: Bug 3 - Add isSignedIn() as a base helper to prevent silent evaluation failures during token refresh
+    // Chats & Messaging
     match /chats/{chatId} {
-      allow read: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
-      allow write: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
+      allow read: if isSignedIn() && (
+        isSuperAdmin() ||
+        isSchoolAdmin(chatId) ||
+        isTeacher(getUserSchoolId()) ||
+        chatId == getUserSchoolId() ||
+        chatId == ('group_' + getUserSchoolId()) ||
+        chatId.matches('dm_' + getUserSchoolId() + '_.*')
+      );
+      allow write: if isSignedIn() && (
+        isSuperAdmin() ||
+        isSchoolAdmin(chatId)
+      );
 
       match /messages/{messageId} {
-        allow read: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
-        allow create, update: if isSignedIn() && (isSuperAdmin() || isSchoolAdmin(chatId));
+        allow read: if isSignedIn() && (
+          isSuperAdmin() ||
+          isSchoolAdmin(chatId) ||
+          isTeacher(getUserSchoolId())
+        );
+        allow create: if isSignedIn() && (
+          isSuperAdmin() ||
+          isSchoolAdmin(chatId) ||
+          isTeacher(getUserSchoolId())
+        );
+        allow update: if isSignedIn() && (
+          isSuperAdmin() ||
+          isSchoolAdmin(chatId) ||
+          isTeacher(getUserSchoolId())
+        );
         allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
       }
     }
