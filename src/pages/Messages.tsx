@@ -963,6 +963,14 @@ export default function Messages({ user }: { user: any }) {
     ? (selectedChat.name || selectedChat.teacherName || (chatType === 'support' ? 'Super Admin Support' : 'Chat')) 
     : '';
 
+  if (!user) {
+    return (
+      <div className="h-screen w-screen fixed inset-0 flex items-center justify-center bg-gray-100">
+        <Loader2 className="animate-spin text-blue-600" size={24} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen w-screen fixed inset-0 flex bg-gray-100 overflow-hidden animate-in fade-in duration-500">
       
