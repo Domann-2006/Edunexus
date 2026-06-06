@@ -932,7 +932,7 @@ export default function Messages({ user }: { user: any }) {
   );
 
   const filteredSchoolsList = schools.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase())
+    (s.name || s.schoolName || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Compute final message listing with "Delete for me" filtration and unique de-duplication applied
