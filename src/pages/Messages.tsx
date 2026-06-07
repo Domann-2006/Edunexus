@@ -714,7 +714,7 @@ export default function Messages({ user }: { user: any }) {
           lastSenderId: user.id,
           updatedAt: serverTimestamp(),
           schoolId: selectedChat.id,
-          schoolName: selectedChat.name || 'Unknown Partner',
+          schoolName: selectedChat.schoolName || selectedChat.name || selectedChat.id || 'School',
           unreadCount: increment(1)
         }, { merge: true });
       } catch (statusErr) {
@@ -799,7 +799,7 @@ export default function Messages({ user }: { user: any }) {
           lastSenderId: user.id,
           updatedAt: serverTimestamp(),
           schoolId: selectedChat.id,
-          schoolName: selectedChat.name || 'Unknown Partner',
+          schoolName: selectedChat.schoolName || selectedChat.name || selectedChat.id || 'School',
           unreadCount: increment(1)
         }, { merge: true });
       } catch (statusErr) {
@@ -963,6 +963,26 @@ export default function Messages({ user }: { user: any }) {
     ? (selectedChat.name || selectedChat.teacherName || (chatType === 'support' ? 'Super Admin Support' : 'Chat')) 
     : '';
 
+  const formatChatTime = (updatedAt: any): string => {
+    if (!updatedAt) return '';
+    const date = updatedAt.toDate ? updatedAt.toDate() : new Date(updatedAt);
+    if (isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffWeeks < 4) return `${diffWeeks}w ago`;
+    if (diffMonths < 12) return `${diffMonths}mo ago`;
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  };
+
   if (!user) {
     return (
       <div className="h-screen w-screen fixed inset-0 flex items-center justify-center bg-gray-100">
@@ -1074,11 +1094,9 @@ export default function Messages({ user }: { user: any }) {
                             
                             <div className="flex-1 min-w-0">
                               <div className="flex justify-between items-center">
-                                <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">{chat.schoolName || chat.name}</span>
+                                <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">{chat.schoolName || chat.name || chat.id || 'School'}</span>
                                 {chat.updatedAt && (
-                                  <span className="text-[8px] text-gray-400 font-semibold whitespace-nowrap uppercase">
-                                    {chat.updatedAt.toDate ? chat.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
-                                  </span>
+                                  <span className="text-xs text-gray-400">{formatChatTime(chat.updatedAt)}</span>
                                 )}
                               </div>
                               <div className="flex items-center justify-between mt-1">
@@ -1127,9 +1145,7 @@ export default function Messages({ user }: { user: any }) {
                             <div className="flex justify-between items-center">
                               <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">Super Admin Support</span>
                               {myChats.support.updatedAt && (
-                                <span className="text-[8px] text-gray-400 font-semibold whitespace-nowrap uppercase">
-                                  {myChats.support.updatedAt.toDate ? myChats.support.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
-                                </span>
+                                <span className="text-xs text-gray-400">{formatChatTime(myChats.support.updatedAt)}</span>
                               )}
                             </div>
                             <div className="flex items-center justify-between mt-1">
@@ -1256,9 +1272,7 @@ export default function Messages({ user }: { user: any }) {
                                 <div className="flex justify-between items-center">
                                   <span className="font-extrabold text-gray-900 text-xs truncate uppercase tracking-wider">{displayName}</span>
                                   {dm.updatedAt && (
-                                    <span className="text-[8px] text-gray-400 font-semibold whitespace-nowrap uppercase">
-                                      {dm.updatedAt.toDate ? dm.updatedAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
-                                    </span>
+                                    <span className="text-xs text-gray-400">{formatChatTime(dm.updatedAt)}</span>
                                   )}
                                 </div>
                                 <div className="flex items-center justify-between mt-1">

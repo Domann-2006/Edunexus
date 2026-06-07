@@ -495,7 +495,7 @@ export default function Teachers({ user }: { user: any }) {
                         <div className="space-y-3 md:col-span-2">
                           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Class Teacher Assignments</label>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-3xl max-h-48 overflow-y-auto border border-gray-100">
-                             {classes.map(c => {
+                             {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => {
                                const isSelected = formData.classAssignments.includes(c.id);
                                return (
                                  <div 
@@ -562,112 +562,126 @@ export default function Teachers({ user }: { user: any }) {
                                 <p className="text-[9px] mt-0.5 lowercase italic font-normal">Click "+ Add Subject Assignment" above to map a subject, class, academic session, and term.</p>
                               </div>
                             ) : (
-                              formData.subjectAssignments.map((sa, idx) => (
-                                <div key={idx} className="p-4 bg-gray-50 border border-gray-100 rounded-3xl relative space-y-4 shadow-sm animate-fade-in">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs uppercase font-extrabold text-gray-700">
-                                    <div>
-                                      <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Subject</label>
-                                      <select
-                                        required
-                                        value={sa.subjectId || ''}
-                                        onChange={(e) => {
-                                          const subId = e.target.value;
-                                          const found = fetchedSubjects.find(s => s.id === subId);
-                                          const updated = [...formData.subjectAssignments];
-                                          updated[idx] = { 
-                                            ...sa, 
-                                            subjectId: subId, 
-                                            subjectName: found ? found.name : '' 
-                                          };
-                                          setFormData({ ...formData, subjectAssignments: updated });
-                                        }}
-                                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
-                                      >
-                                        <option value="">Select Subject</option>
-                                        {fetchedSubjects.map(sub => (
-                                          <option key={sub.id} value={sub.id}>{sub.name} ({sub.class})</option>
-                                        ))}
-                                      </select>
+                              formData.subjectAssignments.map((sa, idx) => {
+                                const classSubjects = sa.classId
+                                  ? fetchedSubjects.filter(s => s.classId === sa.classId || s.class === classes.find(c => c.id === sa.classId)?.name)
+                                  : [];
+
+                                const isSubjectDisabled = !sa.classId || classSubjects.length === 0;
+                                const subjectPlaceholder = !sa.classId 
+                                  ? 'Select class first' 
+                                  : (classSubjects.length === 0 ? 'No subjects for this class' : 'Select Subject');
+
+                                return (
+                                  <div key={idx} className="p-4 bg-gray-50 border border-gray-100 rounded-3xl relative space-y-4 shadow-sm animate-fade-in">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs uppercase font-extrabold text-gray-700">
+                                      <div>
+                                        <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Class</label>
+                                        <select
+                                          required
+                                          value={sa.classId || ''}
+                                          onChange={(e) => {
+                                            const cId = e.target.value;
+                                            const found = classes.find(c => c.id === cId);
+                                            const updated = [...formData.subjectAssignments];
+                                            updated[idx] = { 
+                                              ...sa, 
+                                              classId: cId, 
+                                              className: found ? found.name : '',
+                                              subjectId: '',
+                                              subjectName: ''
+                                            };
+                                            setFormData({ ...formData, subjectAssignments: updated });
+                                          }}
+                                          className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
+                                        >
+                                          <option value="">Select Class</option>
+                                          {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Subject</label>
+                                        <select
+                                          required
+                                          disabled={isSubjectDisabled}
+                                          value={sa.subjectId || ''}
+                                          onChange={(e) => {
+                                            const subId = e.target.value;
+                                            const found = fetchedSubjects.find(s => s.id === subId);
+                                            const updated = [...formData.subjectAssignments];
+                                            updated[idx] = { 
+                                              ...sa, 
+                                              subjectId: subId, 
+                                              subjectName: found ? found.name : '' 
+                                            };
+                                            setFormData({ ...formData, subjectAssignments: updated });
+                                          }}
+                                          className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs disabled:opacity-60 disabled:bg-gray-100"
+                                        >
+                                          <option value="">{subjectPlaceholder}</option>
+                                          {classSubjects.map(sub => (
+                                            <option key={sub.id} value={sub.id}>{sub.name} ({sub.class})</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Session</label>
+                                        <select
+                                          required
+                                          value={sa.sessionId || ''}
+                                          onChange={(e) => {
+                                            const sId = e.target.value;
+                                            const found = fetchedSessions.find(s => s.id === sId);
+                                            const updated = [...formData.subjectAssignments];
+                                            updated[idx] = { 
+                                              ...sa, 
+                                              sessionId: sId, 
+                                              sessionName: found ? found.name : '' 
+                                            };
+                                            setFormData({ ...formData, subjectAssignments: updated });
+                                          }}
+                                          className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
+                                        >
+                                          <option value="">Select Session</option>
+                                          {fetchedSessions.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Term</label>
+                                        <select
+                                          value={sa.term || ''}
+                                          onChange={(e) => {
+                                            const updated = [...formData.subjectAssignments];
+                                            updated[idx] = { ...sa, term: e.target.value || undefined };
+                                            setFormData({ ...formData, subjectAssignments: updated });
+                                          }}
+                                          className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
+                                        >
+                                          <option value="">All Terms</option>
+                                          <option value="First Term">First Term</option>
+                                          <option value="Second Term">Second Term</option>
+                                          <option value="Third Term">Third Term</option>
+                                        </select>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Class</label>
-                                      <select
-                                        required
-                                        value={sa.classId || ''}
-                                        onChange={(e) => {
-                                          const cId = e.target.value;
-                                          const found = classes.find(c => c.id === cId);
-                                          const updated = [...formData.subjectAssignments];
-                                          updated[idx] = { 
-                                            ...sa, 
-                                            classId: cId, 
-                                            className: found ? found.name : '' 
-                                          };
-                                          setFormData({ ...formData, subjectAssignments: updated });
-                                        }}
-                                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
-                                      >
-                                        <option value="">Select Class</option>
-                                        {classes.map(c => (
-                                          <option key={c.id} value={c.id}>{c.name}</option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    <div>
-                                      <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Session</label>
-                                      <select
-                                        required
-                                        value={sa.sessionId || ''}
-                                        onChange={(e) => {
-                                          const sId = e.target.value;
-                                          const found = fetchedSessions.find(s => s.id === sId);
-                                          const updated = [...formData.subjectAssignments];
-                                          updated[idx] = { 
-                                            ...sa, 
-                                            sessionId: sId, 
-                                            sessionName: found ? found.name : '' 
-                                          };
-                                          setFormData({ ...formData, subjectAssignments: updated });
-                                        }}
-                                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
-                                      >
-                                        <option value="">Select Session</option>
-                                        {fetchedSessions.map(s => (
-                                          <option key={s.id} value={s.id}>{s.name}</option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    <div>
-                                      <label className="text-[9px] text-gray-400 uppercase font-black leading-none mb-1 block">Term</label>
-                                      <select
-                                        value={sa.term || ''}
-                                        onChange={(e) => {
-                                          const updated = [...formData.subjectAssignments];
-                                          updated[idx] = { ...sa, term: e.target.value || undefined };
-                                          setFormData({ ...formData, subjectAssignments: updated });
-                                        }}
-                                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
-                                      >
-                                        <option value="">All Terms</option>
-                                        <option value="First Term">First Term</option>
-                                        <option value="Second Term">Second Term</option>
-                                        <option value="Third Term">Third Term</option>
-                                      </select>
-                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = formData.subjectAssignments.filter((_, i) => i !== idx);
+                                        setFormData({ ...formData, subjectAssignments: updated });
+                                      }}
+                                      className="absolute -top-1.5 -right-1.5 p-1 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                                      title="Delete Assignment"
+                                    >
+                                      <X size={12} />
+                                    </button>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updated = formData.subjectAssignments.filter((_, i) => i !== idx);
-                                      setFormData({ ...formData, subjectAssignments: updated });
-                                    }}
-                                    className="absolute -top-1.5 -right-1.5 p-1 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
-                                    title="Delete Assignment"
-                                  >
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                              ))
+                                );
+                              })
                             )}
                           </div>
                         </div>
