@@ -137,7 +137,9 @@ export default function Messages({ user }: { user: any }) {
   const [swipeStartX, setSwipeStartX] = useState<Record<string, number>>({});
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
-  const [backfillDone, setBackfillDone] = useState(false);
+  const [backfillDone, setBackfillDone] = useState(() => {
+    return localStorage.getItem('edunexus_backfill_done') === 'true';
+  });
 
   const toggleSelectMessage = (id: string) => {
     setSelectedMessageIds(prev => {
@@ -726,6 +728,7 @@ export default function Messages({ user }: { user: any }) {
       // Succeeded! Note: We DO NOT filter out optimistic messages here anymore, 
       // they are safely filtered out in onSnapshot once received! This completely avoids the blink bug.
       logChatAction('MESSAGE_SENT', `Sent a WhatsApp-styled message to chat ID: ${selectedChat.id}`);
+      setSendError('');
 
     } catch (err: any) {
       console.error('[CHAT_FAIL_DETAILS]', err);
@@ -1046,6 +1049,7 @@ export default function Messages({ user }: { user: any }) {
                       onClick={async () => {
                         try {
                           await api.post('/v1/chats/backfill-school-chats');
+                          localStorage.setItem('edunexus_backfill_done', 'true');
                           setBackfillDone(true);
                           window.location.reload();
                         } catch (err) {

@@ -125,7 +125,6 @@ export default function Results({ user }: { user: any }) {
       }
 
       setStudents(classStudents);
-      console.log('[RESULTS_DEBUG] classStudents:', classStudents.length, 'filters:', filters, 'allStudents sample:', allStudents.slice(0, 2));
       setResults(resRes.data);
 
       const initialScores: any = {};

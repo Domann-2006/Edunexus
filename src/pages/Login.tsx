@@ -12,6 +12,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const [loginType, setLoginType] = useState<'teacher' | 'admin' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -52,6 +53,7 @@ export default function Login({ onLogin }: LoginProps) {
     if (!loginType) return;
     
     setLoading(true);
+    setIsLoading(true);
     setError('');
     try {
       const { data } = await authService.login({ email, password, loginType });
@@ -64,6 +66,7 @@ export default function Login({ onLogin }: LoginProps) {
       setError(err.response?.data?.message || 'Failed to login');
     } finally {
       setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -167,10 +170,18 @@ export default function Login({ onLogin }: LoginProps) {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={isLoading}
           className={`w-full ${type === 'teacher' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' : 'bg-gray-900 hover:bg-black shadow-gray-200'} text-white font-bold py-4 rounded-2x flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98] uppercase tracking-widest text-xs`}
         >
-          {loading ? <Loader2 className="animate-spin" /> : <span>Sign In</span>}
+          {isLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              Signing in...
+            </span>
+          ) : 'Sign In'}
           <ArrowRight size={20} />
         </button>
       </form>
