@@ -170,13 +170,7 @@ const PLAN_LIMITS = {
 async function logActivity(req, action, details, customSchoolId = null) {
   try {
     const schoolId = customSchoolId || req.user?.schoolId || 'SUPER';
-    let schoolName = 'System';
-    if (schoolId && schoolId !== 'SUPER') {
-      const sDoc = await db.collection('schools').doc(schoolId).get();
-      if (sDoc.exists) {
-        schoolName = sDoc.data().name;
-      }
-    }
+    const schoolName = req.user?.schoolName || 'System';
     const logData = {
       userId: req.user?.id || 'SYSTEM',
       userName: req.user?.name || 'System',
@@ -506,9 +500,17 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         } else if (collectionName === 'announcements') {
           (async () => {
             try {
-              const teachersSnap = await db.collection('users')
-                .where('role', '==', 'TEACHER')
-                .get();
+              const announcementSchoolId = data.schoolId && data.schoolId !== 'SUPER' ? data.schoolId : null;
+
+              const teachersQuery = announcementSchoolId
+                ? db.collection('users').where('schoolId', '==', announcementSchoolId).where('role', '==', 'TEACHER')
+                : db.collection('users').where('role', '==', 'TEACHER');
+
+              const adminsQuery = announcementSchoolId
+                ? db.collection('users').where('schoolId', '==', announcementSchoolId).where('role', '==', 'SCHOOL_ADMIN')
+                : db.collection('users').where('role', '==', 'SCHOOL_ADMIN');
+
+              const teachersSnap = await teachersQuery.get();
               teachersSnap.forEach(tDoc => {
                 createNotification({
                   recipientId: tDoc.id,
@@ -520,9 +522,7 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
                 });
               });
 
-              const adminsSnap = await db.collection('users')
-                .where('role', '==', 'SCHOOL_ADMIN')
-                .get();
+              const adminsSnap = await adminsQuery.get();
               adminsSnap.forEach(aDoc => {
                 createNotification({
                   recipientId: aDoc.id,
@@ -989,6 +989,14 @@ teacherRouter.delete('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (r
     // Delete User Document
     if (teacherData.userId) {
       await db.collection('users').doc(teacherData.userId).delete();
+    }
+
+    // Clean up DM chat document
+    try {
+      const dmChatId = `dm_${req.user.schoolId}_${teacherData.userId}`;
+      await db.collection('chats').doc(dmChatId).delete();
+    } catch (dmErr) {
+      console.error('Failed to delete teacher DM chat:', dmErr);
     }
 
     // Automatically clean up chats
