@@ -254,10 +254,23 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         }
       }
 
-      // Dynamic filters from query params
-      const skipParams = ['schoolId', 'id', 'limit', 'offset', 'sort'];
+      // Dynamic filters from query params with strict whitelist
+      const allowedFilters = {
+        students: ['classId', 'status', 'gender'],
+        teachers: ['classId', 'roleType'],
+        classes: ['level'],
+        subjects: ['level', 'class', 'stream'],
+        results: ['classId', 'subjectName', 'status', 'sessionId', 'term'],
+        attendance: ['classId', 'date', 'sessionId'],
+        sessions: ['isCurrent'],
+        announcements: ['type'],
+        schools: [],
+        'activity-logs': ['action', 'role'],
+        notifications: [],
+      };
+      const allowed = allowedFilters[collectionName] || [];
       Object.keys(req.query).forEach(key => {
-        if (!skipParams.includes(key) && req.query[key]) {
+        if (allowed.includes(key) && req.query[key]) {
           query = query.where(key, '==', req.query[key]);
         }
       });
