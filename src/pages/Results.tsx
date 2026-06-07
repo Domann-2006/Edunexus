@@ -81,7 +81,7 @@ export default function Results({ user }: { user: any }) {
       }
 
       setSessions(sessRes.data);
-      setClasses(fetchedClasses);
+      setClasses([...fetchedClasses].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
       setSubjects(fetchedSubjects);
       setAllStudents(studRes.data);
       
@@ -583,7 +583,7 @@ export default function Results({ user }: { user: any }) {
             className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors"
           >
             <option value="">Select Class</option>
-            {classes.map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
+            {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
           </select>
         </div>
         <div className="space-y-1">

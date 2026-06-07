@@ -46,7 +46,7 @@ export default function Attendance({ user }: { user: any }) {
         }
       }
 
-      setClasses(fetchedClasses);
+      setClasses([...fetchedClasses].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
       if (fetchedClasses.length > 0) {
         setSelectedClassId(fetchedClasses[0].id);
       }
@@ -141,7 +141,7 @@ export default function Attendance({ user }: { user: any }) {
             onChange={(e) => setSelectedClassId(e.target.value)}
             className="px-5 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
           >
-            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           {user.role === 'TEACHER' && (
             <button 

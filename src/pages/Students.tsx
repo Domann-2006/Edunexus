@@ -90,7 +90,7 @@ export default function Students({ user }: { user: any }) {
       }
 
       setStudents(fetchedStudents);
-      setClasses(fetchedClasses);
+      setClasses([...fetchedClasses].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
       if (results[2]) setSchools(results[2].data);
     } catch (err) {
       console.debug('Background silent student fetch skipped:', err);
@@ -148,7 +148,7 @@ export default function Students({ user }: { user: any }) {
       }
 
       setStudents(fetchedStudents);
-      setClasses(fetchedClasses);
+      setClasses([...fetchedClasses].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
       if (results[2]) setSchools(results[2].data);
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -278,7 +278,7 @@ export default function Students({ user }: { user: any }) {
             className="w-full sm:w-auto px-3 py-2.5 md:px-6 md:py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-[10px] font-black tracking-widest uppercase appearance-none"
           >
             <option value="">All Classes</option>
-            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
 
@@ -452,7 +452,7 @@ export default function Students({ user }: { user: any }) {
                         className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none appearance-none"
                       >
                         <option value="">Select Class</option>
-                        {classes.map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
+                        {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
                       </select>
                     </div>
 

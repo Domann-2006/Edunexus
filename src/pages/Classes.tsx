@@ -56,7 +56,7 @@ export default function Classes({ user }: { user: any }) {
         }
       }
 
-      setClasses(fetchedClasses);
+      setClasses([...fetchedClasses].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
       setTeachers(fetchedTeachers);
       if (results[2]) setSchools(results[2].data);
     } catch (err) {
@@ -197,7 +197,7 @@ export default function Classes({ user }: { user: any }) {
             No classes defined yet.
           </div>
         ) : (
-          classes.map((cls) => (
+          [...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map((cls) => (
             <motion.div
               key={cls.id}
               layout
