@@ -1,4 +1,4 @@
-    rules_version = '2';
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Default deny
@@ -36,6 +36,13 @@ service cloud.firestore {
 
     function getUserSchoolId() {
       return getUserData().schoolId;
+    }
+
+    function isSchoolMember() {
+      return isSignedIn() && (
+        getUserData().role == 'SCHOOL_ADMIN' ||
+        getUserData().role == 'TEACHER'
+      );
     }
 
     // Schools
@@ -101,32 +108,41 @@ service cloud.firestore {
     match /chats/{chatId} {
       allow read: if isSignedIn() && (
         isSuperAdmin() ||
-        isSchoolAdmin(chatId) ||
-        isTeacher(getUserSchoolId()) ||
         chatId == getUserSchoolId() ||
         chatId == ('group_' + getUserSchoolId()) ||
-        chatId.matches('dm_' + getUserSchoolId() + '_.*')
+        chatId.matches('dm_.*')
       );
       allow write: if isSignedIn() && (
         isSuperAdmin() ||
-        isSchoolAdmin(chatId)
+        chatId == getUserSchoolId() ||
+        chatId == ('group_' + getUserSchoolId()) ||
+        (getUserData().role == 'TEACHER' && chatId.matches('dm_.*'))
       );
 
       match /messages/{messageId} {
         allow read: if isSignedIn() && (
           isSuperAdmin() ||
-          isSchoolAdmin(chatId) ||
-          isTeacher(getUserSchoolId())
+          chatId == getUserSchoolId() ||
+          chatId == ('group_' + getUserSchoolId()) ||
+          chatId.matches('dm_.*')
         );
         allow create: if isSignedIn() && (
           isSuperAdmin() ||
-          isSchoolAdmin(chatId) ||
-          isTeacher(getUserSchoolId())
+          chatId == getUserSchoolId() ||
+          chatId == ('group_' + getUserSchoolId()) ||
+          (getUserData().role == 'TEACHER' && (
+            chatId == ('group_' + getUserSchoolId()) ||
+            chatId.matches('dm_.*')
+          ))
         );
         allow update: if isSignedIn() && (
           isSuperAdmin() ||
-          isSchoolAdmin(chatId) ||
-          isTeacher(getUserSchoolId())
+          chatId == getUserSchoolId() ||
+          chatId == ('group_' + getUserSchoolId()) ||
+          (getUserData().role == 'TEACHER' && (
+            chatId == ('group_' + getUserSchoolId()) ||
+            chatId.matches('dm_.*')
+          ))
         );
         allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
       }
