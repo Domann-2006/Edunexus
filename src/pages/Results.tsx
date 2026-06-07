@@ -3,6 +3,30 @@ import api, { resultService, studentService, classService, subjectService, sessi
 import { Save, Loader2, Trophy, AlertCircle, FileText, Download, Filter, Eye, X, BookOpen, User, MapPin, ShieldCheck, CheckSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+const levelOrder = ['CRECHE', 'KINDERGARTEN', 'NURSERY', 'PRIMARY', 'JSS', 'SSS'];
+
+const getLevel = (cls: any): string => {
+  const level = (cls.level || cls.name || '').toUpperCase();
+  if (level.includes('CRECHE')) return 'CRECHE';
+  if (level.includes('KINDERGARTEN') || level.includes('KG')) return 'KINDERGARTEN';
+  if (level.includes('NURSERY')) return 'NURSERY';
+  if (level.includes('PRIMARY')) return 'PRIMARY';
+  if (level.includes('JSS') || level.includes('JUNIOR')) return 'JSS';
+  if (level.includes('SSS') || level.includes('SENIOR') || level.includes('SS')) return 'SSS';
+  return 'OTHER';
+};
+
+const sortClasses = (classesList: any[]): any[] => {
+  return [...classesList].sort((a, b) => {
+    const levelA = getLevel(a);
+    const levelB = getLevel(b);
+    const levelDiff = (levelOrder.indexOf(levelA) === -1 ? 99 : levelOrder.indexOf(levelA)) -
+                      (levelOrder.indexOf(levelB) === -1 ? 99 : levelOrder.indexOf(levelB));
+    if (levelDiff !== 0) return levelDiff;
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  });
+};
+
 export default function Results({ user }: { user: any }) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -81,7 +105,7 @@ export default function Results({ user }: { user: any }) {
       }
 
       setSessions(sessRes.data);
-      setClasses([...fetchedClasses].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
+      setClasses(sortClasses(fetchedClasses));
       setSubjects(fetchedSubjects);
       setAllStudents(studRes.data);
       
@@ -583,7 +607,7 @@ export default function Results({ user }: { user: any }) {
             className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors"
           >
             <option value="">Select Class</option>
-            {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
+            {sortClasses(classes).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
           </select>
         </div>
         <div className="space-y-1">

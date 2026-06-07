@@ -4,6 +4,30 @@ import { CheckCircle, XCircle, Clock, AlertCircle, Calendar, Users, Loader2, Sav
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
+const levelOrder = ['CRECHE', 'KINDERGARTEN', 'NURSERY', 'PRIMARY', 'JSS', 'SSS'];
+
+const getLevel = (cls: any): string => {
+  const level = (cls.level || cls.name || '').toUpperCase();
+  if (level.includes('CRECHE')) return 'CRECHE';
+  if (level.includes('KINDERGARTEN') || level.includes('KG')) return 'KINDERGARTEN';
+  if (level.includes('NURSERY')) return 'NURSERY';
+  if (level.includes('PRIMARY')) return 'PRIMARY';
+  if (level.includes('JSS') || level.includes('JUNIOR')) return 'JSS';
+  if (level.includes('SSS') || level.includes('SENIOR') || level.includes('SS')) return 'SSS';
+  return 'OTHER';
+};
+
+const sortClasses = (classesList: any[]): any[] => {
+  return [...classesList].sort((a, b) => {
+    const levelA = getLevel(a);
+    const levelB = getLevel(b);
+    const levelDiff = (levelOrder.indexOf(levelA) === -1 ? 99 : levelOrder.indexOf(levelA)) -
+                      (levelOrder.indexOf(levelB) === -1 ? 99 : levelOrder.indexOf(levelB));
+    if (levelDiff !== 0) return levelDiff;
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  });
+};
+
 export default function Attendance({ user }: { user: any }) {
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -46,7 +70,7 @@ export default function Attendance({ user }: { user: any }) {
         }
       }
 
-      setClasses([...fetchedClasses].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
+      setClasses(sortClasses(fetchedClasses));
       if (fetchedClasses.length > 0) {
         setSelectedClassId(fetchedClasses[0].id);
       }
@@ -141,7 +165,7 @@ export default function Attendance({ user }: { user: any }) {
             onChange={(e) => setSelectedClassId(e.target.value)}
             className="px-5 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none"
           >
-            {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {sortClasses(classes).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           {user.role === 'TEACHER' && (
             <button 

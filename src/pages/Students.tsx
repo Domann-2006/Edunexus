@@ -6,6 +6,30 @@ import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 import { SSS_STREAMS } from '../constants';
 
+const levelOrder = ['CRECHE', 'KINDERGARTEN', 'NURSERY', 'PRIMARY', 'JSS', 'SSS'];
+
+const getLevel = (cls: any): string => {
+  const level = (cls.level || cls.name || '').toUpperCase();
+  if (level.includes('CRECHE')) return 'CRECHE';
+  if (level.includes('KINDERGARTEN') || level.includes('KG')) return 'KINDERGARTEN';
+  if (level.includes('NURSERY')) return 'NURSERY';
+  if (level.includes('PRIMARY')) return 'PRIMARY';
+  if (level.includes('JSS') || level.includes('JUNIOR')) return 'JSS';
+  if (level.includes('SSS') || level.includes('SENIOR') || level.includes('SS')) return 'SSS';
+  return 'OTHER';
+};
+
+const sortClasses = (classesList: any[]): any[] => {
+  return [...classesList].sort((a, b) => {
+    const levelA = getLevel(a);
+    const levelB = getLevel(b);
+    const levelDiff = (levelOrder.indexOf(levelA) === -1 ? 99 : levelOrder.indexOf(levelA)) -
+                      (levelOrder.indexOf(levelB) === -1 ? 99 : levelOrder.indexOf(levelB));
+    if (levelDiff !== 0) return levelDiff;
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  });
+};
+
 export default function Students({ user }: { user: any }) {
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -90,7 +114,7 @@ export default function Students({ user }: { user: any }) {
       }
 
       setStudents(fetchedStudents);
-      setClasses([...fetchedClasses].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
+      setClasses(sortClasses(fetchedClasses));
       if (results[2]) setSchools(results[2].data);
     } catch (err) {
       console.debug('Background silent student fetch skipped:', err);
@@ -148,7 +172,7 @@ export default function Students({ user }: { user: any }) {
       }
 
       setStudents(fetchedStudents);
-      setClasses([...fetchedClasses].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
+      setClasses(sortClasses(fetchedClasses));
       if (results[2]) setSchools(results[2].data);
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -278,7 +302,7 @@ export default function Students({ user }: { user: any }) {
             className="w-full sm:w-auto px-3 py-2.5 md:px-6 md:py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-[10px] font-black tracking-widest uppercase appearance-none"
           >
             <option value="">All Classes</option>
-            {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {sortClasses(classes).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
 
@@ -452,7 +476,7 @@ export default function Students({ user }: { user: any }) {
                         className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none appearance-none"
                       >
                         <option value="">Select Class</option>
-                        {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
+                        {sortClasses(classes).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
                       </select>
                     </div>
 

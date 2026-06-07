@@ -4,6 +4,30 @@ import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPi
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
+const levelOrder = ['CRECHE', 'KINDERGARTEN', 'NURSERY', 'PRIMARY', 'JSS', 'SSS'];
+
+const getLevel = (cls: any): string => {
+  const level = (cls.level || cls.name || '').toUpperCase();
+  if (level.includes('CRECHE')) return 'CRECHE';
+  if (level.includes('KINDERGARTEN') || level.includes('KG')) return 'KINDERGARTEN';
+  if (level.includes('NURSERY')) return 'NURSERY';
+  if (level.includes('PRIMARY')) return 'PRIMARY';
+  if (level.includes('JSS') || level.includes('JUNIOR')) return 'JSS';
+  if (level.includes('SSS') || level.includes('SENIOR') || level.includes('SS')) return 'SSS';
+  return 'OTHER';
+};
+
+const sortClasses = (classesList: any[]): any[] => {
+  return [...classesList].sort((a, b) => {
+    const levelA = getLevel(a);
+    const levelB = getLevel(b);
+    const levelDiff = (levelOrder.indexOf(levelA) === -1 ? 99 : levelOrder.indexOf(levelA)) -
+                      (levelOrder.indexOf(levelB) === -1 ? 99 : levelOrder.indexOf(levelB));
+    if (levelDiff !== 0) return levelDiff;
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  });
+};
+
 export default function Teachers({ user }: { user: any }) {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
@@ -57,7 +81,7 @@ export default function Teachers({ user }: { user: any }) {
       }
       const [teacherRes, classRes, subjectRes, sessionRes, schoolRes] = await Promise.all(promises);
       setTeachers(teacherRes.data);
-      setClasses(classRes.data);
+      setClasses(sortClasses(classRes.data));
       setFetchedSubjects(subjectRes?.data || []);
       setFetchedSessions(sessionRes?.data || []);
       if (schoolRes) setSchools(schoolRes.data);
@@ -495,7 +519,7 @@ export default function Teachers({ user }: { user: any }) {
                         <div className="space-y-3 md:col-span-2">
                           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Class Teacher Assignments</label>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-3xl max-h-48 overflow-y-auto border border-gray-100">
-                             {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => {
+                             {sortClasses(classes).map(c => {
                                const isSelected = formData.classAssignments.includes(c.id);
                                return (
                                  <div 
@@ -596,7 +620,7 @@ export default function Teachers({ user }: { user: any }) {
                                           className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-xs"
                                         >
                                           <option value="">Select Class</option>
-                                          {[...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })).map(c => (
+                                          {sortClasses(classes).map(c => (
                                             <option key={c.id} value={c.id}>{c.name}</option>
                                           ))}
                                         </select>
