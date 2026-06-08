@@ -17,6 +17,7 @@ export default function Profile({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
   
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -76,6 +77,7 @@ export default function Profile({
       }
     } catch (err) {
       console.error('Failed to fetch profile:', err);
+      setError('Failed to load profile data. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -97,6 +99,12 @@ export default function Profile({
         <h1 className="text-3xl font-bold text-gray-900 tracking-tight">My Profile</h1>
         <p className="text-gray-500 mt-1">Manage your personal information and account settings.</p>
       </header>
+
+      {error && (
+        <div className="mx-4 mt-4 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm font-medium">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Profile Card */}

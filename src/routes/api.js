@@ -1372,7 +1372,7 @@ const getMyChatsHandler = async (req, res) => {
     }
 
     if (role === 'SUPER_ADMIN') {
-      const snap = await db.collection('chats').get();
+      const snap = await db.collection('chats').orderBy('updatedAt', 'desc').limit(100).get();
       const chats = [];
       snap.forEach(doc => {
         const data = doc.data();
@@ -1951,39 +1951,49 @@ router.get('/activity-logs', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADM
     // Sort by createdAt descending
     query = query.orderBy('createdAt', 'desc').limit(500);
 
-    const snapshot = await query.get();
-    let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    try {
+      const snapshot = await query.get();
+      let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // Role-based segregation for Super Admin
-    if (req.user.role === 'SUPER_ADMIN') {
-      // Super Admin should ONLY see School Admin and Super Admin and System logs.
-      // Super Admin should NOT see teacher-level operational logs directly!
-      docs = docs.filter(doc => doc.role !== 'TEACHER');
+      // Role-based segregation for Super Admin
+      if (req.user.role === 'SUPER_ADMIN') {
+        // Super Admin should ONLY see School Admin and Super Admin and System logs.
+        // Super Admin should NOT see teacher-level operational logs directly!
+        docs = docs.filter(doc => doc.role !== 'TEACHER');
+      }
+
+      // Filter by search term if provided
+      if (req.query.search) {
+        const searchStr = req.query.search.toLowerCase();
+        docs = docs.filter(doc => 
+          doc.details?.toLowerCase().includes(searchStr) ||
+          doc.action?.toLowerCase().includes(searchStr) ||
+          doc.userName?.toLowerCase().includes(searchStr) ||
+          doc.role?.toLowerCase().includes(searchStr) ||
+          doc.schoolName?.toLowerCase().includes(searchStr)
+        );
+      }
+
+      // Filter by role if provided
+      if (req.query.roleFilter) {
+        docs = docs.filter(doc => doc.role === req.query.roleFilter);
+      }
+
+      // Filter by action if provided
+      if (req.query.actionFilter) {
+        docs = docs.filter(doc => doc.action === req.query.actionFilter);
+      }
+
+      res.json(docs);
+    } catch (err) {
+      if (err.message && err.message.includes('index')) {
+        return res.status(500).json({
+          message: 'Activity logs index is being built. Please try again in a few minutes.',
+          indexRequired: true
+        });
+      }
+      throw err;
     }
-
-    // Filter by search term if provided
-    if (req.query.search) {
-      const searchStr = req.query.search.toLowerCase();
-      docs = docs.filter(doc => 
-        doc.details?.toLowerCase().includes(searchStr) ||
-        doc.action?.toLowerCase().includes(searchStr) ||
-        doc.userName?.toLowerCase().includes(searchStr) ||
-        doc.role?.toLowerCase().includes(searchStr) ||
-        doc.schoolName?.toLowerCase().includes(searchStr)
-      );
-    }
-
-    // Filter by role if provided
-    if (req.query.roleFilter) {
-      docs = docs.filter(doc => doc.role === req.query.roleFilter);
-    }
-
-    // Filter by action if provided
-    if (req.query.actionFilter) {
-      docs = docs.filter(doc => doc.action === req.query.actionFilter);
-    }
-
-    res.json(docs);
   } catch (err) {
     console.error('Failed to retrieve activity-logs:', err);
     res.status(500).json({ message: err.message });
