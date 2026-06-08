@@ -5,6 +5,7 @@ import { Plus, Search, MoreVertical, Edit2, Trash2, X, Check, Loader2, User as U
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 import { SSS_STREAMS } from '../constants';
+import { Download, FileText } from 'lucide-react';
 
 const levelOrder = ['CRECHE', 'KINDERGARTEN', 'NURSERY', 'PRIMARY', 'JSS', 'SSS'];
 
@@ -251,6 +252,130 @@ export default function Students({ user }: { user: any }) {
     return matchesSearch && matchesClass;
   });
 
+  const exportCSV = () => {
+    const headers = ['Name', 'Admission Number', 'Class', 'Level', 'Gender', 'Date of Birth', 'Guardian Name', 'Guardian Phone'];
+    const rows = filteredStudents.map(s => {
+      const cls = classes.find(c => c.id === s.classId);
+      return [
+        s.name || '',
+        s.admissionNumber || '',
+        cls?.name || 'Unassigned',
+        cls?.level || '',
+        s.gender || '',
+        s.dateOfBirth || '',
+        s.guardianName || '',
+        s.guardianPhone || ''
+      ];
+    });
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const className = classes.find(c => c.id === selectedClassIdFilter)?.name || 'All Classes';
+    link.href = url;
+    link.download = `EduNexus_Students_${className}_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPDF = () => {
+    const className = classes.find(c => c.id === selectedClassIdFilter)?.name || 'All Classes';
+    const schoolName = user?.schoolName || 'School';
+    const printDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const tableRows = filteredStudents.map((s, index) => {
+      const cls = classes.find(c => c.id === s.classId);
+      return `
+        <tr style="background:${index % 2 === 0 ? '#f9fafb' : '#ffffff'}">
+          <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;font-weight:600">${index + 1}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;font-weight:700">${s.name || '-'}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6;font-family:monospace;color:#6b7280">${s.admissionNumber || '-'}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6">${cls?.name || 'Unassigned'}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6">${s.gender || '-'}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6">${s.dateOfBirth || '-'}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6">${s.guardianName || '-'}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #f3f4f6">${s.guardianPhone || '-'}</td>
+        </tr>`;
+    }).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Student List - ${className}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Inter', Arial, sans-serif; color: #111827; background: white; padding: 32px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 3px solid #2563eb; }
+          .brand { font-size: 28px; font-weight: 900; color: #2563eb; letter-spacing: -1px; font-style: italic; }
+          .meta { text-align: right; font-size: 12px; color: #6b7280; }
+          .meta strong { display: block; font-size: 18px; color: #111827; font-weight: 800; margin-bottom: 4px; }
+          .stats { display: flex; gap: 16px; margin-bottom: 24px; }
+          .stat { background: #eff6ff; border-radius: 12px; padding: 12px 20px; }
+          .stat-number { font-size: 24px; font-weight: 900; color: #2563eb; }
+          .stat-label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          thead { background: #1e40af; color: white; }
+          th { padding: 12px; text-align: left; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+          .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; font-size: 11px; color: #9ca3af; }
+          @media print { body { padding: 16px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="brand">EduNexus</div>
+          <div class="meta">
+            <strong>${schoolName}</strong>
+            Student List — ${className}<br/>
+            Generated: ${printDate}
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-number">${filteredStudents.length}</div>
+            <div class="stat-label">Total Students</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number">${className}</div>
+            <div class="stat-label">Class / Filter</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Full Name</th>
+              <th>Admission No.</th>
+              <th>Class</th>
+              <th>Gender</th>
+              <th>Date of Birth</th>
+              <th>Guardian</th>
+              <th>Guardian Phone</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        <div class="footer">
+          <span>EduNexus — School Management Platform</span>
+          <span>Total: ${filteredStudents.length} students</span>
+        </div>
+      </body>
+      </html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
+  };
+
   const selectedClassInfo = classes.find(c => c.id === formData.classId);
   const showStream = selectedClassInfo?.level === 'SSS';
 
@@ -271,6 +396,26 @@ export default function Students({ user }: { user: any }) {
               <option value="">All Schools</option>
               {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
+          )}
+          {filteredStudents.length > 0 && (
+            <>
+              <button
+                onClick={exportCSV}
+                className="flex items-center gap-2 px-4 py-2.5 bg-green-50 text-green-700 hover:bg-green-100 rounded-2xl font-bold text-xs transition-all"
+                title="Export as CSV"
+              >
+                <Download size={16} />
+                <span className="hidden sm:inline">CSV</span>
+              </button>
+              <button
+                onClick={exportPDF}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-2xl font-bold text-xs transition-all"
+                title="Export & Print PDF"
+              >
+                <FileText size={16} />
+                <span className="hidden sm:inline">Print</span>
+              </button>
+            </>
           )}
           {canManage && (
             <button 
