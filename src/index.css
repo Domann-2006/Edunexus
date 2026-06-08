@@ -6,8 +6,6 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-@variant dark (&:where(.dark, .dark *));
-
 @layer base {
   html, body {
     height: 100%;
@@ -24,10 +22,6 @@
   body {
     @apply font-sans text-gray-900 antialiased bg-gray-50;
     min-height: 100dvh;
-  }
-
-  .dark body, body.dark {
-    @apply bg-gray-900 text-gray-100;
   }
 
   #root {
