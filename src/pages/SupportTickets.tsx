@@ -110,25 +110,26 @@ export default function SupportTickets({ user }: { user: any }) {
     if (!replyText.trim() || !viewTicket) return;
 
     try {
-      const newResponse = {
-        userId: user.id,
-        userName: user.name,
-        role: user.role,
-        message: replyText,
-        createdAt: new Date().toISOString()
-      };
+      const existingReplies = viewTicket.replies || [];
+      const updatedReplies = [...existingReplies, {
+        text: replyText,
+        sentBy: user.name,
+        sentByRole: user.role,
+        sentAt: new Date().toISOString()
+      }];
+      const newStatus = user.role === 'SUPER_ADMIN' ? 'AWAITING_RESPONSE' : viewTicket.status;
 
-      const updatedResponses = [...(viewTicket.responses || []), newResponse];
-      
-      await ticketService.update(viewTicket.id, { 
-        responses: updatedResponses,
-        status: isSuper ? 'AWAITING_RESPONSE' : 'IN_PROGRESS'
+      await ticketService.update(viewTicket.id, {
+        replies: updatedReplies,
+        status: newStatus,
+        updatedAt: new Date().toISOString()
       });
 
       const updatedTicket = { 
         ...viewTicket, 
-        responses: updatedResponses,
-        status: isSuper ? 'AWAITING_RESPONSE' : 'IN_PROGRESS'
+        replies: updatedReplies,
+        status: newStatus,
+        updatedAt: new Date().toISOString()
       };
 
       setViewTicket(updatedTicket);
@@ -503,29 +504,29 @@ export default function SupportTickets({ user }: { user: any }) {
                 </div>
 
                 {/* Responses */}
-                {(viewTicket.responses || []).map((resp: any, i: number) => (
-                  <div key={i} className={`flex gap-4 ${resp.role === 'SUPER_ADMIN' ? 'flex-row-reverse' : ''}`}>
+                {(viewTicket.replies || []).map((resp: any, i: number) => (
+                  <div key={i} className={`flex gap-4 ${resp.sentByRole === 'SUPER_ADMIN' ? 'flex-row-reverse' : ''}`}>
                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${
-                      resp.role === 'SUPER_ADMIN' ? 'bg-blue-600 text-white shadow-blue-100' : 'bg-gray-900 text-white shadow-gray-200'
+                      resp.sentByRole === 'SUPER_ADMIN' ? 'bg-blue-600 text-white shadow-blue-100' : 'bg-gray-900 text-white shadow-gray-200'
                     }`}>
-                      {resp.role === 'SUPER_ADMIN' ? <ShieldAlert size={16} /> : <User size={16} />}
+                      {resp.sentByRole === 'SUPER_ADMIN' ? <ShieldAlert size={16} /> : <User size={16} />}
                     </div>
-                    <div className={`flex-1 space-y-2 ${resp.role === 'SUPER_ADMIN' ? 'text-right' : ''}`}>
-                      <div className={`flex items-center gap-2 ${resp.role === 'SUPER_ADMIN' ? 'flex-row-reverse' : ''}`}>
-                        <span className="text-xs font-black text-gray-900">{resp.userName}</span>
+                    <div className={`flex-1 space-y-2 ${resp.sentByRole === 'SUPER_ADMIN' ? 'text-right' : ''}`}>
+                      <div className={`flex items-center gap-2 ${resp.sentByRole === 'SUPER_ADMIN' ? 'flex-row-reverse' : ''}`}>
+                        <span className="text-xs font-black text-gray-900">{resp.sentBy}</span>
                         <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${
-                          resp.role === 'SUPER_ADMIN' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'
+                          resp.sentByRole === 'SUPER_ADMIN' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'
                         }`}>
-                          {resp.role?.replace('_', ' ')}
+                          {resp.sentByRole?.replace('_', ' ')}
                         </span>
-                        <span className="text-[9px] font-bold text-gray-400 ml-auto">{new Date(resp.createdAt).toLocaleString()}</span>
+                        <span className="text-[9px] font-bold text-gray-400 ml-auto">{resp.sentAt ? new Date(resp.sentAt).toLocaleString() : ''}</span>
                       </div>
                       <div className={`p-5 text-sm font-medium leading-relaxed border transition-all ${
-                        resp.role === 'SUPER_ADMIN' 
+                        resp.sentByRole === 'SUPER_ADMIN' 
                           ? 'bg-blue-600 text-white border-blue-500 rounded-3xl rounded-tr-none shadow-xl shadow-blue-100' 
                           : 'bg-white text-gray-600 border-gray-100 rounded-3xl rounded-tl-none shadow-sm'
                       }`}>
-                        {resp.message}
+                        {resp.text}
                       </div>
                     </div>
                   </div>

@@ -368,6 +368,24 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           }
         }
 
+        if (collectionName === 'attendance') {
+          const existingAtt = await db.collection('attendance')
+            .where('classId', '==', req.body.classId)
+            .where('date', '==', req.body.date)
+            .where('studentId', '==', req.body.studentId)
+            .limit(1)
+            .get();
+          if (!existingAtt.empty) {
+            // Update existing instead of creating duplicate
+            await existingAtt.docs[0].ref.update({
+              status: req.body.status,
+              updatedAt: new Date().toISOString(),
+              updatedBy: req.user?.id
+            });
+            return res.json({ id: existingAtt.docs[0].id, ...existingAtt.docs[0].data(), status: req.body.status });
+          }
+        }
+
         let data = {
           ...req.body,
           schoolId: req.user?.schoolId || null,
