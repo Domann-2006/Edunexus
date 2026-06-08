@@ -21,7 +21,6 @@ async function createNotification({ recipientId, recipientRole, schoolId, title,
       createdAt: new Date().toISOString()
     };
     await db.collection('notifications').add(notificationData);
-    console.log(`[NOTIFICATION CREATED] For ${recipientId} (${recipientRole}): ${title}`);
   } catch (err) {
     console.error('Failed to create notification:', err);
   }
@@ -151,7 +150,6 @@ async function setupSchoolCurriculum(schoolId) {
     }
 
     await batch.commit();
-    console.log(`Curriculum preloaded for school: ${schoolId}`);
   } catch (err) {
     console.error('Failed to preload curriculum:', err);
     // Don't throw, we want the school creation to succeed even if preloading fails
@@ -183,7 +181,6 @@ async function logActivity(req, action, details, customSchoolId = null) {
       createdAt: new Date().toISOString()
     };
     await db.collection('activity-logs').add(logData);
-    console.log(`[ACTIVITY LOG] ${action}: ${details}`);
   } catch (err) {
     console.error('Failed to write activity log:', err);
   }
@@ -331,7 +328,6 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
   if (!skipPost) {
     crudRouter.post('/', authenticate, authorize(roles), async (req, res) => {
       try {
-        console.log(`Creating document in ${collectionName}`, req.body);
 
         // Only Super Admins can create schools
         if (collectionName === 'schools' && req.user?.role !== 'SUPER_ADMIN') {
@@ -458,7 +454,6 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         });
 
         const ref = await db.collection(collectionName).add(data);
-        console.log(`Document created with ID: ${ref.id}`);
 
         // Trigger notifications in fire-and-forget fashion
         if (collectionName === 'students') {
@@ -698,6 +693,43 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         }
 
         await docRef.delete();
+
+        // Cascade cleanup when a school is deleted
+        if (collectionName === 'schools') {
+          const schoolId = req.params.id;
+          try {
+            const collectionsToClean = ['users', 'students', 'teachers', 'classes', 'subjects', 'results', 'attendance', 'sessions', 'activity-logs', 'notifications'];
+            for (const col of collectionsToClean) {
+              const snap = await db.collection(col).where('schoolId', '==', schoolId).limit(500).get();
+              if (!snap.empty) {
+                const batch = db.batch();
+                snap.docs.forEach(d => batch.delete(d.ref));
+                await batch.commit();
+              }
+            }
+            // Delete chat documents
+            const chatIds = [schoolId, `group_${schoolId}`];
+            for (const chatId of chatIds) {
+              const chatRef = db.collection('chats').doc(chatId);
+              const messagesSnap = await chatRef.collection('messages').limit(500).get();
+              if (!messagesSnap.empty) {
+                const batch = db.batch();
+                messagesSnap.docs.forEach(d => batch.delete(d.ref));
+                await batch.commit();
+              }
+              await chatRef.delete();
+            }
+            // Delete DM chats
+            const dmSnap = await db.collection('chats').where('schoolId', '==', schoolId).get();
+            if (!dmSnap.empty) {
+              const batch = db.batch();
+              dmSnap.docs.forEach(d => batch.delete(d.ref));
+              await batch.commit();
+            }
+          } catch (cascadeErr) {
+            console.error('School cascade deletion error:', cascadeErr);
+          }
+        }
 
         // Log Activity for all roles
         try {

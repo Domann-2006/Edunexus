@@ -22,7 +22,6 @@ router.post('/login', async (req, res) => {
   const { email, password, loginType } = req.body;
 
   try {
-    console.log(`Login attempt for: ${email}, type: ${loginType}`);
     const user = await findUserByEmail(email);
     if (!user) {
       console.warn(`Login failed: User not found for email ${email}`);
@@ -46,7 +45,6 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Incorrect password. Please try again.' });
     }
 
-    console.log(`Login successful for: ${email}, role: ${user.role}`);
     
     // Log Activity
     try {
@@ -79,7 +77,6 @@ router.post('/login', async (req, res) => {
     let firebaseToken = null;
     try {
       const { auth: adminAuth } = await import('../lib/firebase-admin.js');
-      console.log(`[FIREBASE_CUSTOM_TOKEN] Generating custom token for user ID (Firestore doc ID): ${user.id}`);
       firebaseToken = await adminAuth.createCustomToken(user.id);
     } catch (fbErr) {
       console.error('Failed to generate Firebase token:', fbErr);
@@ -146,7 +143,6 @@ router.get('/me', authenticate, async (req, res) => {
     let firebaseToken = null;
     try {
       const { auth: adminAuth } = await import('../lib/firebase-admin.js');
-      console.log(`[FIREBASE_CUSTOM_TOKEN_ME] Generating custom token during session check for user ID (Firestore doc ID): ${userDoc.id}`);
       firebaseToken = await adminAuth.createCustomToken(userDoc.id);
     } catch (fbErr) {
       console.error('Failed to generate Firebase token during session check:', fbErr);
