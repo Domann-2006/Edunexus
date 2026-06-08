@@ -5,14 +5,18 @@ import OnboardingTour from './OnboardingTour';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import ThemeToggle from './ThemeToggle';
+import { Theme } from '../hooks/useTheme';
 
 interface LayoutProps {
   children: React.ReactNode;
   user: any;
   onLogout: () => void;
+  theme: Theme;
+  setTheme: (t: Theme) => void;
 }
 
-export default function Layout({ children, user, onLogout }: LayoutProps) {
+export default function Layout({ children, user, onLogout, theme, setTheme }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,10 +40,10 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
   }, [user]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col lg:flex-row">
       <OnboardingTour user={user} />
       {/* Mobile Header */}
-      <header className="lg:hidden bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+      <header className="lg:hidden bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           {user?.schoolLogo ? (
             <img src={user.schoolLogo} alt="Logo" className="w-8 h-8 rounded-lg object-contain" />
@@ -81,6 +85,8 @@ export default function Layout({ children, user, onLogout }: LayoutProps) {
         onLogout={onLogout} 
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        theme={theme}
+        setTheme={setTheme}
       />
       <main className={isMessages ? 'flex-1 overflow-hidden' : 'flex-1 lg:ml-64 p-3 md:p-8'}>
         <div className={isMessages ? '' : 'max-w-7xl mx-auto'}>

@@ -26,6 +26,8 @@ import {
   Bell
 } from 'lucide-react';
 import ProfileImage from './ProfileImage';
+import ThemeToggle from './ThemeToggle';
+import { Theme } from '../hooks/useTheme';
 import { cacheEvents, offlineQueue } from '../services/api';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -35,9 +37,11 @@ interface SidebarProps {
   onLogout: () => void;
   isOpen: boolean;
   onClose: () => void;
+  theme: Theme;
+  setTheme: (t: Theme) => void;
 }
 
-export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ user, onLogout, isOpen, onClose, theme, setTheme }: SidebarProps) {
   const role = user?.role;
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -158,7 +162,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
       )}
 
       <div className={`
-        w-64 bg-white border-r border-gray-100 flex flex-col h-[100dvh] fixed left-0 top-0 z-40 transition-all duration-300
+        w-64 bg-white dark:bg-gray-900 border-r border-gray-100 flex flex-col h-[100dvh] fixed left-0 top-0 z-40 transition-all duration-300
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
       <div className="p-5 lg:p-8 flex items-center justify-between">
@@ -273,6 +277,12 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
             </span>
           )}
         </button>
+
+        {/* Theme Toggle */}
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+          <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Appearance</p>
+          <ThemeToggle theme={theme} setTheme={setTheme} />
+        </div>
 
         <button
           onClick={onLogout}

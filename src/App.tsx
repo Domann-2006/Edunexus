@@ -22,6 +22,7 @@ import Messages from './pages/Messages';
 import SubscriptionDetails from './pages/SubscriptionDetails';
 import Notifications from './pages/Notifications';
 import Layout from './components/Layout';
+import { useTheme } from './hooks/useTheme';
 import InstallPWA from './components/InstallPWA';
 import ErrorBoundary from './components/ErrorBoundary';
 import { authService } from './services/api';
@@ -31,6 +32,7 @@ import { signInWithCustomToken } from 'firebase/auth';
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { theme, setTheme } = useTheme();
 
   const safeLocalStorage = {
     getItem: (key: string) => {
@@ -170,7 +172,7 @@ export default function App() {
         
         <Route path="/" element={
           <ProtectedRoute>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Dashboard user={user} />
             </Layout>
           </ProtectedRoute>
@@ -178,7 +180,7 @@ export default function App() {
 
         <Route path="/students" element={
           <ProtectedRoute roles={OPERATIONAL_ROLES}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Students user={user} />
             </Layout>
           </ProtectedRoute>
@@ -186,7 +188,7 @@ export default function App() {
 
         <Route path="/teachers" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Teachers user={user} />
             </Layout>
           </ProtectedRoute>
@@ -194,7 +196,7 @@ export default function App() {
 
         <Route path="/classes" element={
           <ProtectedRoute roles={OPERATIONAL_ROLES}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Classes user={user} />
             </Layout>
           </ProtectedRoute>
@@ -202,7 +204,7 @@ export default function App() {
 
         <Route path="/subjects" element={
           <ProtectedRoute roles={OPERATIONAL_ROLES}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Subjects user={user} />
             </Layout>
           </ProtectedRoute>
@@ -210,7 +212,7 @@ export default function App() {
 
         <Route path="/results" element={
           <ProtectedRoute roles={OPERATIONAL_ROLES}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Results user={user} />
             </Layout>
           </ProtectedRoute>
@@ -218,7 +220,7 @@ export default function App() {
 
         <Route path="/attendance" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN', 'TEACHER']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Attendance user={user} />
             </Layout>
           </ProtectedRoute>
@@ -226,7 +228,7 @@ export default function App() {
 
         <Route path="/activity-logs" element={
           <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <ActivityLogs user={user} />
             </Layout>
           </ProtectedRoute>
@@ -234,7 +236,7 @@ export default function App() {
 
         <Route path="/profile" element={
           <ProtectedRoute>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Profile user={user} updateUser={updateUser} refreshUser={refreshUser} />
             </Layout>
           </ProtectedRoute>
@@ -242,7 +244,7 @@ export default function App() {
 
         <Route path="/notifications" element={
           <ProtectedRoute>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Notifications user={user} />
             </Layout>
           </ProtectedRoute>
@@ -250,7 +252,7 @@ export default function App() {
 
         <Route path="/schools" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Schools />
             </Layout>
           </ProtectedRoute>
@@ -258,7 +260,7 @@ export default function App() {
 
         <Route path="/super-admin/admins" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <SchoolAdmins />
             </Layout>
           </ProtectedRoute>
@@ -266,7 +268,7 @@ export default function App() {
 
         <Route path="/messages" element={
           <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <ErrorBoundary>
                 <Messages user={user} />
               </ErrorBoundary>
@@ -276,7 +278,7 @@ export default function App() {
 
         <Route path="/subscription-details" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <SubscriptionDetails />
             </Layout>
           </ProtectedRoute>
@@ -284,7 +286,7 @@ export default function App() {
 
         <Route path="/super-admin/subscriptions" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Subscriptions />
             </Layout>
           </ProtectedRoute>
@@ -292,7 +294,7 @@ export default function App() {
 
         <Route path="/super-admin/reports" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <PlatformReports />
             </Layout>
           </ProtectedRoute>
@@ -300,7 +302,7 @@ export default function App() {
 
         <Route path="/super-admin/announcements" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <Announcements />
             </Layout>
           </ProtectedRoute>
@@ -308,7 +310,7 @@ export default function App() {
 
         <Route path="/super-admin/settings" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <PlatformSettings />
             </Layout>
           </ProtectedRoute>
@@ -316,7 +318,7 @@ export default function App() {
 
         <Route path="/settings/school" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN']}>
-            <Layout user={user} onLogout={handleLogout}>
+            <Layout user={user} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
               <SchoolSettings user={user} refreshUser={refreshUser} />
             </Layout>
           </ProtectedRoute>
