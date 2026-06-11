@@ -16,6 +16,12 @@ interface NotificationDoc {
   type: 'message' | 'student' | 'teacher' | 'announcement' | 'result';
   read: boolean;
   createdAt: string;
+  metadata?: {
+    classId?: string;
+    sessionId?: string;
+    subjectId?: string;
+    term?: string;
+  };
 }
 
 enum OperationType {
@@ -82,13 +88,25 @@ function getRelativeTime(dateString: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const getNotificationLink = (type: string): string => {
-  switch (type) {
+const getNotificationLink = (notification: NotificationDoc): string => {
+  switch (notification.type) {
     case 'message': return '/messages';
     case 'student': return '/students';
     case 'teacher': return '/teachers';
     case 'announcement': return '/super-admin/announcements';
-    case 'result': return '/results';
+    case 'result': {
+      const m = notification.metadata;
+      if (m?.classId && m?.sessionId && m?.subjectId) {
+        const params = new URLSearchParams({
+          classId: m.classId,
+          sessionId: m.sessionId,
+          subjectId: m.subjectId,
+          term: m.term || '1st',
+        });
+        return `/results?${params.toString()}`;
+      }
+      return '/results';
+    }
     default: return '/notifications';
   }
 };
@@ -134,7 +152,7 @@ export default function Notifications({ user }: { user: any }) {
     return () => unsubscribe();
   }, [user]);
 
-  const handleMarkAsRead = async (id: string, currentlyRead: boolean, type: string) => {
+  const handleMarkAsRead = async (id: string, currentlyRead: boolean, notification: NotificationDoc) => {
     try {
       if (!currentlyRead) {
         setNotifications(prev =>
@@ -142,7 +160,7 @@ export default function Notifications({ user }: { user: any }) {
         );
         await api.put(`/v1/notifications/${id}/read`);
       }
-      navigate(getNotificationLink(type));
+      navigate(getNotificationLink(notification));
     } catch (err: any) {
       console.error('Failed to mark notification as read:', err);
     }
@@ -239,7 +257,7 @@ export default function Notifications({ user }: { user: any }) {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.03, duration: 0.2 }}
-              onClick={() => handleMarkAsRead(notification.id, notification.read, notification.type)}
+              onClick={() => handleMarkAsRead(notification.id, notification.read, notification)}
               className={`
                 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 
                 flex items-start gap-4 transition-all hover:shadow-md cursor-pointer relative overflow-hidden

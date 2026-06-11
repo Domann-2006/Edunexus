@@ -7,7 +7,7 @@ import { LEVEL_CLASSES, DEFAULT_SUBJECTS } from '../lib/curriculum.js';
 
 const router = express.Router();
 
-async function createNotification({ recipientId, recipientRole, schoolId, title, message, type }) {
+async function createNotification({ recipientId, recipientRole, schoolId, title, message, type, metadata }) {
   try {
     if (!recipientId) return;
     const notificationData = {
@@ -18,7 +18,8 @@ async function createNotification({ recipientId, recipientRole, schoolId, title,
       message,
       type,
       read: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      ...(metadata ? { metadata } : {})
     };
     await db.collection('notifications').add(notificationData);
   } catch (err) {
@@ -1846,7 +1847,13 @@ resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) =
             schoolId: req.user.schoolId,
             title: 'New Result Submitted',
             message: 'A teacher has submitted a new result for review',
-            type: 'result'
+            type: 'result',
+            metadata: {
+              classId: data.classId,
+              sessionId: data.sessionId,
+              subjectId: data.subjectId,
+              term: data.term,
+            }
           });
         });
       } catch (err) {

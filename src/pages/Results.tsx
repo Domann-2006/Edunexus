@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import api, { resultService, studentService, classService, subjectService, sessionService, teacherService } from '../services/api';
 import { Save, Loader2, Trophy, AlertCircle, FileText, Download, Filter, Eye, X, BookOpen, User, MapPin, ShieldCheck, CheckSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -27,7 +28,26 @@ const sortClasses = (classesList: any[]): any[] => {
   });
 };
 
+const STREAM_ORDER = ['GENERAL', 'SCIENCE', 'COMMERCIAL', 'ARTS'];
+
+const sortAndDeduplicateSubjects = (subjectsList: any[]): any[] => {
+  const seen = new Set<string>();
+  const unique = subjectsList.filter(s => {
+    if (seen.has(s.id)) return false;
+    seen.add(s.id);
+    return true;
+  });
+  return unique.sort((a, b) => {
+    const streamA = STREAM_ORDER.indexOf((a.stream || 'GENERAL').toUpperCase());
+    const streamB = STREAM_ORDER.indexOf((b.stream || 'GENERAL').toUpperCase());
+    const streamDiff = (streamA === -1 ? 99 : streamA) - (streamB === -1 ? 99 : streamB);
+    if (streamDiff !== 0) return streamDiff;
+    return a.name.localeCompare(b.name);
+  });
+};
+
 export default function Results({ user }: { user: any }) {
+  const location = useLocation();
   const [sessions, setSessions] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -106,17 +126,23 @@ export default function Results({ user }: { user: any }) {
 
       setSessions(sessRes.data);
       setClasses(sortClasses(fetchedClasses));
-      setSubjects(fetchedSubjects);
+      setSubjects(sortAndDeduplicateSubjects(fetchedSubjects));
       setAllStudents(studRes.data);
       
       const currentSess = sessRes.data.find((s: any) => s.isCurrent);
-      if (currentSess) {
-        setFilters(f => ({ 
-          ...f, 
-          sessionId: currentSess.id,
-          term: currentSess.activeTerm || '1st'
-        }));
-      }
+      const params = new URLSearchParams(location.search);
+      const qClassId = params.get('classId');
+      const qSessionId = params.get('sessionId');
+      const qSubjectId = params.get('subjectId');
+      const qTerm = params.get('term');
+
+      setFilters(f => ({
+        ...f,
+        sessionId: qSessionId || currentSess?.id || '',
+        term: qTerm || currentSess?.activeTerm || '1st',
+        classId: qClassId || '',
+        subjectId: qSubjectId || '',
+      }));
     } catch (err: any) {
       console.error('Failed to load initial data:', err);
     } finally {
@@ -619,7 +645,17 @@ export default function Results({ user }: { user: any }) {
             className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors disabled:opacity-50"
           >
             <option value="">Select Subject</option>
-            {filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.stream})</option>)}
+            {STREAM_ORDER.map(stream => {
+              const group = filteredSubjects.filter(s => (s.stream || 'GENERAL').toUpperCase() === stream);
+              if (group.length === 0) return null;
+              return (
+                <optgroup key={stream} label={stream.charAt(0) + stream.slice(1).toLowerCase()}>
+                  {group.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
         </div>
       </div>
