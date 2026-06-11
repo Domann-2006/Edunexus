@@ -102,13 +102,10 @@ export default function ProfileImage({
         alwaysKeepResolution: false,
       };
 
-      console.log('Processing image:', (file.size / 1024 / 1024).toFixed(2), 'MB');
-      
       let fileToUpload = file;
       try {
         const compressedFile = await imageCompression(file, options);
         fileToUpload = compressedFile;
-        console.log('Compressed to:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
         
         // Show compressed version and revoke old preview
         compressedObjectUrl = URL.createObjectURL(compressedFile);
@@ -139,6 +136,7 @@ export default function ProfileImage({
       setTimeout(() => {
         setUploading(false);
         setProgress(0);
+        setPreviewUrl(null);
       }, 500);
       
       // We keep the last previewUrl (compressedObjectUrl) until component unmounts or next upload
