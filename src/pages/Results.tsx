@@ -136,17 +136,80 @@ export default function Results({ user }: { user: any }) {
       const qSubjectId = params.get('subjectId');
       const qTerm = params.get('term');
 
-      setFilters(f => ({
-        ...f,
+      const resolvedFilters = {
         sessionId: qSessionId || currentSess?.id || '',
         term: qTerm || currentSess?.activeTerm || '1st',
         classId: qClassId || '',
         subjectId: qSubjectId || '',
-      }));
+      };
+
+      setFilters(f => ({ ...f, ...resolvedFilters }));
+
+      // If URL params are present, load results immediately using fresh data (not stale state)
+      if (qClassId && qSessionId && qSubjectId) {
+        await loadResultsWithData({
+          filters: resolvedFilters,
+          classes: sortClasses(fetchedClasses),
+          subjects: sortAndDeduplicateSubjects(fetchedSubjects),
+          allStudents: studRes.data,
+        });
+      }
     } catch (err: any) {
       console.error('Failed to load initial data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadResultsWithData = async ({ filters: f, classes: cls, subjects: subs, allStudents: studs }: {
+    filters: { sessionId: string; classId: string; subjectId: string; term: string };
+    classes: any[];
+    subjects: any[];
+    allStudents: any[];
+  }) => {
+    try {
+      const selectedClass = cls.find(c => c.id === f.classId);
+      const selectedSubject = subs.find(s => s.id === f.subjectId);
+
+      const resRes = await resultService.list({
+        classId: f.classId,
+        sessionId: f.sessionId,
+        subjectId: f.subjectId,
+        term: f.term
+      });
+
+      let classStudents = studs.filter((s: any) =>
+        s.classId === f.classId ||
+        s.classId === selectedClass?.name ||
+        s.className === selectedClass?.name
+      );
+
+      if (selectedClass?.level === 'SSS' && selectedSubject?.stream !== 'GENERAL') {
+        classStudents = classStudents.filter(s => s.stream === selectedSubject.stream);
+      }
+
+      setStudents(classStudents);
+      setResults(resRes.data);
+
+      const initialScores: any = {};
+      classStudents.forEach((student: any) => {
+        const studentId = student.userId || student.id;
+        const result = resRes.data.find((r: any) => r.studentId === studentId);
+        initialScores[studentId] = {
+          id: result?.id,
+          ca1: result?.ca1 || 0,
+          ca2: result?.ca2 || 0,
+          assignment: result?.assignment || 0,
+          test: result?.test || 0,
+          exam: result?.exam || 0,
+          status: result?.status || 'DRAFT',
+          teacherRemark: result?.teacherRemark || '',
+          adminRemark: result?.adminRemark || ''
+        };
+      });
+      setScores(initialScores);
+    } catch (err: any) {
+      console.error('Failed to load results:', err);
     }
   };
 
@@ -640,7 +703,7 @@ export default function Results({ user }: { user: any }) {
           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-4">Curriculum Subject</label>
           <select 
             value={filters.subjectId}
-            disabled={!filters.classId}
+            disabled={!filters.classId && subjects.length === 0}
             onChange={(e) => setFilters(f => ({ ...f, subjectId: e.target.value }))}
             className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors disabled:opacity-50"
           >
