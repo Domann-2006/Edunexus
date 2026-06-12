@@ -31,13 +31,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.warn('Unauthorized access - potential expired or invalid token. Redirecting to login.');
-      // Remove local auth data
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      // Force page reload to trigger App.tsx internal states and redirect to /login
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      if (!isLoginRequest) {
+        console.warn('Unauthorized access - potential expired or invalid token. Redirecting to login.');
+        // Remove local auth data
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        // Force page reload to trigger App.tsx internal states and redirect to /login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
       }
     }
     

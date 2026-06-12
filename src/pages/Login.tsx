@@ -171,7 +171,7 @@ export default function Login({ onLogin }: LoginProps) {
         <button
           type="submit"
           disabled={isLoading}
-          className={`w-full ${type === 'teacher' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' : 'bg-gray-900 hover:bg-black shadow-gray-200'} text-white font-bold py-4 rounded-2x flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98] uppercase tracking-widest text-xs`}
+          className={`w-full ${type === 'teacher' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' : 'bg-gray-900 hover:bg-black shadow-gray-200'} text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98] uppercase tracking-widest text-xs`}
         >
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">
