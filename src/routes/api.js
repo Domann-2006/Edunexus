@@ -2041,6 +2041,28 @@ router.get('/dashboard-stats', authenticate, async (req, res) => {
       subjects: await getCount('subjects')
     };
 
+    // For teachers, override student count to only show students in their assigned classes
+    if (req.user?.role === 'TEACHER') {
+      const teacherDoc = await db.collection('teachers')
+        .where('userId', '==', req.user.id)
+        .limit(1).get();
+
+      const assignedClassIds = teacherDoc.empty
+        ? []
+        : (teacherDoc.docs[0].data().classAssignments ||
+           teacherDoc.docs[0].data().assignedClassIds || []);
+
+      if (assignedClassIds.length > 0) {
+        const studentSnap = await db.collection('students')
+          .where('schoolId', '==', req.user.schoolId)
+          .where('classId', 'in', assignedClassIds)
+          .count().get();
+        stats.students = studentSnap.data().count;
+      } else {
+        stats.students = 0;
+      }
+    }
+
     if (isSuper) {
       const schoolsSnap = await db.collection('schools').get();
       const schools = schoolsSnap.docs.map(d => d.data());
