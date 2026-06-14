@@ -94,6 +94,7 @@ export default function Messages({ user }: { user: any }) {
   // Firebase Auth sync checkpoint
   const [firebaseReady, setFirebaseReady] = useState(false);
   const [firebaseTimeout, setFirebaseTimeout] = useState(false);
+  const [loadingSlow, setLoadingSlow] = useState(false);
   const [sendError, setSendError] = useState('');
   const [debugError, setDebugError] = useState('');
   
@@ -229,6 +230,15 @@ export default function Messages({ user }: { user: any }) {
     }, 10000);
     return () => clearTimeout(timer);
   }, [firebaseReady]);
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadingSlow(true), 8000);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   // Dynamic Self-Healing Firebase Auth Restorer & Sync Hub
   useEffect(() => {
@@ -374,8 +384,13 @@ export default function Messages({ user }: { user: any }) {
       console.error('Failed to fetch my chats:', err);
       if (err?.response?.status === 404) {
         setMyChats({ group: null, dms: [], support: null });
+        setLoading(false);
+      } else {
+        // Auto-retry after 5 seconds for network/cold-start failures
+        setTimeout(() => {
+          fetchMyChats();
+        }, 5000);
       }
-      setLoading(false);
     }
   };
 
@@ -407,7 +422,7 @@ export default function Messages({ user }: { user: any }) {
 
   // Real-time listener for discussions list (only runs when Firebase credentials match)
   useEffect(() => {
-    if (!user || !firebaseReady) return;
+    if (!user) return;
 
     const q = query(collection(db, 'chats'), orderBy('updatedAt', 'desc'));
     
@@ -1037,9 +1052,19 @@ export default function Messages({ user }: { user: any }) {
           {/* Conversations Scroll view */}
           <div className="flex-1 overflow-y-auto bg-white custom-scrollbar divide-y divide-gray-50">
              {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                  <Loader2 className="animate-spin text-blue-600 animate-duration-1000" size={24} />
-                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Awaiting cloud connection...</span>
+                <div className="flex flex-col items-center justify-center h-40 gap-3">
+                  <Loader2 className="animate-spin text-blue-500" size={24} />
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                    {loadingSlow ? 'Server is waking up, please wait...' : 'Awaiting cloud connection...'}
+                  </p>
+                  {loadingSlow && (
+                    <button
+                      onClick={() => fetchMyChats()}
+                      className="text-xs text-blue-600 font-bold underline"
+                    >
+                      Retry now
+                    </button>
+                  )}
                 </div>
              ) : isSuper ? (
                 // SUPER ADMIN scenario
@@ -1061,9 +1086,12 @@ export default function Messages({ user }: { user: any }) {
                       Initialize School Chats
                     </button>
                   )}
-                  {myChats.dms.length === 0 ? (
-                    <div className="py-20 text-center px-4">
-                      <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">No support chats found</p>
+                  {myChats.dms.length === 0 && !loading && !loadingSlow ? (
+                    <div className="text-center py-8 text-xs text-gray-400 font-bold uppercase tracking-wider">
+                      No support chats found.{' '}
+                      <button onClick={() => fetchMyChats()} className="text-blue-500 underline">
+                        Refresh
+                      </button>
                     </div>
                   ) : (
                     myChats.dms
