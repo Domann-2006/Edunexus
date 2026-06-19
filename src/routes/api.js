@@ -2007,6 +2007,40 @@ router.get('/activity-logs', authenticate, authorize(['SUPER_ADMIN', 'SCHOOL_ADM
   }
 });
 
+// Enrollment trend stats
+router.get('/enrollment-trend', authenticate, async (req, res) => {
+  try {
+    const schoolId = req.user?.role === 'SUPER_ADMIN' 
+      ? req.query.schoolId 
+      : req.user?.schoolId;
+
+    const months = [];
+    const now = new Date();
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const start = new Date(d.getFullYear(), d.getMonth(), 1);
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+
+      let q = db.collection('students')
+        .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(start))
+        .where('createdAt', '<=', admin.firestore.Timestamp.fromDate(end));
+
+      if (schoolId) q = q.where('schoolId', '==', schoolId);
+
+      const snap = await q.count().get();
+      months.push({
+        name: d.toLocaleString('default', { month: 'short' }),
+        value: snap.data().count
+      });
+    }
+
+    res.json({ trend: months });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Dashboard Stats
 router.get('/dashboard-stats', authenticate, async (req, res) => {
   try {

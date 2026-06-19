@@ -39,6 +39,7 @@ export default function Dashboard({ user }: { user: any }) {
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [teacherProfile, setTeacherProfile] = useState<any>(null);
   const [assignedClasses, setAssignedClasses] = useState<any[]>([]);
+  const [enrollmentTrend, setEnrollmentTrend] = useState<any[]>([]);
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') {
@@ -66,11 +67,20 @@ export default function Dashboard({ user }: { user: any }) {
   }, [user]);
 
   useEffect(() => {
-    setLoading(true);
-    dashboardService.getStats({ schoolId: selectedSchoolId })
-      .then(res => setStats(res.data))
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const res = await dashboardService.getStats({ schoolId: selectedSchoolId });
+        setStats(res.data);
+        const trendRes = await api.get('/enrollment-trend', { params: { schoolId: selectedSchoolId } });
+        setEnrollmentTrend(trendRes.data.trend || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
   }, [selectedSchoolId]);
 
   const superAdminCards = [
@@ -287,12 +297,30 @@ export default function Dashboard({ user }: { user: any }) {
               </div>
             </div>
           ) : (
-            <div className="h-[300px] w-full flex items-center justify-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-               <div className="text-center">
+            enrollmentTrend.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={enrollmentTrend}>
+                  <defs>
+                    <linearGradient id="colorEnrollment" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 700 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} fill="url(#colorEnrollment)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] w-full flex items-center justify-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                <div className="text-center">
                   <PieChart className="mx-auto text-gray-300 mb-2" size={32} />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Trend logs propagating...</p>
-               </div>
-            </div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">No enrollment data yet</p>
+                </div>
+              </div>
+            )
           )}
         </div>
 
