@@ -432,13 +432,15 @@ export default function Results({ user }: { user: any }) {
                     <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Official Student Performance Record</p>
                   </div>
                   <div className="flex gap-3">
-                    <button 
-                      onClick={printReport}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all flex items-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100"
-                    >
-                      <Download size={18} />
-                      Print / Download PDF
-                    </button>
+                    {(user?.role === 'SCHOOL_ADMIN' || user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && (
+                      <button 
+                        onClick={printReport}
+                        className="px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all flex items-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100"
+                      >
+                        <Download size={18} />
+                        Print / Download PDF
+                      </button>
+                    )}
                     <button onClick={() => setIsReportModalOpen(false)} className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-2xl transition-all">
                       <X size={24} />
                     </button>
@@ -631,7 +633,7 @@ export default function Results({ user }: { user: any }) {
           </p>
         </div>
         <div className="flex gap-3">
-          {(user?.role === 'SCHOOL_ADMIN' || user?.teacherType === 'CLASS_TEACHER') && (
+          {(user?.role === 'SCHOOL_ADMIN' || user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && (
             <button 
               onClick={exportCSV}
               disabled={students.length === 0}
