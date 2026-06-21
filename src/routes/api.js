@@ -2174,4 +2174,100 @@ router.put('/notifications/:id/read', authenticate, async (req, res) => {
   }
 });
 
+// Submit results (subject teacher → class teacher, or class teacher → admin)
+router.post('/results/submit', authenticate, async (req, res) => {
+  try {
+    const { classId, subjectId, scores, status } = req.body;
+    const batch = db.batch();
+
+    scores.forEach(({ studentId, ca, exam, total, grade }) => {
+      const ref = db.collection('results').doc(`${studentId}_${subjectId}_${classId}`);
+      batch.set(ref, {
+        studentId, subjectId, classId,
+        schoolId: req.user.schoolId,
+        ca, exam, total, grade,
+        status,
+        submittedBy: req.user.id,
+        submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    });
+
+    await batch.commit();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Approve results (school admin only)
+router.post('/results/approve', authenticate, async (req, res) => {
+  try {
+    if (req.user?.role !== 'SCHOOL_ADMIN') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    const { classId, subjectId } = req.body;
+    const snap = await db.collection('results')
+      .where('classId', '==', classId)
+      .where('subjectId', '==', subjectId)
+      .where('schoolId', '==', req.user.schoolId)
+      .get();
+
+    const batch = db.batch();
+    snap.docs.forEach(doc => {
+      batch.update(doc.ref, { 
+        status: 'APPROVED',
+        approvedBy: req.user.id,
+        approvedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    await batch.commit();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Auto-collate scores for class teacher view
+router.get('/results/collated', authenticate, async (req, res) => {
+  try {
+    const { classId } = req.query;
+    const schoolId = req.user.schoolId;
+
+    const snap = await db.collection('results')
+      .where('classId', '==', classId)
+      .where('schoolId', '==', schoolId)
+      .where('status', 'in', ['PENDING_ADMIN', 'APPROVED'])
+      .get();
+
+    const collated = {};
+    snap.docs.forEach(doc => {
+      const d = doc.data();
+      if (!collated[d.studentId]) {
+        collated[d.studentId] = { studentId: d.studentId, subjects: [], totalScore: 0, subjectCount: 0 };
+      }
+      collated[d.studentId].subjects.push({
+        subjectId: d.subjectId,
+        ca: d.ca,
+        exam: d.exam,
+        total: d.total,
+        grade: d.grade
+      });
+      collated[d.studentId].totalScore += d.total || 0;
+      collated[d.studentId].subjectCount += 1;
+    });
+
+    Object.values(collated).forEach(student => {
+      student.average = student.subjectCount > 0 
+        ? (student.totalScore / student.subjectCount).toFixed(1) 
+        : 0;
+    });
+
+    res.json({ collated: Object.values(collated) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

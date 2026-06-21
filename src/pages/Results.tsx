@@ -80,6 +80,119 @@ export default function Results({ user }: { user: any }) {
     id?: string;
   }>>({});
 
+  const [collatedResults, setCollatedResults] = useState<any[]>([]);
+  const [showCollated, setShowCollated] = useState(false);
+
+  const getGrade = (total: number) => {
+    if (total >= 75) return 'A1';
+    if (total >= 70) return 'B2';
+    if (total >= 65) return 'B3';
+    if (total >= 60) return 'C4';
+    if (total >= 55) return 'C5';
+    if (total >= 50) return 'C6';
+    if (total >= 45) return 'D7';
+    if (total >= 40) return 'E8';
+    return 'F9';
+  };
+
+  const fetchCollatedResults = async () => {
+    if (!filters.classId) return;
+    try {
+      const res = await api.get(`/results/collated?classId=${filters.classId}`);
+      setCollatedResults(res.data.collated || []);
+    } catch (err) {
+      console.error('Failed to fetch collated results:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (showCollated && filters.classId) {
+      fetchCollatedResults();
+    }
+  }, [showCollated, filters.classId]);
+
+  const handleSubmitSubjectScores = async () => {
+    setSaving(true);
+    try {
+      const scoresArray = students.map(student => {
+        const studentId = student.userId || student.id;
+        const s = scores[studentId] || { ca1: 0, ca2: 0, assignment: 0, test: 0, exam: 0 };
+        const total = s.ca1 + s.ca2 + s.assignment + s.test + s.exam;
+        const grade = getGrade(total);
+        return {
+          studentId,
+          ca: s.ca1 + s.ca2 + s.assignment + s.test,
+          exam: s.exam,
+          total,
+          grade
+        };
+      });
+
+      await api.post('/results/submit', {
+        classId: filters.classId,
+        subjectId: filters.subjectId,
+        scores: scoresArray,
+        status: 'PENDING_CLASS_TEACHER'
+      });
+
+      alert("Scores submitted to class teacher for review.");
+      loadResults();
+    } catch (err: any) {
+      alert(`Error: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSubmitToAdmin = async () => {
+    setSaving(true);
+    try {
+      const scoresArray = students.map(student => {
+        const studentId = student.userId || student.id;
+        const s = scores[studentId] || { ca1: 0, ca2: 0, assignment: 0, test: 0, exam: 0 };
+        const total = s.ca1 + s.ca2 + s.assignment + s.test + s.exam;
+        const grade = getGrade(total);
+        return {
+          studentId,
+          ca: s.ca1 + s.ca2 + s.assignment + s.test,
+          exam: s.exam,
+          total,
+          grade
+        };
+      });
+
+      await api.post('/results/submit', {
+        classId: filters.classId,
+        subjectId: filters.subjectId,
+        scores: scoresArray,
+        status: 'PENDING_ADMIN'
+      });
+
+      alert("Scores submitted to admin for review.");
+      loadResults();
+    } catch (err: any) {
+      alert(`Error: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApproveResults = async () => {
+    setSaving(true);
+    try {
+      await api.post('/results/approve', {
+        classId: filters.classId,
+        subjectId: filters.subjectId
+      });
+      alert("Results approved successfully.");
+      loadResults();
+    } catch (err: any) {
+      alert(`Error: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     loadInitialData();
   }, []);
@@ -644,25 +757,36 @@ export default function Results({ user }: { user: any }) {
             </button>
           )}
           
-          {user.role === 'TEACHER' && (
+          {user.role === 'TEACHER' && (user?.roleType === 'SUBJECT' || user?.teacherType === 'SUBJECT_TEACHER') && (
             <button 
-              onClick={() => handleSaveAll('SUBMITTED')}
+              onClick={handleSubmitSubjectScores}
               disabled={saving || students.length === 0}
               className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
             >
               {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              <span>Submit for Review</span>
+              <span>Submit to Class Teacher</span>
+            </button>
+          )}
+
+          {user.role === 'TEACHER' && (user?.roleType === 'CLASS' || user?.roleType === 'BOTH' || user?.teacherType === 'CLASS_TEACHER') && (
+            <button 
+              onClick={handleSubmitToAdmin}
+              disabled={saving || students.length === 0}
+              className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              <span>Submit to Admin</span>
             </button>
           )}
 
           {user.role === 'SCHOOL_ADMIN' && (
             <button 
-              onClick={() => handleSaveAll('APPROVED')}
+              onClick={handleApproveResults}
               disabled={saving || students.length === 0}
               className="flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-50"
             >
               {saving ? <Loader2 className="animate-spin" size={18} /> : <CheckSquare size={18} />}
-              <span>Bulk Approve</span>
+              <span>Approve Results</span>
             </button>
           )}
         </div>
@@ -727,26 +851,129 @@ export default function Results({ user }: { user: any }) {
         </div>
       </div>
 
-      {!filters.classId || !filters.subjectId || !filters.sessionId ? (
-        <div className="flex flex-col items-center justify-center py-24 bg-gray-50 rounded-[4rem] border border-dashed border-gray-200">
-          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-gray-300 mb-6 shadow-sm">
-            <Filter size={40} />
-          </div>
-          <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Filter for curriculum data to begin</p>
+      {/* Tab toggle for class teachers */}
+      {(user?.roleType === 'CLASS' || user?.roleType === 'BOTH' || user?.teacherType === 'CLASS_TEACHER') && filters.classId && filters.sessionId && (
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl max-w-sm mb-6 print:hidden">
+          <button
+            onClick={() => setShowCollated(false)}
+            className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${!showCollated ? 'bg-white text-gray-900 shadow-md' : 'text-gray-500 hover:text-gray-900'}`}
+          >
+            Subject Entry
+          </button>
+          <button
+            onClick={() => setShowCollated(true)}
+            className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${showCollated ? 'bg-white text-gray-900 shadow-md' : 'text-gray-500 hover:text-gray-900'}`}
+          >
+            Collated Class View
+          </button>
         </div>
-      ) : (
-        <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-6 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
-            <div className="flex items-center gap-3 text-white">
-              <Trophy size={18} className="text-blue-400" />
-              <div>
-                 <span className="text-[10px] font-black uppercase tracking-[0.2em] block leading-none">Evaluation Matrix</span>
-                 <span className="text-sm font-black italic tracking-tight">{subjects.find(s => s.id === filters.subjectId)?.name} • {selectedClass?.name}</span>
+      )}
+
+      {showCollated ? (
+        !filters.classId || !filters.sessionId ? (
+          <div className="flex flex-col items-center justify-center py-24 bg-gray-50 rounded-[4rem] border border-dashed border-gray-200">
+            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-gray-300 mb-6 shadow-sm">
+              <Filter size={40} />
+            </div>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Select session and class to view collated results</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-6 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-3 text-white">
+                <Trophy size={18} className="text-yellow-400" />
+                <div>
+                   <span className="text-[10px] font-black uppercase tracking-[0.2em] block leading-none">Class Performance Dossier</span>
+                   <span className="text-sm font-black italic tracking-tight">{selectedClass?.name} • Collated Master Sheet</span>
+                </div>
               </div>
             </div>
             
-            {loading && <Loader2 className="animate-spin text-white/20" size={24} />}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                    <th className="px-3 py-3 md:px-6 md:py-4">Student Name</th>
+                    {Array.from(new Set(collatedResults.flatMap(st => st.subjects.map((sub: any) => sub.subjectId)))).map((subId: any) => (
+                      <th key={subId} className="px-3 py-3 md:px-6 md:py-4 text-center">
+                        {subjects.find(sub => sub.id === subId)?.name || subId}
+                      </th>
+                    ))}
+                    <th className="px-3 py-3 md:px-6 md:py-4 text-center">Average Score</th>
+                    <th className="px-3 py-3 md:px-6 md:py-4 text-center">Overall Grade</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {collatedResults.length === 0 ? (
+                    <tr>
+                      <td colSpan={Array.from(new Set(collatedResults.flatMap(st => st.subjects.map((sub: any) => sub.subjectId)))).length + 3} className="text-center py-12 text-gray-400 text-xs font-bold uppercase tracking-widest">
+                         No collated results found for this class.
+                      </td>
+                    </tr>
+                  ) : (
+                    collatedResults.map((student: any) => {
+                      const studentObj = allStudents.find(s => (s.userId === student.studentId || s.id === student.studentId));
+                      const studentName = studentObj ? studentObj.name : `Student (${student.studentId})`;
+                      const avgNum = parseFloat(student.average) || 0;
+                      const overallGrade = getGrade(avgNum);
+                      const uniqueSubIds = Array.from(new Set(collatedResults.flatMap(st => st.subjects.map((sub: any) => sub.subjectId))));
+                      
+                      return (
+                        <tr key={student.studentId} className="hover:bg-gray-50/50 transition-colors group">
+                          <td className="px-3 py-3 md:px-6 md:py-4">
+                             <div className="font-bold text-gray-900">{studentName}</div>
+                          </td>
+                          {uniqueSubIds.map((subId: any) => {
+                            const subScore = student.subjects.find((sub: any) => sub.subjectId === subId);
+                            return (
+                              <td key={subId} className="px-3 py-3 md:px-6 md:py-4 text-center font-black text-gray-800">
+                                {subScore ? subScore.total : '-'}
+                                {subScore && <span className="text-[10px] text-gray-400 ml-1 font-mono">({subScore.grade})</span>}
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-3 md:px-6 md:py-4 text-center text-lg font-black text-blue-600">
+                            {student.average}%
+                          </td>
+                          <td className="px-3 py-3 md:px-6 md:py-4 text-center">
+                            <span className={`px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest ${
+                               avgNum >= 70 ? 'bg-emerald-50 text-emerald-600' :
+                               avgNum >= 50 ? 'bg-blue-50 text-blue-600' :
+                               'bg-rose-50 text-rose-600'
+                             }`}>
+                              {overallGrade}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
+        )
+      ) : (
+        !filters.classId || !filters.subjectId || !filters.sessionId ? (
+          <div className="flex flex-col items-center justify-center py-24 bg-gray-50 rounded-[4rem] border border-dashed border-gray-200">
+            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-gray-300 mb-6 shadow-sm">
+              <Filter size={40} />
+            </div>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Filter for curriculum data to begin</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-6 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-3 text-white">
+                <Trophy size={18} className="text-blue-400" />
+                <div>
+                   <span className="text-[10px] font-black uppercase tracking-[0.2em] block leading-none">Evaluation Matrix</span>
+                   <span className="text-sm font-black italic tracking-tight">{subjects.find(s => s.id === filters.subjectId)?.name} • {selectedClass?.name}</span>
+                </div>
+              </div>
+              
+              {loading && <Loader2 className="animate-spin text-white/20" size={24} />}
+            </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -842,7 +1069,8 @@ export default function Results({ user }: { user: any }) {
             </table>
           </div>
         </div>
-      )}
+      )
+    )}
     </div>
   );
 };
