@@ -219,7 +219,7 @@ export default function App() {
         <Route path="/attendance" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN', 'TEACHER']}>
             <Layout user={user} onLogout={handleLogout}>
-              {user?.teacherType === 'SUBJECT_TEACHER' 
+              {user?.roleType === 'SUBJECT' 
                 ? <Navigate to="/dashboard" /> 
                 : <Attendance user={user} />}
             </Layout>

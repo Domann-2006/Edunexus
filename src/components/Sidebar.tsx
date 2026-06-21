@@ -128,7 +128,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
       { name: 'Subjects', path: '/subjects', icon: Book },
     ]},
     { section: 'Academic', items: [
-      ...(user?.teacherType !== 'SUBJECT_TEACHER' ? [{ name: role === 'SCHOOL_ADMIN' ? 'Attendance Monitor' : 'Attendance', path: '/attendance', icon: CheckSquare }] : []),
+      ...(user?.roleType !== 'SUBJECT' ? [{ name: role === 'SCHOOL_ADMIN' ? 'Attendance Monitor' : 'Attendance', path: '/attendance', icon: CheckSquare }] : []),
       { name: role === 'SCHOOL_ADMIN' ? 'Result Monitoring' : 'Results', path: '/results', icon: FileSpreadsheet },
     ]},
     { section: 'Support Uplink', items: [
