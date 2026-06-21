@@ -417,7 +417,7 @@ export default function Students({ user }: { user: any }) {
               </button>
             </>
           )}
-          {canManage && (
+          {(user?.role === 'SCHOOL_ADMIN' || user?.role === 'SUPER_ADMIN' || user?.teacherType === 'CLASS_TEACHER') && (
             <button 
               onClick={() => openModal()}
               className="flex items-center justify-center gap-2 px-3 py-2.5 md:px-6 md:py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
