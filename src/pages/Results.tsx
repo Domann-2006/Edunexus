@@ -631,14 +631,16 @@ export default function Results({ user }: { user: any }) {
           </p>
         </div>
         <div className="flex gap-3">
-          <button 
-            onClick={exportCSV}
-            disabled={students.length === 0}
-            className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-100 text-gray-900 font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-sm hover:shadow-md transition-all disabled:opacity-50"
-          >
-            <Download size={18} />
-            <span>Aggregate CSV</span>
-          </button>
+          {(user?.role === 'SCHOOL_ADMIN' || user?.teacherType === 'CLASS_TEACHER') && (
+            <button 
+              onClick={exportCSV}
+              disabled={students.length === 0}
+              className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-100 text-gray-900 font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+            >
+              <Download size={18} />
+              <span>Aggregate CSV</span>
+            </button>
+          )}
           
           {user.role === 'TEACHER' && (
             <button 
