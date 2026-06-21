@@ -114,7 +114,7 @@ export default function Students({ user }: { user: any }) {
         }
       }
 
-      if (user?.teacherType === 'SUBJECT_TEACHER' || user?.roleType === 'SUBJECT') {
+      if (user?.roleType === 'SUBJECT') {
         fetchedStudents = fetchedStudents.filter((student: any) => 
           user?.assignedClassIds?.includes(student.classId) &&
           user?.subjectIds?.some((subjectId: string) => student.enrolledSubjects?.includes(subjectId))
@@ -179,7 +179,7 @@ export default function Students({ user }: { user: any }) {
         }
       }
 
-      if (user?.teacherType === 'SUBJECT_TEACHER' || user?.roleType === 'SUBJECT') {
+      if (user?.roleType === 'SUBJECT') {
         fetchedStudents = fetchedStudents.filter((student: any) => 
           user?.assignedClassIds?.includes(student.classId) &&
           user?.subjectIds?.some((subjectId: string) => student.enrolledSubjects?.includes(subjectId))
@@ -431,7 +431,7 @@ export default function Students({ user }: { user: any }) {
               </button>
             </>
           )}
-          {(user?.role === 'SCHOOL_ADMIN' || user?.role === 'SUPER_ADMIN' || user?.teacherType === 'CLASS_TEACHER') && (
+          {(user?.role === 'SCHOOL_ADMIN' || user?.role === 'SUPER_ADMIN' || user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && (
             <button 
               onClick={() => openModal()}
               className="flex items-center justify-center gap-2 px-3 py-2.5 md:px-6 md:py-3 bg-blue-600 text-white font-semibold rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
