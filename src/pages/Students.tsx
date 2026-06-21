@@ -114,6 +114,13 @@ export default function Students({ user }: { user: any }) {
         }
       }
 
+      if (user?.teacherType === 'SUBJECT_TEACHER' || user?.roleType === 'SUBJECT') {
+        fetchedStudents = fetchedStudents.filter((student: any) => 
+          user?.assignedClassIds?.includes(student.classId) &&
+          user?.subjectIds?.some((subjectId: string) => student.enrolledSubjects?.includes(subjectId))
+        );
+      }
+
       setStudents(fetchedStudents);
       setClasses(sortClasses(fetchedClasses));
       if (results[2]) setSchools(results[2].data);
@@ -170,6 +177,13 @@ export default function Students({ user }: { user: any }) {
             fetchedStudents = [];
           }
         }
+      }
+
+      if (user?.teacherType === 'SUBJECT_TEACHER' || user?.roleType === 'SUBJECT') {
+        fetchedStudents = fetchedStudents.filter((student: any) => 
+          user?.assignedClassIds?.includes(student.classId) &&
+          user?.subjectIds?.some((subjectId: string) => student.enrolledSubjects?.includes(subjectId))
+        );
       }
 
       setStudents(fetchedStudents);
@@ -503,16 +517,18 @@ export default function Students({ user }: { user: any }) {
                       </td>
                       <td className="px-3 py-3 md:px-6 md:py-4 text-gray-500">{student.guardianName}</td>
                       <td className="px-3 py-3 md:px-6 md:py-4 text-right">
-                        {canManage ? (
+                        {canManage && user?.teacherType !== 'SUBJECT_TEACHER' && user?.roleType !== 'SUBJECT' ? (
                           <div className="flex justify-end gap-2 text-xs">
-                            <button 
-                              onClick={() => openModal(student)}
-                              className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
-                              title="Edit Student"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            {isAdmin && (
+                            {user?.teacherType !== 'SUBJECT_TEACHER' && user?.roleType !== 'SUBJECT' && (
+                              <button 
+                                onClick={() => openModal(student)}
+                                className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
+                                title="Edit Student"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                            )}
+                            {isAdmin && user?.teacherType !== 'SUBJECT_TEACHER' && user?.roleType !== 'SUBJECT' && (
                               <button 
                                 onClick={() => handleDelete(student.id)}
                                 className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"
