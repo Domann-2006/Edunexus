@@ -48,6 +48,13 @@ const sortAndDeduplicateSubjects = (subjectsList: any[]): any[] => {
 
 export default function Results({ user }: { user: any }) {
   const location = useLocation();
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const [sessions, setSessions] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -135,10 +142,10 @@ export default function Results({ user }: { user: any }) {
         status: 'PENDING_CLASS_TEACHER'
       });
 
-      alert("Scores submitted to class teacher for review.");
+      showToast("Scores submitted to class teacher for review.");
       loadResults();
     } catch (err: any) {
-      alert(`Error: ${err.response?.data?.error || err.message}`);
+      showToast(err.response?.data?.error || err.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -168,10 +175,10 @@ export default function Results({ user }: { user: any }) {
         status: 'PENDING_ADMIN'
       });
 
-      alert("Scores submitted to admin for review.");
+      showToast("Scores submitted to admin for review.");
       loadResults();
     } catch (err: any) {
-      alert(`Error: ${err.response?.data?.error || err.message}`);
+      showToast(err.response?.data?.error || err.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -184,10 +191,10 @@ export default function Results({ user }: { user: any }) {
         classId: filters.classId,
         subjectId: filters.subjectId
       });
-      alert("Results approved successfully.");
+      showToast("Results approved successfully.");
       loadResults();
     } catch (err: any) {
-      alert(`Error: ${err.response?.data?.error || err.message}`);
+      showToast(err.response?.data?.error || err.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -428,7 +435,7 @@ export default function Results({ user }: { user: any }) {
       await Promise.all(promises);
       loadResults();
     } catch (err: any) {
-      alert(`Error: ${err.response?.data?.message || err.message}`);
+      showToast(err.response?.data?.message || err.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -519,6 +526,14 @@ export default function Results({ user }: { user: any }) {
 
   return (
     <div className="space-y-8 pb-20">
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl text-white text-sm font-bold transition-all ${
+          toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'
+        }`}>
+          {toast.type === 'success' ? <CheckSquare size={18} /> : <AlertCircle size={18} />}
+          {toast.message}
+        </div>
+      )}
       <AnimatePresence>
         {isReportModalOpen && selectedStudent && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -639,11 +654,11 @@ export default function Results({ user }: { user: any }) {
                       <thead className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">
                         <tr>
                           <th className="px-3 py-3 md:px-6 md:py-4">Subject</th>
-                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">CA 1 (10)</th>
-                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">CA 2 (10)</th>
-                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">ASS (10)</th>
-                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">TST (10)</th>
-                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">EXM (60)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">1st C.A (10)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">2nd C.A (10)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">Assignment (10)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">Class Test (10)</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">Exam (60)</th>
                           <th className="px-3 py-3 md:px-6 md:py-4 text-center">Total</th>
                           <th className="px-3 py-3 md:px-6 md:py-4 text-center">Grade</th>
                         </tr>
@@ -757,7 +772,7 @@ export default function Results({ user }: { user: any }) {
             </button>
           )}
           
-          {user.role === 'TEACHER' && (user?.roleType === 'SUBJECT' || user?.teacherType === 'SUBJECT_TEACHER') && (
+          {user.role === 'TEACHER' && (user?.roleType === 'SUBJECT') && (
             <button 
               onClick={handleSubmitSubjectScores}
               disabled={saving || students.length === 0}
@@ -768,7 +783,7 @@ export default function Results({ user }: { user: any }) {
             </button>
           )}
 
-          {user.role === 'TEACHER' && (user?.roleType === 'CLASS' || user?.roleType === 'BOTH' || user?.teacherType === 'CLASS_TEACHER') && (
+          {user.role === 'TEACHER' && (user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && (
             <button 
               onClick={handleSubmitToAdmin}
               disabled={saving || students.length === 0}
@@ -779,7 +794,7 @@ export default function Results({ user }: { user: any }) {
             </button>
           )}
 
-          {user.role === 'SCHOOL_ADMIN' && (
+          {user.role === 'SCHOOL_ADMIN' && results.some(r => r.status === 'PENDING_ADMIN') && (
             <button 
               onClick={handleApproveResults}
               disabled={saving || students.length === 0}
@@ -852,7 +867,7 @@ export default function Results({ user }: { user: any }) {
       </div>
 
       {/* Tab toggle for class teachers */}
-      {(user?.roleType === 'CLASS' || user?.roleType === 'BOTH' || user?.teacherType === 'CLASS_TEACHER') && filters.classId && filters.sessionId && (
+      {(user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && filters.classId && filters.sessionId && (
         <div className="flex bg-gray-100 p-1.5 rounded-2xl max-w-sm mb-6 print:hidden">
           <button
             onClick={() => setShowCollated(false)}
@@ -980,13 +995,14 @@ export default function Results({ user }: { user: any }) {
               <thead className="bg-gray-50/80 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
                 <tr>
                   <th className="px-3 py-3 md:px-6 md:py-4">Student Basis</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">CA 1 (10)</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">CA 2 (10)</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">ASS (10)</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">TST (10)</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">EXM (60)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">1st C.A (10)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">2nd C.A (10)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Assignment (10)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Class Test (10)</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Exam (60)</th>
                   <th className="px-3 py-3 md:px-6 md:py-4 text-center">TOT</th>
                   <th className="px-3 py-3 md:px-6 md:py-4 text-center">Grade</th>
+                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Status</th>
                   <th className="px-3 py-3 md:px-6 md:py-4 text-center">Workflow</th>
                 </tr>
               </thead>
@@ -1032,6 +1048,19 @@ export default function Results({ user }: { user: any }) {
                           }`}>
                             {res?.grade || '-'}
                           </span>
+                      </td>
+                      <td className="px-3 py-3 md:px-6 md:py-4 text-center">
+                        {(() => {
+                          const result = results.find(r => {
+                            const studentId = student.userId || student.id;
+                            return r.studentId === studentId;
+                          });
+                          if (!result) return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gray-100 text-gray-400">Not Submitted</span>;
+                          if (result.status === 'PENDING_CLASS_TEACHER') return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-600">Awaiting Class Teacher</span>;
+                          if (result.status === 'PENDING_ADMIN') return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-50 text-blue-600">Awaiting Admin</span>;
+                          if (result.status === 'APPROVED') return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Approved</span>;
+                          return null;
+                        })()}
                       </td>
                       <td className="px-3 py-3 md:px-6 md:py-4">
                          <div className="flex items-center justify-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
