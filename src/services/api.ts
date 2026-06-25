@@ -28,18 +28,33 @@ api.interceptors.request.use((config) => {
 
 // Response interceptor to catch "Login Page instead of JSON" issues and Auth errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    sessionStorage.removeItem('authFailCount');
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
       const isLoginRequest = error.config?.url?.includes('/auth/login');
+      const isVerifyRequest = error.config?.url?.includes('/auth/me') || error.config?.url?.includes('/auth/current');
+      
       if (!isLoginRequest) {
-        console.warn('Unauthorized access - potential expired or invalid token. Redirecting to login.');
-        // Remove local auth data
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-        // Force page reload to trigger App.tsx internal states and redirect to /login
-        if (typeof window !== 'undefined') {
+        // Only hard logout if the token is genuinely gone
+        const token = localStorage.getItem('token');
+        if (!token) {
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
           window.location.href = '/login';
+        } else if (!isVerifyRequest) {
+          // Token exists but request failed — could be a fluke
+          // Only logout after 2 consecutive 401s on non-verify requests
+          const failCount = parseInt(sessionStorage.getItem('authFailCount') || '0') + 1;
+          sessionStorage.setItem('authFailCount', String(failCount));
+          if (failCount >= 2) {
+            sessionStorage.removeItem('authFailCount');
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+          }
         }
       }
     }
