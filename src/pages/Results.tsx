@@ -749,215 +749,642 @@ export default function Results({ user }: { user: any }) {
         )}
       </AnimatePresence>
 
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-             {user.role === 'SCHOOL_ADMIN' ? 'Evaluation Monitor' : 'Result Upload Portal'}
-          </h1>
-          <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-1">
-             {user.role === 'SCHOOL_ADMIN' 
-               ? 'Review and approve academic scores submitted by teachers.' 
-               : 'Upload student scores for assigned subjects and submit for review.'}
-          </p>
-        </div>
-        <div className="flex gap-3">
-          {(user?.role === 'SCHOOL_ADMIN' || user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && (
-            <button 
-              onClick={exportCSV}
-              disabled={students.length === 0}
-              className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-100 text-gray-900 font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-sm hover:shadow-md transition-all disabled:opacity-50"
-            >
-              <Download size={18} />
-              <span>Aggregate CSV</span>
-            </button>
-          )}
-          
-          {user.role === 'TEACHER' && (user?.roleType === 'SUBJECT') && (
-            <button 
-              onClick={handleSubmitSubjectScores}
-              disabled={saving || students.length === 0}
-              className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              <span>Submit to Class Teacher</span>
-            </button>
-          )}
+      {/* Part 1 — Subject Teacher view (roleType === 'SUBJECT') */}
+      {user?.role === 'TEACHER' && user?.roleType === 'SUBJECT' && (
+        <div className="space-y-6">
+          {/* Page header */}
+          <div>
+            <h1 className="text-2xl font-black text-gray-900">Record Results</h1>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">
+              Follow the steps below to submit scores for your subject
+            </p>
+          </div>
 
-          {user.role === 'TEACHER' && (user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && (
-            <button 
-              onClick={handleSubmitToAdmin}
-              disabled={saving || students.length === 0}
-              className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              <span>Submit to Admin</span>
-            </button>
-          )}
-
-          {user.role === 'SCHOOL_ADMIN' && results.some(r => r.status === 'PENDING_ADMIN') && (
-            <button 
-              onClick={handleApproveResults}
-              disabled={saving || students.length === 0}
-              className="flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="animate-spin" size={18} /> : <CheckSquare size={18} />}
-              <span>Approve Results</span>
-            </button>
-          )}
-        </div>
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm">
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-4">Yearly Session</label>
-          <select 
-            value={filters.sessionId}
-            onChange={(e) => setFilters(f => ({ ...f, sessionId: e.target.value }))}
-            className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors"
-          >
-            <option value="">Select Session</option>
-            {sessions.map(s => <option key={s.id} value={s.id}>{s.name} {s.isCurrent ? '(Current)' : ''}</option>)}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-4">Current Term</label>
-          <select 
-            value={filters.term}
-            onChange={(e) => setFilters(f => ({ ...f, term: e.target.value }))}
-            className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors"
-          >
-            <option value="1st">1st Term</option>
-            <option value="2nd">2nd Term</option>
-            <option value="3rd">3rd Term</option>
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-4">Academic Level</label>
-          <select 
-            value={filters.classId}
-            onChange={(e) => setFilters(f => ({ ...f, classId: e.target.value, subjectId: '' }))}
-            className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors"
-          >
-            <option value="">Select Class</option>
-            {sortClasses(classes).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-4">Curriculum Subject</label>
-          <select 
-            value={filters.subjectId}
-            disabled={!filters.classId && subjects.length === 0}
-            onChange={(e) => setFilters(f => ({ ...f, subjectId: e.target.value }))}
-            className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none hover:bg-gray-100/50 transition-colors disabled:opacity-50"
-          >
-            <option value="">Select Subject</option>
-            {STREAM_ORDER.map(stream => {
-              const group = filteredSubjects.filter(s => (s.stream || 'GENERAL').toUpperCase() === stream);
-              if (group.length === 0) return null;
+          {/* Step indicators */}
+          <div className="flex items-center gap-2">
+            {['Select Class', 'Select Subject', 'Enter Scores', 'Submit'].map((step, i) => {
+              const isComplete = 
+                (i === 0 && filters.classId) ||
+                (i === 1 && filters.subjectId) ||
+                (i === 2 && students.length > 0) ||
+                false;
+              const isActive =
+                (i === 0 && !filters.classId) ||
+                (i === 1 && filters.classId && !filters.subjectId) ||
+                (i === 2 && filters.subjectId && students.length > 0) ||
+                (i === 3 && students.length > 0 && Object.keys(scores).length > 0);
               return (
-                <optgroup key={stream} label={stream.charAt(0) + stream.slice(1).toLowerCase()}>
-                  {group.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </optgroup>
+                <div key={step} className="flex items-center gap-2 flex-1">
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex-1 justify-center ${
+                    isComplete ? 'bg-emerald-50 text-emerald-600' :
+                    isActive ? 'bg-blue-600 text-white' :
+                    'bg-gray-100 text-gray-400'
+                  }`}>
+                    <span>{i + 1}. {step}</span>
+                  </div>
+                  {i < 3 && <div className="w-4 h-0.5 bg-gray-200 flex-shrink-0" />}
+                </div>
               );
             })}
-          </select>
-        </div>
-      </div>
+          </div>
 
-      {/* Tab toggle for class teachers */}
-      {(user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && filters.classId && filters.sessionId && (
-        <div className="flex bg-gray-100 p-1.5 rounded-2xl max-w-sm mb-6 print:hidden">
-          <button
-            onClick={() => setShowCollated(false)}
-            className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${!showCollated ? 'bg-white text-gray-900 shadow-md' : 'text-gray-500 hover:text-gray-900'}`}
-          >
-            Subject Entry
-          </button>
-          <button
-            onClick={() => setShowCollated(true)}
-            className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${showCollated ? 'bg-white text-gray-900 shadow-md' : 'text-gray-500 hover:text-gray-900'}`}
-          >
-            Collated Class View
-          </button>
+          {/* Step 1 & 2 — Session, Term, Class, Subject selectors */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4">
+            <h2 className="text-xs font-black uppercase tracking-widest text-gray-400">Step 1 & 2 — Choose Class & Subject</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Academic Session</label>
+                <select value={filters.sessionId} onChange={(e) => setFilters(f => ({ ...f, sessionId: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none">
+                  <option value="">Select Session</option>
+                  {sessions.map(s => <option key={s.id} value={s.id}>{s.name} {s.isCurrent ? '(Current)' : ''}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Term</label>
+                <select value={filters.term} onChange={(e) => setFilters(f => ({ ...f, term: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none">
+                  <option value="1st">1st Term</option>
+                  <option value="2nd">2nd Term</option>
+                  <option value="3rd">3rd Term</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Class</label>
+                <select value={filters.classId} onChange={(e) => setFilters(f => ({ ...f, classId: e.target.value, subjectId: '' }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none">
+                  <option value="">Select Class</option>
+                  {sortClasses(classes).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Subject</label>
+                <select value={filters.subjectId} disabled={!filters.classId}
+                  onChange={(e) => setFilters(f => ({ ...f, subjectId: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold appearance-none disabled:opacity-50">
+                  <option value="">Select Subject</option>
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 3 — Score entry table, only show when class and subject selected */}
+          {filters.classId && filters.subjectId && (
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xs font-black uppercase tracking-widest text-gray-400">Step 3 — Enter Scores</h2>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {students.length} students • {subjects.find(s => s.id === filters.subjectId)?.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleSaveAll()}
+                  disabled={saving || students.length === 0}
+                  className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-md hover:bg-gray-800 transition-all disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                  Save Draft
+                </button>
+              </div>
+
+              {/* Main Score Entry Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50/80 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
+                    <tr>
+                      <th className="px-3 py-3 md:px-6 md:py-4">Student Basis</th>
+                      <th className="px-3 py-3 md:px-6 md:py-4 text-center">1st C.A (10)</th>
+                      <th className="px-3 py-3 md:px-6 md:py-4 text-center">2nd C.A (10)</th>
+                      <th className="px-3 py-3 md:px-6 md:py-4 text-center">Assignment (10)</th>
+                      <th className="px-3 py-3 md:px-6 md:py-4 text-center">Class Test (10)</th>
+                      <th className="px-3 py-3 md:px-6 md:py-4 text-center">Exam (60)</th>
+                      <th className="px-3 py-3 md:px-6 md:py-4 text-center">TOT</th>
+                      <th className="px-3 py-3 md:px-6 md:py-4 text-center">Grade</th>
+                      <th className="px-3 py-3 md:px-6 md:py-4 text-center">Status</th>
+                      <th className="px-3 py-3 md:px-6 md:py-4 text-center">Workflow</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {students.map((student) => {
+                      const studentId = student.userId || student.id;
+                      const s = (scores[studentId] || { ca1: 0, ca2: 0, assignment: 0, test: 0, exam: 0, status: 'DRAFT', id: undefined }) as any;
+                      const res = results.find(r => r.studentId === studentId);
+                      const total = s.ca1 + s.ca2 + s.assignment + s.test + s.exam;
+                      const isLocked = user.role === 'TEACHER' && res?.status === 'APPROVED';
+                      
+                      return (
+                        <tr key={student.id} className="hover:bg-gray-50/50 transition-colors group">
+                          <td className="px-3 py-3 md:px-6 md:py-4">
+                            <div className="flex items-center gap-4">
+                              <div className="flex flex-col">
+                                <div className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{student.name}</div>
+                                <div className="text-[10px] text-gray-400 font-mono flex items-center gap-1 uppercase tracking-tighter">
+                                   {student.admissionNumber} {getStatusBadge(s.status)}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          {['ca1', 'ca2', 'assignment', 'test', 'exam'].map(field => (
+                            <td key={field} className="px-3 py-3 md:px-6 md:py-4 text-center">
+                              <input 
+                                type="number" 
+                                disabled={isLocked || user.role === 'SCHOOL_ADMIN'}
+                                value={(s as any)[field]}
+                                onChange={(e) => handleScoreChange(studentId, field, e.target.value)}
+                                className={`w-14 px-2 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 text-center font-black text-gray-900 outline-none transition-all ${isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 focus:bg-white'}`}
+                              />
+                            </td>
+                          ))}
+                          <td className="px-3 py-3 md:px-6 md:py-4 text-center">
+                            <span className="text-lg font-black text-blue-600 italic leading-none">{res?.total || total}</span>
+                          </td>
+                          <td className="px-3 py-3 md:px-6 md:py-4 text-center">
+                             <span className={`px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest ${
+                                (res?.total || total) >= 70 ? 'bg-emerald-50 text-emerald-600' :
+                                 (res?.total || total) >= 50 ? 'bg-blue-50 text-blue-600' :
+                                'bg-rose-50 text-rose-600'
+                              }`}>
+                                {res?.grade || '-'}
+                              </span>
+                          </td>
+                          <td className="px-3 py-3 md:px-6 md:py-4 text-center">
+                            {(() => {
+                              const result = results.find(r => {
+                                const studentId = student.userId || student.id;
+                                return r.studentId === studentId;
+                              });
+                              if (!result) return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gray-100 text-gray-400">Not Submitted</span>;
+                              if (result.status === 'PENDING_CLASS_TEACHER') return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-600">Awaiting Class Teacher</span>;
+                              if (result.status === 'PENDING_ADMIN') return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-50 text-blue-600">Awaiting Admin</span>;
+                              if (result.status === 'APPROVED') return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Approved</span>;
+                              return null;
+                            })()}
+                          </td>
+                          <td className="px-3 py-3 md:px-6 md:py-4">
+                             <div className="flex items-center justify-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                <button 
+                                   onClick={() => openReportCard(student)}
+                                   className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                   title="Full Report Card"
+                                >
+                                   <Eye size={18} />
+                                </button>
+                             </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4 — Submit button, only show when scores entered */}
+          {filters.classId && filters.subjectId && students.length > 0 && (
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xs font-black uppercase tracking-widest text-gray-400">Step 4 — Submit to Class Teacher</h2>
+                <p className="text-xs text-gray-400 mt-1">Once submitted, the class teacher will review and forward to admin</p>
+              </div>
+              <button
+                onClick={handleSubmitSubjectScores}
+                disabled={saving || students.length === 0}
+                className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50 whitespace-nowrap"
+              >
+                {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                Submit to Class Teacher
+              </button>
+            </div>
+          )}
+
+          {/* My Submissions section */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-50">
+              <h2 className="text-xs font-black uppercase tracking-widest text-gray-400">My Submissions</h2>
+              <p className="text-xs text-gray-400 mt-1">Scores you have already submitted this term</p>
+            </div>
+            <div className="p-6">
+              {results.length === 0 ? (
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest text-center py-8">No submissions yet this term</p>
+              ) : (
+                <div className="space-y-3">
+                  {Array.from(new Set(results.map(r => r.subjectId))).map(subjectId => {
+                    const subjectResults = results.filter(r => r.subjectId === subjectId);
+                    const status = subjectResults[0]?.status;
+                    const subjectName = subjects.find(s => s.id === subjectId)?.name || subjectId;
+                    return (
+                      <div key={subjectId} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                        <div>
+                          <p className="text-sm font-black text-gray-900">{subjectName}</p>
+                          <p className="text-xs text-gray-400 font-bold">{subjectResults.length} students</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          status === 'PENDING_CLASS_TEACHER' ? 'bg-amber-50 text-amber-600' :
+                          status === 'PENDING_ADMIN' ? 'bg-blue-50 text-blue-600' :
+                          status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' :
+                          'bg-gray-100 text-gray-400'
+                        }`}>
+                          {status === 'PENDING_CLASS_TEACHER' ? 'Awaiting Class Teacher' :
+                           status === 'PENDING_ADMIN' ? 'Awaiting Admin' :
+                           status === 'APPROVED' ? 'Approved' : 'Draft'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {showCollated ? (
-        !filters.classId || !filters.sessionId ? (
-          <div className="flex flex-col items-center justify-center py-24 bg-gray-50 rounded-[4rem] border border-dashed border-gray-200">
-            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-gray-300 mb-6 shadow-sm">
-              <Filter size={40} />
-            </div>
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Select session and class to view collated results</p>
+      {/* Part 2 — Class Teacher view (roleType === 'CLASS' || roleType === 'BOTH') */}
+      {user?.role === 'TEACHER' && (user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && (
+        <div className="space-y-6">
+          {/* Page header */}
+          <div>
+            <h1 className="text-2xl font-black text-gray-900">Results Pipeline</h1>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">
+              Review subject teacher submissions and forward to admin
+            </p>
           </div>
-        ) : (
-          <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
-            <div className="p-6 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
-              <div className="flex items-center gap-3 text-white">
-                <Trophy size={18} className="text-yellow-400" />
-                <div>
-                   <span className="text-[10px] font-black uppercase tracking-[0.2em] block leading-none">Class Performance Dossier</span>
-                   <span className="text-sm font-black italic tracking-tight">{selectedClass?.name} • Collated Master Sheet</span>
-                </div>
+
+          {/* Filters — session, term, class only (no subject needed at top level) */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Session</label>
+                <select value={filters.sessionId} onChange={(e) => setFilters(f => ({ ...f, sessionId: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl outline-none text-sm font-bold appearance-none">
+                  <option value="">Select Session</option>
+                  {sessions.map(s => <option key={s.id} value={s.id}>{s.name} {s.isCurrent ? '(Current)' : ''}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Term</label>
+                <select value={filters.term} onChange={(e) => setFilters(f => ({ ...f, term: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl outline-none text-sm font-bold appearance-none">
+                  <option value="1st">1st Term</option>
+                  <option value="2nd">2nd Term</option>
+                  <option value="3rd">3rd Term</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Class</label>
+                <select value={filters.classId} onChange={(e) => setFilters(f => ({ ...f, classId: e.target.value, subjectId: '' }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl outline-none text-sm font-bold appearance-none">
+                  <option value="">Select Class</option>
+                  {sortClasses(classes).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
+                </select>
               </div>
             </div>
-            
+          </div>
+
+          {/* Pipeline cards — one per subject */}
+          {filters.classId && filters.sessionId ? (
+            <div className="space-y-4">
+              {/* Summary bar */}
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { label: 'Pending Review', count: results.filter(r => r.status === 'PENDING_CLASS_TEACHER').length, color: 'amber' },
+                  { label: 'Sent to Admin', count: results.filter(r => r.status === 'PENDING_ADMIN').length, color: 'blue' },
+                  { label: 'Approved', count: results.filter(r => r.status === 'APPROVED').length, color: 'emerald' },
+                ].map(s => (
+                  <div key={s.label} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 text-center">
+                    <div className={`text-2xl font-black text-${s.color}-600`}>{s.count}</div>
+                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mt-1">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Subject pipeline cards */}
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                  <h2 className="text-xs font-black uppercase tracking-widest text-gray-400">Subject Submissions</h2>
+                  <button
+                    onClick={() => setShowCollated(true)}
+                    className="px-4 py-2 bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
+                  >
+                    View Collated Sheet
+                  </button>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {subjects.filter(sub => {
+                    const subjectResults = results.filter(r => r.subjectId === sub.id);
+                    return subjectResults.length > 0;
+                  }).map(sub => {
+                    const subjectResults = results.filter(r => r.subjectId === sub.id);
+                    const status = subjectResults[0]?.status;
+                    return (
+                      <div key={sub.id} className="p-6 flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <p className="font-black text-gray-900 text-sm">{sub.name}</p>
+                          <p className="text-xs text-gray-400 font-bold mt-1">{subjectResults.length} students</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          status === 'PENDING_CLASS_TEACHER' ? 'bg-amber-50 text-amber-600' :
+                          status === 'PENDING_ADMIN' ? 'bg-blue-50 text-blue-600' :
+                          status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' :
+                          'bg-gray-100 text-gray-400'
+                        }`}>
+                          {status === 'PENDING_CLASS_TEACHER' ? 'Needs Review' :
+                           status === 'PENDING_ADMIN' ? 'Sent to Admin' :
+                           status === 'APPROVED' ? 'Approved' : 'Not Submitted'}
+                        </span>
+                        {status === 'PENDING_CLASS_TEACHER' && (
+                          <button
+                            onClick={() => {
+                              setFilters(f => ({ ...f, subjectId: sub.id }));
+                              handleSubmitToAdmin();
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all whitespace-nowrap"
+                          >
+                            Forward to Admin
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {subjects.filter(sub => results.some(r => r.subjectId === sub.id)).length === 0 && (
+                    <div className="p-12 text-center text-xs text-gray-400 font-bold uppercase tracking-widest">
+                      No subject results submitted yet for this class
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Collated view toggle */}
+              {showCollated && (
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                    <h2 className="text-xs font-black uppercase tracking-widest text-gray-400">Collated Class Sheet</h2>
+                    <button onClick={() => setShowCollated(false)} className="text-gray-400 hover:text-gray-600">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  
+                  {/* EXISTING COLLATED RESULTS TABLE */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                          <th className="px-3 py-3 md:px-6 md:py-4">Student Name</th>
+                          {Array.from(new Set(collatedResults.flatMap(st => st.subjects.map((sub: any) => sub.subjectId)))).map((subId: any) => (
+                            <th key={subId} className="px-3 py-3 md:px-6 md:py-4 text-center">
+                              {subjects.find(sub => sub.id === subId)?.name || subId}
+                            </th>
+                          ))}
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">Average Score</th>
+                          <th className="px-3 py-3 md:px-6 md:py-4 text-center">Overall Grade</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {collatedResults.length === 0 ? (
+                          <tr>
+                            <td colSpan={Array.from(new Set(collatedResults.flatMap(st => st.subjects.map((sub: any) => sub.subjectId)))).length + 3} className="text-center py-12 text-gray-400 text-xs font-bold uppercase tracking-widest">
+                               No collated results found for this class.
+                            </td>
+                          </tr>
+                        ) : (
+                          collatedResults.map((student: any) => {
+                            const studentObj = allStudents.find(s => (s.userId === student.studentId || s.id === student.studentId));
+                            const studentName = studentObj ? studentObj.name : `Student (${student.studentId})`;
+                            const avgNum = parseFloat(student.average) || 0;
+                            const overallGrade = getGrade(avgNum);
+                            const uniqueSubIds = Array.from(new Set(collatedResults.flatMap(st => st.subjects.map((sub: any) => sub.subjectId))));
+                            
+                            return (
+                              <tr key={student.studentId} className="hover:bg-gray-50/50 transition-colors group">
+                                <td className="px-3 py-3 md:px-6 md:py-4">
+                                   <div className="font-bold text-gray-900">{studentName}</div>
+                                </td>
+                                {uniqueSubIds.map((subId: any) => {
+                                  const subScore = student.subjects.find((sub: any) => sub.subjectId === subId);
+                                  return (
+                                    <td key={subId} className="px-3 py-3 md:px-6 md:py-4 text-center font-black text-gray-800">
+                                      {subScore ? subScore.total : '-'}
+                                      {subScore && <span className="text-[10px] text-gray-400 ml-1 font-mono">({subScore.grade})</span>}
+                                    </td>
+                                  );
+                                })}
+                                <td className="px-3 py-3 md:px-6 md:py-4 text-center text-lg font-black text-blue-600">
+                                  {student.average}%
+                                </td>
+                                <td className="px-3 py-3 md:px-6 md:py-4 text-center">
+                                  <span className={`px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest ${
+                                     avgNum >= 70 ? 'bg-emerald-50 text-emerald-600' :
+                                     avgNum >= 50 ? 'bg-blue-50 text-blue-600' :
+                                     'bg-rose-50 text-rose-600'
+                                   }`}>
+                                    {overallGrade}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Export button */}
+              <div className="flex justify-end">
+                {(user?.role === 'SCHOOL_ADMIN' || user?.roleType === 'CLASS' || user?.roleType === 'BOTH') && (
+                  <button onClick={exportCSV} disabled={students.length === 0}
+                    className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-100 text-gray-900 font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-sm hover:shadow-md transition-all disabled:opacity-50">
+                    <Download size={16} />
+                    Export CSV
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-24 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+              <Filter size={40} className="text-gray-200 mb-4" />
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Select a session and class to view the pipeline</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Part 3 — School Admin view (role === 'SCHOOL_ADMIN') */}
+      {user?.role === 'SCHOOL_ADMIN' && (
+        <div className="space-y-6">
+          {/* Page header */}
+          <div>
+            <h1 className="text-2xl font-black text-gray-900">Results Monitor</h1>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">
+              Review and approve results submitted by class teachers
+            </p>
+          </div>
+
+          {/* Filters */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Session</label>
+                <select value={filters.sessionId} onChange={(e) => setFilters(f => ({ ...f, sessionId: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl outline-none text-sm font-bold appearance-none">
+                  <option value="">Select Session</option>
+                  {sessions.map(s => <option key={s.id} value={s.id}>{s.name} {s.isCurrent ? '(Current)' : ''}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Term</label>
+                <select value={filters.term} onChange={(e) => setFilters(f => ({ ...f, term: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl outline-none text-sm font-bold appearance-none">
+                  <option value="1st">1st Term</option>
+                  <option value="2nd">2nd Term</option>
+                  <option value="3rd">3rd Term</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Class</label>
+                <select value={filters.classId} onChange={(e) => setFilters(f => ({ ...f, classId: e.target.value, subjectId: '' }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl outline-none text-sm font-bold appearance-none">
+                  <option value="">All Classes</option>
+                  {sortClasses(classes).map(c => <option key={c.id} value={c.id}>{c.level} - {c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Subject</label>
+                <select value={filters.subjectId} onChange={(e) => setFilters(f => ({ ...f, subjectId: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl outline-none text-sm font-bold appearance-none">
+                  <option value="">All Subjects</option>
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Pipeline overview stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: 'Total Results', count: results.length, color: 'gray' },
+              { label: 'Pending Review', count: results.filter(r => r.status === 'PENDING_CLASS_TEACHER').length, color: 'amber' },
+              { label: 'Awaiting Approval', count: results.filter(r => r.status === 'PENDING_ADMIN').length, color: 'blue' },
+              { label: 'Approved', count: results.filter(r => r.status === 'APPROVED').length, color: 'emerald' },
+            ].map(s => (
+              <div key={s.label} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 text-center">
+                <div className={`text-2xl font-black text-${s.color === 'gray' ? 'gray' : s.color}-600`}>{s.count}</div>
+                <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mt-1">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Results table with approve action */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+              <h2 className="text-xs font-black uppercase tracking-widest text-gray-400">
+                {results.filter(r => r.status === 'PENDING_ADMIN').length} results awaiting your approval
+              </h2>
+              <div className="flex gap-3">
+                {results.some(r => r.status === 'PENDING_ADMIN') && (
+                  <button
+                    onClick={handleApproveResults}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 className="animate-spin" size={16} /> : <CheckSquare size={16} />}
+                    Approve All Pending
+                  </button>
+                )}
+                <button onClick={exportCSV} disabled={students.length === 0}
+                  className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 text-gray-900 font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-sm hover:shadow-md transition-all disabled:opacity-50">
+                  <Download size={16} />
+                  Export CSV
+                </button>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-400">
-                    <th className="px-3 py-3 md:px-6 md:py-4">Student Name</th>
-                    {Array.from(new Set(collatedResults.flatMap(st => st.subjects.map((sub: any) => sub.subjectId)))).map((subId: any) => (
-                      <th key={subId} className="px-3 py-3 md:px-6 md:py-4 text-center">
-                        {subjects.find(sub => sub.id === subId)?.name || subId}
-                      </th>
-                    ))}
-                    <th className="px-3 py-3 md:px-6 md:py-4 text-center">Average Score</th>
-                    <th className="px-3 py-3 md:px-6 md:py-4 text-center">Overall Grade</th>
+              <table className="w-full text-left">
+                <thead className="bg-gray-50/50 text-gray-400 text-[10px] font-black uppercase tracking-widest border-b border-gray-50">
+                  <tr>
+                    <th className="px-6 py-4">Student</th>
+                    <th className="px-6 py-4">Class</th>
+                    <th className="px-6 py-4">Subject</th>
+                    <th className="px-6 py-4 text-center">Total</th>
+                    <th className="px-6 py-4 text-center">Grade</th>
+                    <th className="px-6 py-4 text-center">Status</th>
+                    <th className="px-6 py-4 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {collatedResults.length === 0 ? (
+                  {loading ? (
                     <tr>
-                      <td colSpan={Array.from(new Set(collatedResults.flatMap(st => st.subjects.map((sub: any) => sub.subjectId)))).length + 3} className="text-center py-12 text-gray-400 text-xs font-bold uppercase tracking-widest">
-                         No collated results found for this class.
+                      <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                        <Loader2 className="animate-spin inline mr-2 text-blue-600" size={20} />
+                        Loading results...
+                      </td>
+                    </tr>
+                  ) : results.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-xs text-gray-400 font-bold uppercase tracking-widest">
+                        No results found for selected filters
                       </td>
                     </tr>
                   ) : (
-                    collatedResults.map((student: any) => {
-                      const studentObj = allStudents.find(s => (s.userId === student.studentId || s.id === student.studentId));
-                      const studentName = studentObj ? studentObj.name : `Student (${student.studentId})`;
-                      const avgNum = parseFloat(student.average) || 0;
-                      const overallGrade = getGrade(avgNum);
-                      const uniqueSubIds = Array.from(new Set(collatedResults.flatMap(st => st.subjects.map((sub: any) => sub.subjectId))));
-                      
+                    results.map((result) => {
+                      const student = allStudents.find(s => s.id === result.studentId || s.userId === result.studentId);
+                      const subject = subjects.find(s => s.id === result.subjectId);
+                      const cls = classes.find(c => c.id === result.classId);
                       return (
-                        <tr key={student.studentId} className="hover:bg-gray-50/50 transition-colors group">
-                          <td className="px-3 py-3 md:px-6 md:py-4">
-                             <div className="font-bold text-gray-900">{studentName}</div>
+                        <tr key={result.id} className="hover:bg-gray-50/50 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => {
+                                  setSelectedStudent(student);
+                                  setStudentResults(results.filter(r => r.studentId === result.studentId));
+                                  setIsReportModalOpen(true);
+                                }}
+                                className="text-blue-600 hover:text-blue-700"
+                              >
+                                <Eye size={16} />
+                              </button>
+                              <span className="font-bold text-gray-900 text-sm">{student?.name || result.studentId}</span>
+                            </div>
                           </td>
-                          {uniqueSubIds.map((subId: any) => {
-                            const subScore = student.subjects.find((sub: any) => sub.subjectId === subId);
-                            return (
-                              <td key={subId} className="px-3 py-3 md:px-6 md:py-4 text-center font-black text-gray-800">
-                                {subScore ? subScore.total : '-'}
-                                {subScore && <span className="text-[10px] text-gray-400 ml-1 font-mono">({subScore.grade})</span>}
-                              </td>
-                            );
-                          })}
-                          <td className="px-3 py-3 md:px-6 md:py-4 text-center text-lg font-black text-blue-600">
-                            {student.average}%
+                          <td className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">{cls?.name || result.classId}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-gray-500">{subject?.name || result.subjectId}</td>
+                          <td className="px-6 py-4 text-center font-black text-gray-900">{result.total}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-3 py-1 rounded-full text-[9px] font-black tracking-widest ${
+                              result.total >= 70 ? 'bg-emerald-50 text-emerald-600' :
+                              result.total >= 50 ? 'bg-blue-50 text-blue-600' :
+                              'bg-rose-50 text-rose-600'
+                            }`}>{result.grade}</span>
                           </td>
-                          <td className="px-3 py-3 md:px-6 md:py-4 text-center">
-                            <span className={`px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest ${
-                               avgNum >= 70 ? 'bg-emerald-50 text-emerald-600' :
-                               avgNum >= 50 ? 'bg-blue-50 text-blue-600' :
-                               'bg-rose-50 text-rose-600'
-                             }`}>
-                              {overallGrade}
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                              result.status === 'PENDING_CLASS_TEACHER' ? 'bg-amber-50 text-amber-600' :
+                              result.status === 'PENDING_ADMIN' ? 'bg-blue-50 text-blue-600' :
+                              result.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' :
+                              'bg-gray-100 text-gray-400'
+                            }`}>
+                              {result.status === 'PENDING_CLASS_TEACHER' ? 'With Class Teacher' :
+                               result.status === 'PENDING_ADMIN' ? 'Awaiting Approval' :
+                               result.status === 'APPROVED' ? 'Approved' : result.status}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {result.status === 'PENDING_ADMIN' && (
+                              <button
+                                onClick={() => {
+                                  setFilters(f => ({ ...f, classId: result.classId, subjectId: result.subjectId }));
+                                  handleApproveResults();
+                                }}
+                                className="px-3 py-1.5 bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider rounded-xl hover:bg-emerald-700 transition-all"
+                              >
+                                Approve
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -967,139 +1394,8 @@ export default function Results({ user }: { user: any }) {
               </table>
             </div>
           </div>
-        )
-      ) : (
-        !filters.classId || !filters.subjectId || !filters.sessionId ? (
-          <div className="flex flex-col items-center justify-center py-24 bg-gray-50 rounded-[4rem] border border-dashed border-gray-200">
-            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-gray-300 mb-6 shadow-sm">
-              <Filter size={40} />
-            </div>
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Filter for curriculum data to begin</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
-            <div className="p-6 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
-              <div className="flex items-center gap-3 text-white">
-                <Trophy size={18} className="text-blue-400" />
-                <div>
-                   <span className="text-[10px] font-black uppercase tracking-[0.2em] block leading-none">Evaluation Matrix</span>
-                   <span className="text-sm font-black italic tracking-tight">{subjects.find(s => s.id === filters.subjectId)?.name} • {selectedClass?.name}</span>
-                </div>
-              </div>
-              
-              {loading && <Loader2 className="animate-spin text-white/20" size={24} />}
-            </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50/80 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
-                <tr>
-                  <th className="px-3 py-3 md:px-6 md:py-4">Student Basis</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">1st C.A (10)</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">2nd C.A (10)</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Assignment (10)</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Class Test (10)</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Exam (60)</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">TOT</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Grade</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Status</th>
-                  <th className="px-3 py-3 md:px-6 md:py-4 text-center">Workflow</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {students.map((student) => {
-                  const studentId = student.userId || student.id;
-                  const s = (scores[studentId] || { ca1: 0, ca2: 0, assignment: 0, test: 0, exam: 0, status: 'DRAFT', id: undefined }) as any;
-                  const res = results.find(r => r.studentId === studentId);
-                  const total = s.ca1 + s.ca2 + s.assignment + s.test + s.exam;
-                  const isLocked = user.role === 'TEACHER' && res?.status === 'APPROVED';
-                  
-                  return (
-                    <tr key={student.id} className="hover:bg-gray-50/50 transition-colors group">
-                      <td className="px-3 py-3 md:px-6 md:py-4">
-                        <div className="flex items-center gap-4">
-                          <div className="flex flex-col">
-                            <div className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{student.name}</div>
-                            <div className="text-[10px] text-gray-400 font-mono flex items-center gap-1 uppercase tracking-tighter">
-                               {student.admissionNumber} {getStatusBadge(s.status)}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      {['ca1', 'ca2', 'assignment', 'test', 'exam'].map(field => (
-                        <td key={field} className="px-3 py-3 md:px-6 md:py-4 text-center">
-                          <input 
-                            type="number" 
-                            disabled={isLocked || user.role === 'SCHOOL_ADMIN'}
-                            value={(s as any)[field]}
-                            onChange={(e) => handleScoreChange(studentId, field, e.target.value)}
-                            className={`w-14 px-2 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 text-center font-black text-gray-900 outline-none transition-all ${isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 focus:bg-white'}`}
-                          />
-                        </td>
-                      ))}
-                      <td className="px-3 py-3 md:px-6 md:py-4 text-center">
-                        <span className="text-lg font-black text-blue-600 italic leading-none">{res?.total || total}</span>
-                      </td>
-                      <td className="px-3 py-3 md:px-6 md:py-4 text-center">
-                         <span className={`px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest ${
-                            (res?.total || total) >= 70 ? 'bg-emerald-50 text-emerald-600' :
-                             (res?.total || total) >= 50 ? 'bg-blue-50 text-blue-600' :
-                            'bg-rose-50 text-rose-600'
-                          }`}>
-                            {res?.grade || '-'}
-                          </span>
-                      </td>
-                      <td className="px-3 py-3 md:px-6 md:py-4 text-center">
-                        {(() => {
-                          const result = results.find(r => {
-                            const studentId = student.userId || student.id;
-                            return r.studentId === studentId;
-                          });
-                          if (!result) return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-gray-100 text-gray-400">Not Submitted</span>;
-                          if (result.status === 'PENDING_CLASS_TEACHER') return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-600">Awaiting Class Teacher</span>;
-                          if (result.status === 'PENDING_ADMIN') return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-50 text-blue-600">Awaiting Admin</span>;
-                          if (result.status === 'APPROVED') return <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Approved</span>;
-                          return null;
-                        })()}
-                      </td>
-                      <td className="px-3 py-3 md:px-6 md:py-4">
-                         <div className="flex items-center justify-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                            <button 
-                               onClick={() => openReportCard(student)}
-                               className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                               title="Full Report Card"
-                            >
-                               <Eye size={18} />
-                            </button>
-                            {user.role === 'SCHOOL_ADMIN' && s.id && (
-                              <div className="flex gap-1 border-l border-gray-100 pl-1 ml-1">
-                                <button
-                                  onClick={() => handleStatusUpdate(s.id, 'APPROVED')}
-                                  className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                                  title="Approve"
-                                >
-                                  <CheckSquare size={18} />
-                                </button>
-                                <button
-                                  onClick={() => handleStatusUpdate(s.id, 'REJECTED')}
-                                  className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                                  title="Reject"
-                                >
-                                  <X size={18} />
-                                </button>
-                              </div>
-                            )}
-                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         </div>
-      )
-    )}
+      )}
     </div>
   );
 };
