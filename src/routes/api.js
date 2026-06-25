@@ -2270,4 +2270,103 @@ router.get('/results/collated', authenticate, async (req, res) => {
   }
 });
 
+// Today's class attendance summary for admin
+router.get('/attendance/daily-summary', authenticate, async (req, res) => {
+  try {
+    const schoolId = req.user.schoolId;
+    const date = req.query.date || new Date().toISOString().split('T')[0];
+
+    const classesSnap = await db.collection('classes')
+      .where('schoolId', '==', schoolId).get();
+
+    const summary = await Promise.all(classesSnap.docs.map(async (classDoc) => {
+      const classData = classDoc.data();
+      const attendanceSnap = await db.collection('attendance')
+        .where('schoolId', '==', schoolId)
+        .where('classId', '==', classDoc.id)
+        .where('date', '==', date)
+        .get();
+
+      const records = attendanceSnap.docs.map(d => d.data());
+      const present = records.filter(r => r.status === 'PRESENT').length;
+      const absent = records.filter(r => r.status === 'ABSENT').length;
+      const late = records.filter(r => r.status === 'LATE').length;
+      const excused = records.filter(r => r.status === 'EXCUSED').length;
+      const total = records.length;
+
+      return {
+        classId: classDoc.id,
+        className: classData.name,
+        teacherName: classData.teacherName || 'Unassigned',
+        total,
+        present,
+        absent,
+        late,
+        excused,
+        submitted: total > 0,
+      };
+    }));
+
+    const submitted = summary.filter(s => s.submitted).length;
+    const total = summary.length;
+
+    res.json({ summary, submitted, total, date });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Attendance history for a specific class and date (in-memory sort to prevent missing composite index errors)
+router.get('/attendance/history', authenticate, async (req, res) => {
+  try {
+    const { classId, date } = req.query;
+    const schoolId = req.user.schoolId;
+
+    let q = db.collection('attendance')
+      .where('schoolId', '==', schoolId);
+
+    if (classId) q = q.where('classId', '==', classId);
+    if (date) q = q.where('date', '==', date);
+
+    const snap = await q.get();
+    let records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Pre-fetch all students and classes for this school to map names
+    const [studentsSnap, classesSnap] = await Promise.all([
+      db.collection('students').where('schoolId', '==', schoolId).get(),
+      db.collection('classes').where('schoolId', '==', schoolId).get()
+    ]);
+
+    const studentMap = {};
+    studentsSnap.docs.forEach(doc => {
+      const data = doc.data();
+      studentMap[doc.id] = {
+        name: data.name,
+        admissionNumber: data.admissionNumber
+      };
+    });
+
+    const classMap = {};
+    classesSnap.docs.forEach(doc => {
+      classMap[doc.id] = doc.data().name;
+    });
+
+    // Populate records with names
+    records = records.map(r => ({
+      ...r,
+      studentName: studentMap[r.studentId]?.name || 'Unknown Student',
+      admissionNumber: studentMap[r.studentId]?.admissionNumber || '',
+      className: classMap[r.classId] || 'Unknown Class'
+    }));
+    
+    // In-memory sort to avoid index requirements in Firestore
+    records.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const limitedRecords = records.slice(0, 200);
+
+    res.json({ records: limitedRecords });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
