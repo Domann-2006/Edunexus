@@ -67,7 +67,8 @@ router.post('/login', async (req, res) => {
         name: user.name || user.username || user.email.split('@')[0], 
         email: user.email, 
         role: user.role, 
-        schoolId: user.schoolId 
+        schoolId: user.schoolId,
+        roleType: user.roleType || null
       },
       JWT_SECRET,
       { expiresIn: '1d' }
@@ -107,7 +108,8 @@ router.post('/login', async (req, res) => {
         email: user.email,
         role: user.role,
         schoolId: user.schoolId,
-        schoolName: schoolName
+        schoolName: schoolName,
+        roleType: user.roleType || null
       }
     });
   } catch (err) {
@@ -153,6 +155,7 @@ router.get('/me', authenticate, async (req, res) => {
       user: {
         id: userDoc.id,
         ...userData,
+        roleType: userData.roleType || null,
         schoolName,
         schoolLogo // Include school logo for potential UI use
       }
