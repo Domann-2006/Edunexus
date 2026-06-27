@@ -61,6 +61,17 @@ router.post('/login', async (req, res) => {
       console.error('Failed to write login activity log:', logErr);
     }
 
+    // Fetch roleType from teachers collection if user is a TEACHER
+    let roleType = null;
+    if (user.role === 'TEACHER') {
+      const teacherSnap = await db.collection('teachers')
+        .where('userId', '==', user.id)
+        .limit(1).get();
+      if (!teacherSnap.empty) {
+        roleType = teacherSnap.docs[0].data().roleType || 'BOTH';
+      }
+    }
+
     const token = jwt.sign(
       { 
         id: user.id, 
@@ -68,7 +79,7 @@ router.post('/login', async (req, res) => {
         email: user.email, 
         role: user.role, 
         schoolId: user.schoolId,
-        roleType: user.roleType || null
+        roleType: roleType
       },
       JWT_SECRET,
       { expiresIn: '1d' }
@@ -109,7 +120,7 @@ router.post('/login', async (req, res) => {
         role: user.role,
         schoolId: user.schoolId,
         schoolName: schoolName,
-        roleType: user.roleType || null
+        roleType: roleType
       }
     });
   } catch (err) {
@@ -150,12 +161,23 @@ router.get('/me', authenticate, async (req, res) => {
       console.error('Failed to generate Firebase token during session check:', fbErr);
     }
 
+    // Fetch roleType from teachers collection
+    let teacherRoleType = null;
+    if (userData.role === 'TEACHER') {
+      const teacherSnap = await db.collection('teachers')
+        .where('userId', '==', userDoc.id)
+        .limit(1).get();
+      if (!teacherSnap.empty) {
+        teacherRoleType = teacherSnap.docs[0].data().roleType || 'BOTH';
+      }
+    }
+
     res.json({ 
       firebaseToken,
       user: {
         id: userDoc.id,
         ...userData,
-        roleType: userData.roleType || null,
+        roleType: teacherRoleType,
         schoolName,
         schoolLogo // Include school logo for potential UI use
       }
