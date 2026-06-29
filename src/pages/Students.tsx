@@ -5,7 +5,7 @@ import { Plus, Search, MoreVertical, Edit2, Trash2, X, Check, Loader2, User as U
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 import { SSS_STREAMS } from '../constants';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, CheckSquare, AlertCircle } from 'lucide-react';
 
 const levelOrder = ['CRECHE', 'KINDERGARTEN', 'NURSERY', 'PRIMARY', 'JSS', 'SSS'];
 
@@ -32,6 +32,13 @@ const sortClasses = (classesList: any[]): any[] => {
 };
 
 export default function Students({ user }: { user: any }) {
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
@@ -210,7 +217,7 @@ export default function Students({ user }: { user: any }) {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Operation failed';
-      alert(`Error: ${msg}`);
+      showToast(msg, 'error');
     }
   };
 
@@ -221,7 +228,7 @@ export default function Students({ user }: { user: any }) {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Delete failed';
-      alert(`Error: ${msg}`);
+      showToast(msg, 'error');
     }
   };
 
@@ -395,6 +402,18 @@ export default function Students({ user }: { user: any }) {
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl text-white text-sm font-bold transition-all ${
+          toast.type === 'success' ? 'bg-emerald-600' :
+          toast.type === 'error' ? 'bg-rose-600' :
+          'bg-blue-600'
+        }`}>
+          {toast.type === 'success' ? <CheckSquare size={18} /> :
+           toast.type === 'error' ? <AlertCircle size={18} /> :
+           <AlertCircle size={18} />}
+          {toast.message}
+        </div>
+      )}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Students</h1>

@@ -1938,6 +1938,40 @@ router.use('/results', resultsRouter);
 
 router.use('/sessions', createCRUD('sessions', ['SCHOOL_ADMIN']));
 
+router.post('/attendance/bulk-save', authenticate, async (req, res) => {
+  try {
+    const { records } = req.body;
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ error: 'No records provided' });
+    }
+
+    const schoolId = req.user.schoolId;
+    const batch = db.batch();
+
+    records.forEach(record => {
+      // Use studentId + classId + date as document ID to prevent duplicates
+      const docId = `${record.studentId}_${record.classId}_${record.date}`;
+      const ref = db.collection('attendance').doc(docId);
+      batch.set(ref, {
+        studentId: record.studentId,
+        studentName: record.studentName || '',
+        classId: record.classId,
+        className: record.className || '',
+        schoolId: schoolId,
+        date: record.date, // always a string like '2026-06-29'
+        status: record.status || 'PRESENT',
+        recordedBy: req.user.id,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    });
+
+    await batch.commit();
+    res.json({ success: true, count: records.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Attendance - Teachers POST, Admins/Teachers GET
 router.use('/attendance', createCRUD('attendance', ['SCHOOL_ADMIN', 'TEACHER']));
 // GET /activity-logs with advanced filters, search, and strict role segregation

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api, { attendanceService, studentService, classService, teacherService } from '../services/api';
-import { CheckCircle, XCircle, Clock, AlertCircle, Calendar, Users, Loader2, Save, Search, ChevronLeft, ChevronRight, Eye, History } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, AlertCircle, Calendar, Users, Loader2, Save, Search, ChevronLeft, ChevronRight, Eye, History, CheckSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
@@ -29,6 +29,12 @@ const sortClasses = (classesList: any[]): any[] => {
 };
 
 export default function Attendance({ user }: { user: any }) {
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   // Navigation Tabs State
   const [activeTab, setActiveTab] = useState(user?.role === 'SCHOOL_ADMIN' ? 'overview' : 'take');
 
@@ -172,21 +178,21 @@ export default function Attendance({ user }: { user: any }) {
     if (user.role === 'SCHOOL_ADMIN') return;
     setSaving(true);
     try {
-      const records = students.map(student => ({
+      const className = classes.find(c => c.id === selectedClassId)?.name || '';
+      const enrichedRecords = students.map(student => ({
         studentId: student.id,
+        studentName: student.name || '',
         classId: selectedClassId,
+        className,
         schoolId: user?.schoolId,
         date,
         status: attendance[student.id] || 'PRESENT',
-        recordedBy: user?.id,
-        createdAt: new Date().toISOString()
       }));
-      
-      await attendanceService.bulkCreate(records);
-      alert('Attendance saved successfully!');
+      await api.post('/v1/attendance/bulk-save', { records: enrichedRecords });
+      showToast('Attendance saved successfully!');
     } catch (err: any) {
       console.error('Failed to save attendance:', err);
-      alert('Error: ' + (err.response?.data?.message || err.message));
+      showToast(err.response?.data?.message || err.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -218,6 +224,14 @@ export default function Attendance({ user }: { user: any }) {
 
   return (
     <div className="space-y-8 pb-20">
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl text-white text-sm font-bold ${
+          toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          {toast.message}
+        </div>
+      )}
       {/* Page Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>

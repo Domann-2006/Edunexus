@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { schoolService } from '../services/api';
-import { Plus, Edit2, Trash2, X, Loader2, School as SchoolIcon } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Loader2, School as SchoolIcon, CheckSquare, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
 export default function Schools() {
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,7 +68,7 @@ export default function Schools() {
       setIsModalOpen(false);
       fetchData();
     } catch (err) {
-      alert('Operation failed');
+      showToast('Operation failed', 'error');
     }
   };
 
@@ -71,7 +78,7 @@ export default function Schools() {
       await schoolService.delete(id);
       fetchData();
     } catch (err) {
-      alert('Delete failed');
+      showToast('Delete failed', 'error');
     }
   };
 
@@ -116,6 +123,18 @@ export default function Schools() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl text-white text-sm font-bold transition-all ${
+          toast.type === 'success' ? 'bg-emerald-600' :
+          toast.type === 'error' ? 'bg-rose-600' :
+          'bg-blue-600'
+        }`}>
+          {toast.type === 'success' ? <CheckSquare size={18} /> :
+           toast.type === 'error' ? <AlertCircle size={18} /> :
+           <AlertCircle size={18} />}
+          {toast.message}
+        </div>
+      )}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tighter italic">Enterprise Schools</h1>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { classService, teacherService, schoolService } from '../services/api';
-import { Plus, Edit2, Trash2, X, Loader2, BookOpen, GraduationCap, Sparkles } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Loader2, BookOpen, GraduationCap, Sparkles, CheckSquare, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { EDUCATION_LEVELS, LEVEL_CLASSES } from '../constants';
 
@@ -29,6 +29,13 @@ const sortClasses = (classesList: any[]): any[] => {
 };
 
 export default function Classes({ user }: { user: any }) {
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const [classes, setClasses] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
@@ -111,7 +118,7 @@ export default function Classes({ user }: { user: any }) {
       }
       fetchData();
     } catch (err: any) {
-      alert('Error during bulk operation');
+      showToast('Error during bulk operation', 'error');
       fetchData();
     }
   };
@@ -128,7 +135,7 @@ export default function Classes({ user }: { user: any }) {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Operation failed';
-      alert(`Error: ${msg}`);
+      showToast(msg, 'error');
     }
   };
 
@@ -139,7 +146,7 @@ export default function Classes({ user }: { user: any }) {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Delete failed';
-      alert(`Error: ${msg}`);
+      showToast(msg, 'error');
     }
   };
 
@@ -166,6 +173,18 @@ export default function Classes({ user }: { user: any }) {
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl text-white text-sm font-bold transition-all ${
+          toast.type === 'success' ? 'bg-emerald-600' :
+          toast.type === 'error' ? 'bg-rose-600' :
+          'bg-blue-600'
+        }`}>
+          {toast.type === 'success' ? <CheckSquare size={18} /> :
+           toast.type === 'error' ? <AlertCircle size={18} /> :
+           <AlertCircle size={18} />}
+          {toast.message}
+        </div>
+      )}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Classes</h1>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api, { teacherService, schoolService } from '../services/api';
-import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin, CheckCircle, BookOpen, Book } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin, CheckCircle, BookOpen, Book, CheckSquare, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
@@ -29,6 +29,13 @@ const sortClasses = (classesList: any[]): any[] => {
 };
 
 export default function Teachers({ user }: { user: any }) {
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -129,7 +136,7 @@ export default function Teachers({ user }: { user: any }) {
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Operation failed';
       console.error('Submit error:', err);
-      alert(`Error: ${msg}`);
+      showToast(msg, 'error');
     }
   };
 
@@ -140,7 +147,7 @@ export default function Teachers({ user }: { user: any }) {
       fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Delete failed';
-      alert(`Error: ${msg}`);
+      showToast(msg, 'error');
     }
   };
 
@@ -198,6 +205,18 @@ export default function Teachers({ user }: { user: any }) {
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl text-white text-sm font-bold transition-all ${
+          toast.type === 'success' ? 'bg-emerald-600' :
+          toast.type === 'error' ? 'bg-rose-600' :
+          'bg-blue-600'
+        }`}>
+          {toast.type === 'success' ? <CheckSquare size={18} /> :
+           toast.type === 'error' ? <AlertCircle size={18} /> :
+           <AlertCircle size={18} />}
+          {toast.message}
+        </div>
+      )}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Teachers</h1>
