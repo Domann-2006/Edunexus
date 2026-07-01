@@ -478,6 +478,19 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         if (collectionName === 'students') {
           (async () => {
             try {
+              // Get class name for descriptive notification
+              let notifClassName = data.className || '';
+              let notifClassLevel = data.level || '';
+              if (!notifClassName && data.classId) {
+                try {
+                  const classDoc = await db.collection('classes').doc(data.classId).get();
+                  if (classDoc.exists) {
+                    notifClassName = classDoc.data().name || '';
+                    notifClassLevel = classDoc.data().level || '';
+                  }
+                } catch (e) {}
+              }
+
               const teachersSnap = await db.collection('users')
                 .where('schoolId', '==', data.schoolId)
                 .where('role', '==', 'TEACHER')
@@ -487,8 +500,8 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
                   recipientId: tDoc.id,
                   recipientRole: 'TEACHER',
                   schoolId: data.schoolId,
-                  title: 'New Student Added',
-                  message: 'A new student has been added to your school',
+                  title: 'New Student Enrolled',
+                  message: `${data.name || 'A new student'} has been enrolled in ${notifClassName || data.classId || 'a class'}${notifClassLevel ? ` (${notifClassLevel})` : ''}${data.department ? ` as a ${data.department} student` : ''}`,
                   type: 'student'
                 });
               });
@@ -502,8 +515,8 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
                   recipientId: aDoc.id,
                   recipientRole: 'SCHOOL_ADMIN',
                   schoolId: data.schoolId,
-                  title: 'New Student Added',
-                  message: 'A new student has been added to your school',
+                  title: 'New Student Enrolled',
+                  message: `${data.name || 'A new student'} has been enrolled in ${notifClassName || data.classId || 'a class'}${notifClassLevel ? ` (${notifClassLevel})` : ''}${data.department ? ` as a ${data.department} student` : ''}`,
                   type: 'student'
                 });
               });
@@ -530,8 +543,8 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
                   recipientId: tDoc.id,
                   recipientRole: 'TEACHER',
                   schoolId: tDoc.data().schoolId || data.schoolId,
-                  title: 'New Announcement',
-                  message: `New announcement: ${data.title || 'Check the announcements page'}`,
+                  title: `📢 ${data.title || 'New Announcement'}`,
+                  message: `${data.message || data.body || data.content || 'A new announcement has been posted. Tap to view.'}`,
                   type: 'announcement'
                 });
               });
@@ -542,8 +555,8 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
                   recipientId: aDoc.id,
                   recipientRole: 'SCHOOL_ADMIN',
                   schoolId: aDoc.data().schoolId || data.schoolId,
-                  title: 'New Announcement',
-                  message: `New announcement: ${data.title || 'Check the announcements page'}`,
+                  title: `📢 ${data.title || 'New Announcement'}`,
+                  message: `${data.message || data.body || data.content || 'A new announcement has been posted. Tap to view.'}`,
                   type: 'announcement'
                 });
               });
@@ -1659,8 +1672,8 @@ router.post('/chats/:chatId/messages', authenticate, async (req, res) => {
               recipientId: docObj.id,
               recipientRole: 'SCHOOL_ADMIN',
               schoolId: chatId,
-              title: 'New Message',
-              message: 'You have a new message from EduNexus Support',
+              title: '💬 Message from EduNexus Support',
+              message: 'You have a new message from the EduNexus support team. Tap to read and reply.',
               type: 'message'
             });
           });
@@ -1673,8 +1686,8 @@ router.post('/chats/:chatId/messages', authenticate, async (req, res) => {
               recipientId: docObj.id,
               recipientRole: 'SUPER_ADMIN',
               schoolId: 'SUPER',
-              title: 'New Message',
-              message: `${req.user.name} (${req.user.schoolName || 'Your school'}) sent you a message`,
+              title: `💬 New Message from ${req.user.schoolName || 'Your School'}`,
+              message: `${req.user.name} sent you a message. Tap to read and reply.`,
               type: 'message'
             });
           });
@@ -1704,8 +1717,8 @@ router.post('/chats/:chatId/notify', authenticate, async (req, res) => {
           recipientId: docObj.id,
           recipientRole: 'SCHOOL_ADMIN',
           schoolId: chatId,
-          title: 'New Message',
-          message: 'You have a new message from EduNexus Support',
+          title: '💬 Message from EduNexus Support',
+          message: 'You have a new message from the EduNexus support team. Tap to read and reply.',
           type: 'message'
         });
       });
@@ -1718,8 +1731,8 @@ router.post('/chats/:chatId/notify', authenticate, async (req, res) => {
           recipientId: docObj.id,
           recipientRole: 'SUPER_ADMIN',
           schoolId: 'SUPER',
-          title: 'New Message',
-          message: `${req.user.name} (${req.user.schoolName || 'Your school'}) sent you a message`,
+          title: `💬 New Message from ${req.user.schoolName || 'Your School'}`,
+          message: `${req.user.name} sent you a message. Tap to read and reply.`,
           type: 'message'
         });
       });
@@ -1845,8 +1858,8 @@ resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) =
             recipientId: aDoc.id,
             recipientRole: 'SCHOOL_ADMIN',
             schoolId: req.user.schoolId,
-            title: 'New Result Submitted',
-            message: 'A teacher has submitted a new result for review',
+            title: '📋 Results Submitted for Review',
+            message: `${req.user.name || 'A teacher'} has submitted ${req.body.subjectId ? `${req.body.subjectId} results` : 'results'} for ${req.body.classId || 'a class'}. Tap to review.`,
             type: 'result',
             metadata: {
               classId: data.classId,
