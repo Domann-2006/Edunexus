@@ -14,6 +14,49 @@ interface ProfileImageProps {
   showCamera?: boolean;
 }
 
+const compressImage = (file: File): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+
+        // Max dimension 800px — enough for a profile picture
+        const MAX = 800;
+        let { width, height } = img;
+
+        if (width > height) {
+          if (width > MAX) { height = Math.round((height * MAX) / width); width = MAX; }
+        } else {
+          if (height > MAX) { width = Math.round((width * MAX) / height); height = MAX; }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas not supported'));
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to compressed JPEG at 75% quality
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Compression failed'));
+          },
+          'image/jpeg',
+          0.75
+        );
+      };
+      img.onerror = reject;
+    };
+    reader.onerror = reject;
+  });
+};
+
 export default function ProfileImage({ 
   url, 
   onUpload, 
@@ -143,11 +186,18 @@ export default function ProfileImage({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     const file = e.target.files?.[0];
     if (file) {
-      handleUpload(file);
+      try {
+        const compressed = await compressImage(file);
+        const compressedFile = new File([compressed], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+        handleUpload(compressedFile);
+      } catch (err) {
+        console.error('Compression failed, uploading original:', err);
+        handleUpload(file);
+      }
     }
     // Reset input value so same file can be selected again
     e.target.value = '';
