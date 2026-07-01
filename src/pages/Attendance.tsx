@@ -404,7 +404,15 @@ export default function Attendance({ user }: { user: any }) {
                       <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <ProfileImage url={student.avatarUrl} size="sm" />
+                            <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                              {student.avatarUrl ? (
+                                <img src={student.avatarUrl} alt={student.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              ) : (
+                                <span className="text-xs font-black text-gray-400">
+                                  {(student.name || '?').charAt(0).toUpperCase()}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-bold text-gray-900">{student.name}</span>
                           </div>
                         </td>
@@ -506,7 +514,15 @@ export default function Attendance({ user }: { user: any }) {
                           <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <ProfileImage url={student.avatarUrl} size="sm" />
+                                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                                  {student.avatarUrl ? (
+                                    <img src={student.avatarUrl} alt={student.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  ) : (
+                                    <span className="text-xs font-black text-gray-400">
+                                      {(student.name || '?').charAt(0).toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="font-bold text-gray-900">{student.name}</span>
                               </div>
                             </td>
@@ -713,77 +729,102 @@ export default function Attendance({ user }: { user: any }) {
             </button>
           </div>
 
-          {/* History Records Table */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto text-sm uppercase">
-              <table className="w-full text-left">
-                <thead className="bg-gray-50/50 text-gray-400 text-xs font-bold tracking-widest border-b border-gray-50">
-                  <tr>
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Class</th>
-                    <th className="px-6 py-4">Student</th>
-                    <th className="px-6 py-4">Admission #</th>
-                    <th className="px-6 py-4 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50 uppercase tracking-tight">
-                  {loadingHistory ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
-                        <Loader2 className="animate-spin inline mr-2 text-blue-600" size={20} />
-                        Loading History Records...
-                      </td>
-                    </tr>
-                  ) : historyRecords.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-gray-400 lowercase italic">
-                        No history records found matching criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    historyRecords.map((record) => (
-                      <tr key={record.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4 text-gray-500 font-mono text-xs">
-                          {record.date}
-                        </td>
-                        <td className="px-6 py-4 font-bold text-gray-900">
-                          {record.className}
-                        </td>
-                        <td className="px-6 py-4 font-bold text-gray-900">
-                          {record.studentName}
-                        </td>
-                        <td className="px-6 py-4 text-gray-500 font-mono text-xs">
-                          {record.admissionNumber}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {record.status === 'PRESENT' && (
-                            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black tracking-wider">
-                              PRESENT
-                            </span>
-                          )}
-                          {record.status === 'ABSENT' && (
-                            <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-[10px] font-black tracking-wider">
-                              ABSENT
-                            </span>
-                          )}
-                          {record.status === 'LATE' && (
-                            <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black tracking-wider">
-                              LATE
-                            </span>
-                          )}
-                          {record.status === 'EXCUSED' && (
-                            <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black tracking-wider">
-                              EXCUSED
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Group records by date then class */}
+          {(() => {
+            if (loadingHistory) return (
+              <div className="text-center py-12 text-gray-400">
+                <Loader2 className="animate-spin inline mr-2 text-blue-600" size={20} />
+                Loading history...
+              </div>
+            );
+            if (historyRecords.length === 0) return (
+              <div className="flex flex-col items-center justify-center py-16 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">No records found for selected filters</p>
+              </div>
+            );
+
+            // Group by date
+            const byDate = historyRecords.reduce((acc, r) => {
+              const d = r.date || 'Unknown Date';
+              if (!acc[d]) acc[d] = {};
+              const cls = r.className || r.classId || 'Unknown Class';
+              if (!acc[d][cls]) acc[d][cls] = [];
+              acc[d][cls].push(r);
+              return acc;
+            }, {} as Record<string, Record<string, any[]>>);
+
+            // Sort dates descending
+            const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+            return (
+              <div className="space-y-8">
+                {sortedDates.map(date => (
+                  <div key={date} className="space-y-4">
+                    {/* Date header */}
+                    <div className="flex items-center gap-4">
+                      <div className="px-4 py-2 bg-gray-900 text-white text-xs font-black uppercase tracking-widest rounded-xl">
+                        {new Date(date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                      </div>
+                      <div className="flex-1 h-px bg-gray-100" />
+                    </div>
+
+                    {/* Classes for this date */}
+                    {Object.entries(byDate[date]).map(([className, classRecords]) => {
+                      const recordsList = classRecords as any[];
+                      return (
+                        <div key={className} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                          {/* Class header with summary */}
+                          <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+                            <h3 className="font-black text-gray-900 text-sm">{className}</h3>
+                            <div className="flex items-center gap-3">
+                              {[
+                                { label: 'P', count: recordsList.filter(r => r.status === 'PRESENT').length, color: 'emerald' },
+                                { label: 'A', count: recordsList.filter(r => r.status === 'ABSENT').length, color: 'rose' },
+                                { label: 'L', count: recordsList.filter(r => r.status === 'LATE').length, color: 'amber' },
+                                { label: 'E', count: recordsList.filter(r => r.status === 'EXCUSED').length, color: 'blue' },
+                              ].map(s => (
+                                <div key={s.label} className={`flex items-center gap-1 px-2 py-1 rounded-lg bg-${s.color}-50`}>
+                                  <span className={`text-[10px] font-black text-${s.color}-600`}>{s.label}</span>
+                                  <span className={`text-[10px] font-black text-${s.color}-600`}>{s.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Student list with avatars */}
+                          <div className="divide-y divide-gray-50">
+                            {recordsList.map((record, idx) => (
+                              <div key={idx} className="flex items-center gap-4 px-6 py-3">
+                                {/* Avatar circle */}
+                                <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                                  {record.avatarUrl ? (
+                                    <img src={record.avatarUrl} alt={record.studentName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  ) : (
+                                    <span className="text-xs font-black text-gray-400">
+                                      {(record.studentName || '?').charAt(0).toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="flex-1 text-sm font-bold text-gray-900">{record.studentName || 'Unknown Student'}</span>
+                                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                  record.status === 'PRESENT' ? 'bg-emerald-50 text-emerald-600' :
+                                  record.status === 'ABSENT' ? 'bg-rose-50 text-rose-500' :
+                                  record.status === 'LATE' ? 'bg-amber-50 text-amber-600' :
+                                  'bg-blue-50 text-blue-600'
+                                }`}>
+                                  {record.status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

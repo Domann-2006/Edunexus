@@ -2012,6 +2012,25 @@ router.get('/attendance/daily-summary', authenticate, async (req, res) => {
     const submitted = summary.filter(s => s.submitted).length;
     const total = summary.length;
 
+    // Sort summary by school level order before returning
+    const levelOrder = ['CRECHE', 'KINDERGARTEN', 'NURSERY', 'PRIMARY', 'JSS', 'SSS'];
+    const getLevel = (name) => {
+      const n = (name || '').toUpperCase();
+      if (n.includes('CRECHE')) return 'CRECHE';
+      if (n.includes('KINDERGARTEN') || n.includes('KG')) return 'KINDERGARTEN';
+      if (n.includes('NURSERY')) return 'NURSERY';
+      if (n.includes('PRIMARY')) return 'PRIMARY';
+      if (n.includes('JSS') || n.includes('JUNIOR')) return 'JSS';
+      if (n.includes('SSS') || n.includes('SENIOR') || n.includes('SS')) return 'SSS';
+      return 'ZZZ';
+    };
+
+    summary.sort((a, b) => {
+      const levelDiff = levelOrder.indexOf(getLevel(a.className)) - levelOrder.indexOf(getLevel(b.className));
+      if (levelDiff !== 0) return levelDiff;
+      return a.className.localeCompare(b.className);
+    });
+
     res.json({ summary, submitted, total, date });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2044,7 +2063,8 @@ router.get('/attendance/history', authenticate, async (req, res) => {
       const data = doc.data();
       studentMap[doc.id] = {
         name: data.name,
-        admissionNumber: data.admissionNumber
+        admissionNumber: data.admissionNumber,
+        avatarUrl: data.avatarUrl || ''
       };
     });
 
@@ -2057,13 +2077,31 @@ router.get('/attendance/history', authenticate, async (req, res) => {
     records = records.map(r => ({
       ...r,
       studentName: studentMap[r.studentId]?.name || 'Unknown Student',
+      avatarUrl: studentMap[r.studentId]?.avatarUrl || '',
       admissionNumber: studentMap[r.studentId]?.admissionNumber || '',
       className: classMap[r.classId] || 'Unknown Class'
     }));
+
+    // Enrich records with student names and avatars if still missing
+    const enrichedRecords = await Promise.all(records.map(async (record) => {
+      if (record.studentName && record.studentName !== 'Unknown Student') return record;
+      // studentName missing, fetch from students collection
+      try {
+        const studentDoc = await db.collection('students').doc(record.studentId).get();
+        if (studentDoc.exists) {
+          return { 
+            ...record, 
+            studentName: studentDoc.data().name || 'Unknown',
+            avatarUrl: studentDoc.data().avatarUrl || ''
+          };
+        }
+      } catch (e) {}
+      return record;
+    }));
     
     // In-memory sort to avoid index requirements in Firestore
-    records.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    const limitedRecords = records.slice(0, 200);
+    enrichedRecords.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const limitedRecords = enrichedRecords.slice(0, 200);
 
     res.json({ records: limitedRecords });
   } catch (err) {
