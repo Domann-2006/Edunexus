@@ -14,49 +14,6 @@ interface ProfileImageProps {
   showCamera?: boolean;
 }
 
-const compressImage = (file: File): Promise<Blob> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (e) => {
-      const img = new Image();
-      img.src = e.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-
-        // Max dimension 800px — enough for a profile picture
-        const MAX = 800;
-        let { width, height } = img;
-
-        if (width > height) {
-          if (width > MAX) { height = Math.round((height * MAX) / width); width = MAX; }
-        } else {
-          if (height > MAX) { width = Math.round((width * MAX) / height); height = MAX; }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return reject(new Error('Canvas not supported'));
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Convert to compressed JPEG at 75% quality
-        canvas.toBlob(
-          (blob) => {
-            if (blob) resolve(blob);
-            else reject(new Error('Compression failed'));
-          },
-          'image/jpeg',
-          0.75
-        );
-      };
-      img.onerror = reject;
-    };
-    reader.onerror = reject;
-  });
-};
-
 export default function ProfileImage({ 
   url, 
   onUpload, 
@@ -127,22 +84,20 @@ export default function ProfileImage({
     let compressedObjectUrl: string | null = null;
 
     try {
-      // For very large files, avoid setting a preview immediately as it might crash small devices
-      if (file.size < 5 * 1024 * 1024) {
-        primaryObjectUrl = URL.createObjectURL(file);
-        setPreviewUrl(primaryObjectUrl);
-      }
+      // Skip preview before compression — saves memory on low RAM devices
+      // Preview will be set after compression succeeds
 
       // Give the UI a chance to update before heavy compression starts
       await new Promise(resolve => setTimeout(resolve, 200));
 
       // Compression options - optimized for low-memory environments
       const options = {
-        maxSizeMB: 0.4, // Target 400KB
-        maxWidthOrHeight: 800, // Reduced resolution for stability
-        useWebWorker: true,
-        initialQuality: 0.6,
+        maxSizeMB: 0.3,        // Target 300KB
+        maxWidthOrHeight: 600, // Smaller dimension for low RAM phones
+        useWebWorker: true,    // Keeps compression off the main thread
+        initialQuality: 0.5,
         alwaysKeepResolution: false,
+        signal: undefined,
       };
 
       let fileToUpload = file;
@@ -190,14 +145,8 @@ export default function ProfileImage({
     e.preventDefault();
     const file = e.target.files?.[0];
     if (file) {
-      try {
-        const compressed = await compressImage(file);
-        const compressedFile = new File([compressed], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
-        handleUpload(compressedFile);
-      } catch (err) {
-        console.error('Compression failed, uploading original:', err);
-        handleUpload(file);
-      }
+      // Pass directly to handleUpload — compression handled there via Web Worker
+      handleUpload(file);
     }
     // Reset input value so same file can be selected again
     e.target.value = '';

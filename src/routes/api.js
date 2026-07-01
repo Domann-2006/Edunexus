@@ -1981,6 +1981,23 @@ router.get('/attendance/daily-summary', authenticate, async (req, res) => {
     const classesSnap = await db.collection('classes')
       .where('schoolId', '==', schoolId).get();
 
+    // Fetch all teachers for this school and map classId → teacher name
+    const teachersSnap = await db.collection('teachers')
+      .where('schoolId', '==', schoolId)
+      .get();
+
+    const classTeacherMap = {};
+    teachersSnap.docs.forEach(doc => {
+      const t = doc.data();
+      // Only class teachers and BOTH role types
+      if (t.roleType === 'CLASS' || t.roleType === 'BOTH' || !t.roleType) {
+        const assignedClasses = t.assignedClassIds || t.classAssignments || [];
+        assignedClasses.forEach(classId => {
+          classTeacherMap[classId] = t.name || t.fullName || 'Unknown Teacher';
+        });
+      }
+    });
+
     const summary = await Promise.all(classesSnap.docs.map(async (classDoc) => {
       const classData = classDoc.data();
       const attendanceSnap = await db.collection('attendance')
@@ -1999,7 +2016,7 @@ router.get('/attendance/daily-summary', authenticate, async (req, res) => {
       return {
         classId: classDoc.id,
         className: classData.name,
-        teacherName: classData.teacherName || 'Unassigned',
+        teacherName: classTeacherMap[classDoc.id] || classData.teacherName || 'Unassigned',
         total,
         present,
         absent,
