@@ -109,7 +109,7 @@ service cloud.firestore {
     // Notifications security rules
     match /notifications/{notificationId} {
       allow read, update, delete: if isSignedIn() && resource.data.recipientId == request.auth.uid;
-      allow create: if isSignedIn();
+      allow create: if false;
     }
   }
 }

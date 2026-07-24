@@ -104,56 +104,63 @@ export const invalidateAllCaches = (schoolId = null) => {
 // Helper to setup curriculum
 async function setupSchoolCurriculum(schoolId) {
   try {
-    const batch = db.batch();
-    
-    // Create Default Sessions
-    const currentYear = new Date().getFullYear();
-    const sessionData = {
-      name: `${currentYear}/${currentYear + 1}`,
-      isCurrent: true,
-      schoolId: schoolId,
-      createdAt: new Date().toISOString()
-    };
-    const sessionRef = db.collection('sessions').doc();
-    batch.set(sessionRef, sessionData);
+    const ops = []; // collect all { ref, data } pairs first
 
-    // Create Classes and Subjects
+    const currentYear = new Date().getFullYear();
+    const sessionRef = db.collection('sessions').doc();
+    ops.push({
+      ref: sessionRef,
+      data: {
+        name: `${currentYear}/${currentYear + 1}`,
+        isCurrent: true,
+        schoolId,
+        createdAt: new Date().toISOString()
+      }
+    });
+
     for (const level of Object.keys(LEVEL_CLASSES)) {
-      // Create Classes and Subjects for this level
       const classNames = LEVEL_CLASSES[level];
       const streamSubjects = DEFAULT_SUBJECTS[level];
 
       for (const className of classNames) {
         const classRef = db.collection('classes').doc();
-        batch.set(classRef, {
-          name: className,
-          level: level,
-          schoolId: schoolId,
-          createdAt: new Date().toISOString()
+        ops.push({
+          ref: classRef,
+          data: {
+            name: className,
+            level,
+            schoolId,
+            createdAt: new Date().toISOString()
+          }
         });
 
-        // Create Subjects for each class in this level
         for (const stream of Object.keys(streamSubjects)) {
-          const subjects = streamSubjects[stream];
-          for (const subjectName of subjects) {
+          for (const subjectName of streamSubjects[stream]) {
             const subjectRef = db.collection('subjects').doc();
-            batch.set(subjectRef, {
-              name: subjectName,
-              level: level,
-              class: className,
-              stream: stream,
-              schoolId: schoolId,
-              createdAt: new Date().toISOString()
+            ops.push({
+              ref: subjectRef,
+              data: {
+                name: subjectName,
+                level,
+                class: className,
+                stream,
+                schoolId,
+                createdAt: new Date().toISOString()
+              }
             });
           }
         }
       }
     }
 
-    await batch.commit();
+    // Commit in chunks of 400
+    for (let i = 0; i < ops.length; i += 400) {
+      const batch = db.batch();
+      ops.slice(i, i + 400).forEach(({ ref, data }) => batch.set(ref, data));
+      await batch.commit();
+    }
   } catch (err) {
     console.error('Failed to preload curriculum:', err);
-    // Don't throw, we want the school creation to succeed even if preloading fails
   }
 }
 
@@ -732,12 +739,15 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           try {
             const collectionsToClean = ['users', 'students', 'teachers', 'classes', 'subjects', 'results', 'attendance', 'sessions', 'activity-logs', 'notifications'];
             for (const col of collectionsToClean) {
-              const snap = await db.collection(col).where('schoolId', '==', schoolId).limit(500).get();
-              if (!snap.empty) {
-                const batch = db.batch();
-                snap.docs.forEach(d => batch.delete(d.ref));
-                await batch.commit();
-              }
+              let snap;
+              do {
+                snap = await db.collection(col).where('schoolId', '==', schoolId).limit(500).get();
+                if (!snap.empty) {
+                  const batch = db.batch();
+                  snap.docs.forEach(d => batch.delete(d.ref));
+                  await batch.commit();
+                }
+              } while (!snap.empty);
             }
             // Delete chat documents
             const chatIds = [schoolId, `group_${schoolId}`];
@@ -1065,7 +1075,7 @@ teacherRouter.delete('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (r
 
     // Automatically clean up chats
     try {
-      await removeTeacherChats(teacherData.schoolId, req.params.id);
+      await removeTeacherChats(teacherData.schoolId, teacherData.userId);
     } catch (chatErr) {
       console.error('Failed to auto-cleanup teacher chats in Firestore:', chatErr);
     }
@@ -2346,11 +2356,14 @@ router.put('/notifications/mark-all-read', authenticate, async (req, res) => {
       return res.json({ success: true, count: 0 });
     }
 
-    const batch = db.batch();
-    snapshot.docs.forEach(docObj => {
-      batch.update(docObj.ref, { read: true });
-    });
-    await batch.commit();
+    const batchSize = 500;
+    for (let i = 0; i < snapshot.docs.length; i += batchSize) {
+      const batch = db.batch();
+      snapshot.docs.slice(i, i + batchSize).forEach(docObj => {
+        batch.update(docObj.ref, { read: true });
+      });
+      await batch.commit();
+    }
 
     res.json({ success: true, count: snapshot.size });
   } catch (err) {
