@@ -46,6 +46,14 @@ router.post('/login', async (req, res) => {
     }
 
     
+    let schoolName = null;
+    if (user.schoolId && user.schoolId !== 'SUPER') {
+      const schoolDoc = await db.collection('schools').doc(user.schoolId).get();
+      if (schoolDoc.exists) {
+        schoolName = schoolDoc.data().name;
+      }
+    }
+
     // Log Activity
     try {
       await db.collection('activity-logs').add({
@@ -55,6 +63,7 @@ router.post('/login', async (req, res) => {
         action: 'LOGIN',
         details: `${user.role === 'TEACHER' ? 'Teacher' : user.role === 'SCHOOL_ADMIN' ? 'School Admin' : 'Super Admin'} logged in successfully.`,
         schoolId: user.schoolId || 'SUPER',
+        schoolName: schoolName || 'System',
         createdAt: new Date().toISOString()
       });
     } catch (logErr) {
@@ -79,7 +88,8 @@ router.post('/login', async (req, res) => {
         email: user.email, 
         role: user.role, 
         schoolId: user.schoolId,
-        roleType: roleType
+        roleType: roleType,
+        schoolName
       },
       JWT_SECRET,
       { expiresIn: '1d' }
@@ -92,14 +102,6 @@ router.post('/login', async (req, res) => {
       firebaseToken = await adminAuth.createCustomToken(user.id);
     } catch (fbErr) {
       console.error('Failed to generate Firebase token:', fbErr);
-    }
-
-    let schoolName = null;
-    if (user.schoolId && user.schoolId !== 'SUPER') {
-      const schoolDoc = await db.collection('schools').doc(user.schoolId).get();
-      if (schoolDoc.exists) {
-        schoolName = schoolDoc.data().name;
-      }
     }
 
     res.cookie('token', token, { 

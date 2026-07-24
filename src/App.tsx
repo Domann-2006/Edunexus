@@ -90,7 +90,7 @@ export default function App() {
             console.error('Session validation failed in background:', err);
             // Only logout if we get a clear 401 AND the token is actually missing
             // Network errors or server hiccups should NOT log the user out
-            if (err.response?.status === 401 && !safeLocalStorage.getItem('token')) {
+            if (err.response?.status === 401) {
               handleLogout();
             }
             // Otherwise silently fail — user stays logged in
@@ -174,7 +174,9 @@ export default function App() {
         <Route path="/" element={
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
-              <Dashboard user={user} />
+              <ErrorBoundary>
+                <Dashboard user={user} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -182,7 +184,9 @@ export default function App() {
         <Route path="/students" element={
           <ProtectedRoute roles={OPERATIONAL_ROLES}>
             <Layout user={user} onLogout={handleLogout}>
-              <Students user={user} />
+              <ErrorBoundary>
+                <Students user={user} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -190,7 +194,9 @@ export default function App() {
         <Route path="/teachers" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <Teachers user={user} />
+              <ErrorBoundary>
+                <Teachers user={user} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -198,7 +204,9 @@ export default function App() {
         <Route path="/classes" element={
           <ProtectedRoute roles={OPERATIONAL_ROLES}>
             <Layout user={user} onLogout={handleLogout}>
-              <Classes user={user} />
+              <ErrorBoundary>
+                <Classes user={user} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -206,7 +214,9 @@ export default function App() {
         <Route path="/subjects" element={
           <ProtectedRoute roles={OPERATIONAL_ROLES}>
             <Layout user={user} onLogout={handleLogout}>
-              <Subjects user={user} />
+              <ErrorBoundary>
+                <Subjects user={user} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -214,7 +224,9 @@ export default function App() {
         <Route path="/results" element={
           <ProtectedRoute roles={OPERATIONAL_ROLES}>
             <Layout user={user} onLogout={handleLogout}>
-              <Results user={user} />
+              <ErrorBoundary>
+                <Results user={user} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -222,9 +234,11 @@ export default function App() {
         <Route path="/attendance" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN', 'TEACHER']}>
             <Layout user={user} onLogout={handleLogout}>
-              {user?.roleType === 'SUBJECT' 
-                ? <Navigate to="/dashboard" /> 
-                : <Attendance user={user} />}
+              <ErrorBoundary>
+                {user?.roleType === 'SUBJECT' 
+                  ? <Navigate to="/dashboard" /> 
+                  : <Attendance user={user} />}
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -232,7 +246,9 @@ export default function App() {
         <Route path="/activity-logs" element={
           <ProtectedRoute roles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <ActivityLogs user={user} />
+              <ErrorBoundary>
+                <ActivityLogs user={user} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -240,7 +256,9 @@ export default function App() {
         <Route path="/profile" element={
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
-              <Profile user={user} updateUser={updateUser} refreshUser={refreshUser} />
+              <ErrorBoundary>
+                <Profile user={user} updateUser={updateUser} refreshUser={refreshUser} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -248,7 +266,9 @@ export default function App() {
         <Route path="/notifications" element={
           <ProtectedRoute>
             <Layout user={user} onLogout={handleLogout}>
-              <Notifications user={user} />
+              <ErrorBoundary>
+                <Notifications user={user} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -256,7 +276,9 @@ export default function App() {
         <Route path="/schools" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <Schools />
+              <ErrorBoundary>
+                <Schools />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -264,7 +286,9 @@ export default function App() {
         <Route path="/super-admin/admins" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <SchoolAdmins />
+              <ErrorBoundary>
+                <SchoolAdmins />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -282,7 +306,9 @@ export default function App() {
         <Route path="/subscription-details" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <SubscriptionDetails />
+              <ErrorBoundary>
+                <SubscriptionDetails />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -290,7 +316,9 @@ export default function App() {
         <Route path="/super-admin/subscriptions" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <Subscriptions />
+              <ErrorBoundary>
+                <Subscriptions />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -298,7 +326,9 @@ export default function App() {
         <Route path="/super-admin/reports" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <PlatformReports />
+              <ErrorBoundary>
+                <PlatformReports />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -306,7 +336,9 @@ export default function App() {
         <Route path="/super-admin/announcements" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <Announcements />
+              <ErrorBoundary>
+                <Announcements />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -314,7 +346,9 @@ export default function App() {
         <Route path="/super-admin/settings" element={
           <ProtectedRoute roles={['SUPER_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <PlatformSettings />
+              <ErrorBoundary>
+                <PlatformSettings />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />
@@ -322,7 +356,9 @@ export default function App() {
         <Route path="/settings/school" element={
           <ProtectedRoute roles={['SCHOOL_ADMIN']}>
             <Layout user={user} onLogout={handleLogout}>
-              <SchoolSettings user={user} refreshUser={refreshUser} />
+              <ErrorBoundary>
+                <SchoolSettings user={user} refreshUser={refreshUser} />
+              </ErrorBoundary>
             </Layout>
           </ProtectedRoute>
         } />

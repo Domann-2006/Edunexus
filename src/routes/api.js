@@ -948,24 +948,7 @@ teacherRouter.post('/', authenticate, authorize(['SCHOOL_ADMIN']), async (req, r
     
     const teacherRef = await db.collection('teachers').add(teacherData);
 
-    // Auto-initialize DM chat for new teacher
-    {
-      const newUser = userRef;
-      const schoolId = req.user.schoolId;
-      const teacherUserId = newUser.id;
-      const firstName = req.body.firstName || name.split(' ')[0] || '';
-      const lastName = req.body.lastName || name.split(' ').slice(1).join(' ') || '';
-      await db.collection('chats').doc(`dm_${schoolId}_${teacherUserId}`).set({
-        schoolId,
-        teacherId: teacherUserId,
-        teacherName: `${firstName} ${lastName}`,
-        type: 'dm',
-        lastMessage: '',
-        unreadCount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    }
+
 
     // Automatically create chats
     try {
@@ -1479,7 +1462,7 @@ const getMyChatsHandler = async (req, res) => {
       }
 
       if (!group && !dm) {
-        return res.status(404).json({ message: 'No chats found' });
+        return res.json({ group: null, dm: null });
       }
 
       return res.json({ group, dm });
@@ -2234,8 +2217,8 @@ router.get('/enrollment-trend', authenticate, async (req, res) => {
       const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
 
       let q = db.collection('students')
-        .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(start))
-        .where('createdAt', '<=', admin.firestore.Timestamp.fromDate(end));
+        .where('createdAt', '>=', start.toISOString())
+        .where('createdAt', '<=', end.toISOString());
 
       if (schoolId) q = q.where('schoolId', '==', schoolId);
 
@@ -2420,11 +2403,13 @@ router.post('/results/approve', authenticate, async (req, res) => {
     if (req.user?.role !== 'SCHOOL_ADMIN') {
       return res.status(403).json({ error: 'Unauthorized' });
     }
-    const { classId, subjectId } = req.body;
+    const { classId, subjectId, sessionId, term } = req.body;
     const snap = await db.collection('results')
       .where('classId', '==', classId)
       .where('subjectId', '==', subjectId)
       .where('schoolId', '==', req.user.schoolId)
+      .where('sessionId', '==', sessionId)
+      .where('term', '==', term)
       .get();
 
     const batch = db.batch();
@@ -2446,14 +2431,16 @@ router.post('/results/approve', authenticate, async (req, res) => {
 // Auto-collate scores for class teacher view
 router.get('/results/collated', authenticate, async (req, res) => {
   try {
-    const { classId } = req.query;
+    const { classId, sessionId, term } = req.query;
     const schoolId = req.user.schoolId;
 
-    const snap = await db.collection('results')
+    let q = db.collection('results')
       .where('classId', '==', classId)
       .where('schoolId', '==', schoolId)
-      .where('status', 'in', ['PENDING_ADMIN', 'APPROVED'])
-      .get();
+      .where('status', 'in', ['PENDING_ADMIN', 'APPROVED']);
+    if (sessionId) q = q.where('sessionId', '==', sessionId);
+    if (term) q = q.where('term', '==', term);
+    const snap = await q.get();
 
     const collated = {};
     snap.docs.forEach(doc => {

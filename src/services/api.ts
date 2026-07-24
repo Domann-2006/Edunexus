@@ -90,8 +90,12 @@ try {
   const savedCache = localStorage.getItem('edunexus_client_cache');
   if (savedCache) {
     const parsed = JSON.parse(savedCache);
+    const MAX_CACHE_AGE = 10 * 60 * 1000; // 10 minutes
     Object.keys(parsed).forEach(key => {
-      clientCache.set(key, parsed[key]);
+      const entry = parsed[key];
+      if (entry && Date.now() - entry.timestamp < MAX_CACHE_AGE) {
+        clientCache.set(key, entry);
+      }
     });
     console.log('[CACHE] Restored cache slots from storage:', clientCache.size);
   }
@@ -557,7 +561,7 @@ export const sessionService = {
 export const attendanceService = {
   list: (params?: any) => api.get('/v1/attendance', { params }),
   create: (data: any) => api.post('/v1/attendance', data),
-  bulkCreate: (records: any[]) => Promise.all(records.map(r => api.post('/v1/attendance', r))),
+  bulkCreate: (records: any[]) => api.post('/v1/attendance/bulk-save', { records }),
   update: (id: string, data: any) => api.put(`/v1/attendance/${id}`, data),
   delete: (id: string) => api.delete(`/v1/attendance/${id}`),
 };
@@ -604,9 +608,6 @@ export const fileService = {
   upload: async (file: File, folder: string = 'uploads', onProgress?: (p: number) => void) => {
     const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-    // Temporary debugging logs as requested
-    console.log('Cloudinary Config:', { cloudName, uploadPreset });
 
     if (!cloudName || !uploadPreset) {
       throw new Error('Cloudinary configuration is missing. Please check VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET.');
