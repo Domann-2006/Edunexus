@@ -189,7 +189,9 @@ export default function Results({ user }: { user: any }) {
     try {
       await api.post('/v1/results/approve', {
         classId: filters.classId,
-        subjectId: filters.subjectId
+        subjectId: filters.subjectId,
+        sessionId: filters.sessionId,
+        term: filters.term
       });
       showToast("Results approved successfully.");
       loadResults();

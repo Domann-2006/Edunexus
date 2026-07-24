@@ -88,12 +88,11 @@ export default function App() {
             }
           } catch (err: any) {
             console.error('Session validation failed in background:', err);
-            // Only logout if we get a clear 401 AND the token is actually missing
-            // Network errors or server hiccups should NOT log the user out
+            // Logout on any 401 — token has expired or been invalidated
             if (err.response?.status === 401) {
               handleLogout();
             }
-            // Otherwise silently fail — user stays logged in
+            // Otherwise silently fail — network errors should not log the user out
           }
         } else {
           // No session found
