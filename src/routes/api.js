@@ -252,7 +252,7 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         teachers: ['classId', 'roleType'],
         classes: ['level'],
         subjects: ['level', 'class', 'stream'],
-        results: ['classId', 'subjectName', 'status', 'sessionId', 'term'],
+        results: ['classId', 'subjectName', 'subjectId', 'studentId', 'status', 'sessionId', 'term'],
         attendance: ['classId', 'date', 'sessionId'],
         sessions: ['isCurrent'],
         announcements: ['type'],
@@ -1859,7 +1859,7 @@ resultsRouter.post('/', authenticate, authorize(['TEACHER']), async (req, res) =
             recipientRole: 'SCHOOL_ADMIN',
             schoolId: req.user.schoolId,
             title: '📋 Results Submitted for Review',
-            message: `${req.user.name || 'A teacher'} has submitted ${req.body.subjectId ? `${req.body.subjectId} results` : 'results'} for ${req.body.classId || 'a class'}. Tap to review.`,
+            message: `${req.user.name || 'A teacher'} has submitted ${subjectName ? `${subjectName}` : 'results'} for class ${data.classId || 'a class'}. Tap to review.`,
             type: 'result',
             metadata: {
               classId: data.classId,

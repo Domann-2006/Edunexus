@@ -105,7 +105,7 @@ export default function Results({ user }: { user: any }) {
   const fetchCollatedResults = async () => {
     if (!filters.classId) return;
     try {
-      const res = await api.get(`/results/collated?classId=${filters.classId}`);
+      const res = await api.get(`/v1/results/collated?classId=${filters.classId}`);
       setCollatedResults(res.data.collated || []);
     } catch (err) {
       console.error('Failed to fetch collated results:', err);
@@ -135,7 +135,7 @@ export default function Results({ user }: { user: any }) {
         };
       });
 
-      await api.post('/results/submit', {
+      await api.post('/v1/results/submit', {
         classId: filters.classId,
         subjectId: filters.subjectId,
         scores: scoresArray,
@@ -168,7 +168,7 @@ export default function Results({ user }: { user: any }) {
         };
       });
 
-      await api.post('/results/submit', {
+      await api.post('/v1/results/submit', {
         classId: filters.classId,
         subjectId: filters.subjectId,
         scores: scoresArray,
@@ -187,7 +187,7 @@ export default function Results({ user }: { user: any }) {
   const handleApproveResults = async () => {
     setSaving(true);
     try {
-      await api.post('/results/approve', {
+      await api.post('/v1/results/approve', {
         classId: filters.classId,
         subjectId: filters.subjectId
       });
@@ -455,17 +455,19 @@ export default function Results({ user }: { user: any }) {
 
   const exportCSV = () => {
     if (students.length === 0) return;
-    const headers = ['Student Name', 'Admission #', 'CA 1', 'CA 2', 'Exam', 'Total', 'Grade', 'Remark'];
+    const headers = ['Student Name', 'Admission #', 'CA 1', 'CA 2', 'Assignment', 'Test', 'Exam', 'Total', 'Grade', 'Remark'];
     const rows = students.map(student => {
       const studentId = student.userId || student.id;
       const s = scores[studentId];
-      const total = s.ca1 + s.ca2 + s.exam;
+      const total = s.ca1 + s.ca2 + s.assignment + s.test + s.exam;
       const res = results.find(r => r.studentId === studentId);
       return [
         student.name,
         student.admissionNumber,
         s.ca1,
         s.ca2,
+        s.assignment,
+        s.test,
         s.exam,
         res?.total || total,
         res?.grade || '-',
