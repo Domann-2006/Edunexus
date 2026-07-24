@@ -422,35 +422,56 @@ export default function Messages({ user }: { user: any }) {
 
   // Real-time listener for discussions list (only runs when Firebase credentials match)
   useEffect(() => {
-    if (!user) return;
+    if (!user || !firebaseReady) return;
 
-    const q = query(collection(db, 'chats'), orderBy('updatedAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const convos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const filtered = isSuper ? convos : convos.filter((c: any) =>
-        c.id === user.schoolId ||
-        c.id === `group_${user.schoolId}` ||
-        c.id.startsWith(`dm_${user.schoolId}_`)
-      );
-      setConversations(filtered);
-      setLoading(false);
-    }, (error: any) => {
-      if (error?.code === 'permission-denied') {
+    // Super Admin: listen to all chats via full collection query (rules allow this)
+    if (isSuper) {
+      const q = query(collection(db, 'chats'), orderBy('updatedAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const convos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setConversations(convos);
         setLoading(false);
-        return;
-      }
-      console.warn('[FIRESTORE_CONVOS] Snapshot security check fallback:', error);
+      }, (error: any) => {
+        console.warn('[FIRESTORE_CONVOS] Super admin snapshot error:', error);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }
+
+    // School Admin and Teacher: use targeted document listeners for known chat IDs
+    // myChats is already loaded by fetchMyChats() on mount via REST API
+    const chatIds: string[] = [];
+    if (myChats?.support?.id) chatIds.push(myChats.support.id);
+    if (myChats?.group?.id) chatIds.push(myChats.group.id);
+    if ((myChats as any)?.dm?.id) chatIds.push((myChats as any).dm.id);
+    if (myChats?.dms?.length) myChats.dms.forEach((d: any) => chatIds.push(d.id));
+
+    if (chatIds.length === 0) {
       setLoading(false);
-      try {
-        handleFirestoreError(error, OperationType.LIST, 'chats');
-      } catch (err) {
-        // Log details but don't disrupt user loop
-      }
+      return;
+    }
+
+    const unsubscribes: (() => void)[] = [];
+
+    chatIds.forEach(chatId => {
+      const unsubscribe = onSnapshot(doc(db, 'chats', chatId), (snap) => {
+        if (!snap.exists()) return;
+        const updated = { id: snap.id, ...snap.data() };
+        setConversations(prev => {
+          const exists = prev.find(c => c.id === snap.id);
+          if (exists) return prev.map(c => c.id === snap.id ? updated : c);
+          return [...prev, updated];
+        });
+        setLoading(false);
+      }, (error: any) => {
+        console.warn(`[FIRESTORE_CHAT] Listener error for ${chatId}:`, error);
+        setLoading(false);
+      });
+      unsubscribes.push(unsubscribe);
     });
 
-    return () => unsubscribe();
-  }, [user?.id, isSuper, firebaseReady]);
+    return () => unsubscribes.forEach(fn => fn());
+  }, [user?.id, isSuper, firebaseReady, myChats]);
 
   // Real-time listener for current chat's discussions subcollection
   useEffect(() => {
@@ -704,14 +725,27 @@ export default function Messages({ user }: { user: any }) {
 
       // Atomically write message and merge conversation details to ensure reliable storage
       try {
-        await setDoc(doc(db, 'chats', selectedChat.id, 'messages', msgId), firestorePayload);
-
-        // Fire-and-forget notification trigger
-        api.post(`/v1/chats/${selectedChat.id}/notify`, {
-          senderName: user?.name,
-          senderRole: user?.role,
-          text: newMessage
-        }).catch(() => {});
+        if (user.role === 'TEACHER') {
+          // Teachers are blocked by Firestore rules — send via REST API
+          await api.post(`/v1/chats/${selectedChat.id}/messages`, {
+            text: messageText || '',
+            attachment: attachmentToSend || null
+          });
+          // Notify
+          api.post(`/v1/chats/${selectedChat.id}/notify`, {
+            senderName: user?.name,
+            senderRole: user?.role,
+            text: messageText
+          }).catch(() => {});
+        } else {
+          // Admins write directly to Firestore for real-time delivery
+          await setDoc(doc(db, 'chats', selectedChat.id, 'messages', msgId), firestorePayload);
+          api.post(`/v1/chats/${selectedChat.id}/notify`, {
+            senderName: user?.name,
+            senderRole: user?.role,
+            text: messageText
+          }).catch(() => {});
+        }
       } catch (writeErr: any) {
         // FIX 3: Add a console.error with the actual Firestore permission error message and code when sendMessage fails
         console.error('[FIRESTORE_WRITE_ERROR_DETAILS] Failed to write message to Firestore:', {
