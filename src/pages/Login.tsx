@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { authService } from '../services/api';
 import { BookOpen, User, Lock, ArrowRight, Loader2, Shield, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
+import ConnectionStatus from '../components/ConnectionStatus';
 
 interface LoginProps {
   onLogin: (user: any) => void;
@@ -275,8 +276,10 @@ export default function Login({ onLogin }: LoginProps) {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <ConnectionStatus />
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -326,5 +329,6 @@ export default function Login({ onLogin }: LoginProps) {
         </p>
       </div>
     </div>
-  );
+  </div>
+);
 }
