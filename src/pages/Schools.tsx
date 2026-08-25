@@ -49,11 +49,23 @@ export default function Schools() {
     }
   };
 
+  const isValidEmail = (email: string) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email.trim());
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.email && !isValidEmail(formData.email)) {
+      showToast('Please enter a valid school email address.', 'error');
+      return;
+    }
+    if ((!editingId || formData.adminEmail) && !isValidEmail(formData.adminEmail)) {
+      showToast('Please enter a valid admin email address (e.g. admin@school.com).', 'error');
+      return;
+    }
     try {
       const data = {
         ...formData,
+        email: formData.email ? formData.email.trim().toLowerCase() : formData.email,
+        adminEmail: formData.adminEmail ? formData.adminEmail.trim().toLowerCase() : formData.adminEmail,
         subscriptionAmount: Number(formData.subscriptionAmount)
       };
 
@@ -67,8 +79,9 @@ export default function Schools() {
       }
       setIsModalOpen(false);
       fetchData();
-    } catch (err) {
-      showToast('Operation failed', 'error');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Operation failed';
+      showToast(msg, 'error');
     }
   };
 

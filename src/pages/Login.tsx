@@ -49,15 +49,21 @@ export default function Login({ onLogin }: LoginProps) {
   const [setupError, setSetupError] = useState('');
   const [setupSuccess, setSetupSuccess] = useState(false);
 
+  const isValidEmail = (val: string) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val.trim());
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginType) return;
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
     
     setLoading(true);
     setIsLoading(true);
     setError('');
     try {
-      const { data } = await authService.login({ email, password, loginType });
+      const { data } = await authService.login({ email: email.trim().toLowerCase(), password, loginType });
       // FIX: Bug 1 - Save firebaseToken to local storage at login so auth restorer can find it immediately
       if (data && data.firebaseToken) {
         localStorage.setItem('fireToken', data.firebaseToken);
@@ -76,6 +82,10 @@ export default function Login({ onLogin }: LoginProps) {
     e.preventDefault();
     if (!setupName.trim() || !setupEmail.trim() || !setupPassword.trim()) {
       setSetupError('All fields are required.');
+      return;
+    }
+    if (!isValidEmail(setupEmail)) {
+      setSetupError('Please enter a valid email address.');
       return;
     }
     

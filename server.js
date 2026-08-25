@@ -11,24 +11,27 @@ import apiRoutes from './src/routes/api.js';
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false, default: false },
   message: { message: 'Too many auth requests from this IP, please try again after 15 minutes' }
 });
 
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false, default: false },
   skip: (req) => req.originalUrl && req.originalUrl.startsWith('/api/auth'),
   message: { message: 'Too many requests from this IP, please try again after a minute' }
 });
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  app.set('trust proxy', 1);
+  const PORT = process.env.APP_PORT || 3000;
 
   app.use(compression());
 
@@ -91,29 +94,28 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Root route metadata
-  app.get('/', (req, res) => {
-    res.json({
-      name: 'EduNexus API Server',
-      version: '1.0.0',
-      status: 'online',
-      endpoints: {
-        health: '/api/health',
-        auth: '/api/auth'
-      }
+  // Serve Vite in development or static build in production
+  if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
     });
-  });
+    app.use(vite.middlewares);
+  } else {
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const distPath = path.resolve(__dirname, 'dist');
 
-  // Specialized 404 for any other non-API routes on the backend domain
-  app.use((req, res) => {
-    res.status(404).json({
-      error: 'Not Found',
-      message: 'This is an API-only server. For the web interface, please visit the official frontend domain.'
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.resolve(distPath, 'index.html'));
     });
-  });
+  }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`EduNexus API server running on port ${PORT}`);
+    console.log(`EduNexus server running on port ${PORT}`);
   });
 }
 

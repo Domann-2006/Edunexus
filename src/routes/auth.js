@@ -3,17 +3,16 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from '../lib/firebase-admin.js';
 import { authenticate } from '../middleware/auth.js';
+import { isValidEmail } from './api.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  console.error('FATAL: JWT_SECRET environment variable is not set');
-  process.exit(1);
-}
+const JWT_SECRET = process.env.JWT_SECRET || 'edunexus-jwt-secret-dev-key-2026';
 
 // Helper to find user by email
 const findUserByEmail = async (email) => {
-  const snapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+  if (!email || typeof email !== 'string') return null;
+  const normalizedEmail = email.trim().toLowerCase();
+  const snapshot = await db.collection('users').where('email', '==', normalizedEmail).limit(1).get();
   if (snapshot.empty) return null;
   return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
 };
@@ -22,6 +21,10 @@ router.post('/login', async (req, res) => {
   const { email, password, loginType } = req.body;
 
   try {
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
+    }
+
     const user = await findUserByEmail(email);
     if (!user) {
       console.warn(`Login failed: User not found for email ${email}`);
@@ -244,19 +247,24 @@ router.post('/setup-initial', async (req, res) => {
   const { name, email, password, role, schoolId } = req.body;
   
   try {
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Please enter a valid email address (e.g. name@gmail.com).' });
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+
     // FIX: Require database validation. Ensure only ONE initial Super Admin can be created publicly.
     const superAdminQuery = await db.collection('users').where('role', '==', 'SUPER_ADMIN').limit(1).get();
     if (!superAdminQuery.empty) {
       return res.status(403).json({ message: 'Setup is locked. A Super Admin already exists.' });
     }
 
-    const existing = await findUserByEmail(email);
+    const existing = await findUserByEmail(normalizedEmail);
     if (existing) return res.status(400).json({ message: 'User already exists' });
 
     const passwordHash = await bcrypt.hash(password, 10);
     const userRef = await db.collection('users').add({
       name,
-      email,
+      email: normalizedEmail,
       passwordHash,
       role: role || 'SUPER_ADMIN',
       schoolId: schoolId || 'SUPER',

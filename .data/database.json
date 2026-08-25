@@ -1,0 +1,24 @@
+{
+  "users": {
+    "doc_1787656462123_f3xi32g": {
+      "name": "Super Admin",
+      "email": "admin@edunexus.io",
+      "passwordHash": "$2b$10$l3Tg4vDvKyvKOm18p0kQieYHz9ZJutBA91vygu1Fi5Ku7H.5p.w9a",
+      "role": "SUPER_ADMIN",
+      "schoolId": "SUPER",
+      "createdAt": "2026-08-25T11:14:22.123Z"
+    }
+  },
+  "activity-logs": {
+    "doc_1787656466647_zbxm4jy": {
+      "userId": "doc_1787656462123_f3xi32g",
+      "userName": "Super Admin",
+      "role": "SUPER_ADMIN",
+      "action": "LOGIN",
+      "details": "Super Admin logged in successfully.",
+      "schoolId": "SUPER",
+      "schoolName": "System",
+      "createdAt": "2026-08-25T11:14:26.647Z"
+    }
+  }
+}

@@ -99,8 +99,14 @@ export default function Teachers({ user }: { user: any }) {
     }
   };
 
+  const isValidEmail = (email: string) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email.trim());
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidEmail(formData.email)) {
+      showToast('Please enter a valid email address (e.g. name@gmail.com).', 'error');
+      return;
+    }
     try {
       // Calculate union of assigned classes for downstream compatibility
       const classTeacherIds = formData.roleType === 'CLASS' || formData.roleType === 'BOTH' ? formData.classAssignments : [];
@@ -114,6 +120,7 @@ export default function Teachers({ user }: { user: any }) {
 
       const submitData = {
         ...formData,
+        email: formData.email.trim().toLowerCase(),
         roleType: formData.roleType,
         classAssignments: formData.classAssignments,
         subjectAssignments: formData.subjectAssignments,

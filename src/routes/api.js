@@ -7,6 +7,13 @@ import { LEVEL_CLASSES, DEFAULT_SUBJECTS } from '../lib/curriculum.js';
 
 const router = express.Router();
 
+export const isValidEmail = (email) => {
+  if (!email || typeof email !== 'string') return false;
+  const trimmed = email.trim();
+  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return EMAIL_REGEX.test(trimmed) && trimmed.length <= 254;
+};
+
 async function createNotification({ recipientId, recipientRole, schoolId, title, message, type, metadata }) {
   try {
     if (!recipientId) return;
@@ -411,6 +418,15 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
         if (collectionName === 'schools' && req.user?.role === 'SUPER_ADMIN') {
           const { adminPassword, ...schoolData } = req.body;
           
+          if (schoolData.adminEmail && !isValidEmail(schoolData.adminEmail)) {
+            return res.status(400).json({ message: 'Please enter a valid admin email address (e.g. admin@school.com).' });
+          }
+          if (schoolData.email && !isValidEmail(schoolData.email)) {
+            return res.status(400).json({ message: 'Please enter a valid school email address.' });
+          }
+          if (schoolData.adminEmail) schoolData.adminEmail = schoolData.adminEmail.trim().toLowerCase();
+          if (schoolData.email) schoolData.email = schoolData.email.trim().toLowerCase();
+
           // Create the school document (keeping adminName and adminEmail for metadata)
           const cleanSchoolData = { ...schoolData, createdAt: new Date().toISOString(), active: true };
           const schoolRef = await db.collection('schools').add(cleanSchoolData);
@@ -897,7 +913,13 @@ const teacherRouter = createCRUD('teachers', ['SCHOOL_ADMIN'], null, { skipPost:
 // Override POST for teachers to create user account
 teacherRouter.post('/', authenticate, authorize(['SCHOOL_ADMIN']), async (req, res) => {
   try {
-    const { name, email, username, password, assignedClassIds, assignedSubjectIds, roleType, classAssignments, subjectAssignments, ...teacherFields } = req.body;
+    let { name, email, username, password, assignedClassIds, assignedSubjectIds, roleType, classAssignments, subjectAssignments, ...teacherFields } = req.body;
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Please enter a valid email address (e.g. name@gmail.com).' });
+    }
+    email = email.trim().toLowerCase();
+
     const schoolId = req.user?.role === 'SUPER_ADMIN' ? (req.body.schoolId || req.user.schoolId) : req.user.schoolId;
 
     // Check if user already exists
@@ -994,6 +1016,10 @@ teacherRouter.put('/:id', authenticate, authorize(['SCHOOL_ADMIN']), async (req,
     }
 
     const { password, ...updateData } = req.body;
+    if (updateData.email && !isValidEmail(updateData.email)) {
+      return res.status(400).json({ message: 'Please enter a valid email address (e.g. name@gmail.com).' });
+    }
+    if (updateData.email) updateData.email = updateData.email.trim().toLowerCase();
     const finalUpdate = { ...updateData, updatedAt: new Date().toISOString() };
 
     // Update Teacher Profile
