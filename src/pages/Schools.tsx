@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { schoolService } from '../services/api';
-import { Plus, Edit2, Trash2, X, Loader2, School as SchoolIcon, CheckSquare, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Loader2, School as SchoolIcon, CheckSquare, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
@@ -33,6 +33,23 @@ export default function Schools() {
     subscriptionStatus: 'ACTIVE',
   });
 
+  const COUNTRY_CODES = [
+    { code: '+234', country: 'Nigeria' },
+    { code: '+1', country: 'United States' },
+    { code: '+1', country: 'Canada' },
+    { code: '+44', country: 'United Kingdom' },
+    { code: '+233', country: 'Ghana' },
+    { code: '+254', country: 'Kenya' },
+    { code: '+27', country: 'South Africa' },
+    { code: '+91', country: 'India' },
+    { code: '+20', country: 'Egypt' },
+  ];
+
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+234');
+  const [phoneLocalNumber, setPhoneLocalNumber] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [adminPasswordConfirm, setAdminPasswordConfirm] = useState('');
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -58,12 +75,18 @@ export default function Schools() {
       return;
     }
     if ((!editingId || formData.adminEmail) && !isValidEmail(formData.adminEmail)) {
-      showToast('Please enter a valid admin email address (e.g. admin@school.com).', 'error');
+      showToast('Please enter a valid admin email address (e.g. admin@gmail.com).', 'error');
+      return;
+    }
+    if (!editingId && formData.adminPassword !== adminPasswordConfirm) {
+      showToast('Passwords do not match.', 'error');
       return;
     }
     try {
+      const combinedPhone = phoneLocalNumber ? `${phoneCountryCode} ${phoneLocalNumber}`.trim() : '';
       const data = {
         ...formData,
+        phone: combinedPhone,
         email: formData.email ? formData.email.trim().toLowerCase() : formData.email,
         adminEmail: formData.adminEmail ? formData.adminEmail.trim().toLowerCase() : formData.adminEmail,
         subscriptionAmount: Number(formData.subscriptionAmount)
@@ -96,6 +119,8 @@ export default function Schools() {
   };
 
   const openModal = (school?: any) => {
+    setAdminPasswordConfirm('');
+    setShowAdminPassword(false);
     if (school) {
       setEditingId(school.id);
       setFormData({
@@ -113,6 +138,10 @@ export default function Schools() {
         subscriptionEndDate: school.subscriptionEndDate || '',
         subscriptionStatus: school.subscriptionStatus || 'ACTIVE',
       });
+      const existingPhone = school.phone || '';
+      const matchedCode = COUNTRY_CODES.find(c => existingPhone.startsWith(c.code));
+      setPhoneCountryCode(matchedCode ? matchedCode.code : '+234');
+      setPhoneLocalNumber(matchedCode ? existingPhone.slice(matchedCode.code.length).trim() : existingPhone);
     } else {
       setEditingId(null);
       setFormData({ 
@@ -130,6 +159,8 @@ export default function Schools() {
         subscriptionEndDate: '',
         subscriptionStatus: 'ACTIVE',
       });
+      setPhoneCountryCode('+234');
+      setPhoneLocalNumber('');
     }
     setIsModalOpen(true);
   };
@@ -150,15 +181,15 @@ export default function Schools() {
       )}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tighter italic">Enterprise Schools</h1>
-          <p className="text-gray-500 font-medium">Provision and manage multi-tenant educational institutions.</p>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tighter italic">Schools</h1>
+          <p className="text-gray-500 font-medium">Manage all schools on the platform.</p>
         </div>
         <button 
           onClick={() => openModal()}
           className="flex items-center gap-3 px-8 py-5 bg-gray-900 text-white font-black uppercase tracking-[0.3em] text-[10px] rounded-[2rem] shadow-2xl hover:bg-black transition-all transform hover:-translate-y-1 active:scale-95"
         >
           <Plus size={18} />
-          <span>Onboard School</span>
+          <span>Add School</span>
         </button>
       </header>
 
@@ -167,11 +198,11 @@ export default function Schools() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50">
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Identity & Admin</th>
+                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">School</th>
                 <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Subscription</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Economics</th>
+                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Revenue</th>
                 <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Status</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Operations</th>
+                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -179,13 +210,13 @@ export default function Schools() {
                 <tr>
                   <td colSpan={5} className="px-8 py-20 text-center">
                     <Loader2 className="animate-spin inline mr-3 text-blue-600" size={24} />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Loading Matrix...</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Loading...</span>
                   </td>
                 </tr>
               ) : schools.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-8 py-24 text-center">
-                    <div className="text-sm font-medium text-gray-400 italic">No schools registered in the ecosystem.</div>
+                    <div className="text-sm font-medium text-gray-400 italic">No schools yet.</div>
                   </td>
                 </tr>
               ) : (
@@ -220,7 +251,7 @@ export default function Schools() {
                     </td>
                     <td className="px-8 py-6">
                        <div className="text-sm font-black text-gray-900">${school.subscriptionAmount?.toLocaleString() || 0}</div>
-                       <div className="text-[9px] font-bold text-gray-400 uppercase">Total Credited</div>
+                       <div className="text-[9px] font-bold text-gray-400 uppercase">Subscription Amount</div>
                     </td>
                     <td className="px-8 py-6">
                       <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
@@ -269,8 +300,8 @@ export default function Schools() {
               <div className="p-10">
                 <header className="flex justify-between items-center mb-10">
                   <div>
-                    <h2 className="text-3xl font-black text-gray-900 tracking-tighter">{editingId ? 'Modify School' : 'Onboard New School'}</h2>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Tenant Configuration Matrix</p>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tighter">{editingId ? 'Edit School' : 'Add New School'}</h2>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">School & Admin Setup</p>
                   </div>
                   <button onClick={() => setIsModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-gray-50 text-gray-300 hover:text-gray-600 rounded-2xl transition-all">
                     <X size={24} />
@@ -290,7 +321,7 @@ export default function Schools() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-6">
-                      <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] border-b border-blue-50 pb-2">Primary Identity</h3>
+                      <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] border-b border-blue-50 pb-2">School Details</h3>
                       <div className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Official Name</label>
@@ -304,13 +335,24 @@ export default function Schools() {
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contact Phone</label>
-                            <input
-                                type="text"
-                                value={formData.phone}
-                                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                                className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 font-mono"
-                                placeholder="+1..."
-                            />
+                            <div className="flex gap-2">
+                              <select
+                                  value={phoneCountryCode}
+                                  onChange={(e) => setPhoneCountryCode(e.target.value)}
+                                  className="w-36 px-3 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 text-sm"
+                              >
+                                  {COUNTRY_CODES.map((c, i) => (
+                                    <option key={i} value={c.code}>{c.country} ({c.code})</option>
+                                  ))}
+                              </select>
+                              <input
+                                  type="text"
+                                  value={phoneLocalNumber}
+                                  onChange={(e) => setPhoneLocalNumber(e.target.value)}
+                                  className="flex-1 px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 font-mono"
+                                  placeholder="801 234 5678"
+                              />
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">School Email</label>
@@ -319,14 +361,14 @@ export default function Schools() {
                                 value={formData.email}
                                 onChange={(e) => setFormData({...formData, email: e.target.value})}
                                 className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900"
-                                placeholder="contact@school.com"
+                                placeholder="school@gmail.com"
                             />
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-6">
-                      <h3 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] border-b border-emerald-50 pb-2">Economics & Ops</h3>
+                      <h3 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] border-b border-emerald-50 pb-2">Subscription & Billing</h3>
                       <div className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Service Level</label>
@@ -377,7 +419,7 @@ export default function Schools() {
 
                   {!editingId && (
                     <div className="space-y-6 pt-6 border-t border-gray-50">
-                      <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] border-b border-indigo-50 pb-2">Master Administrator</h3>
+                      <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] border-b border-indigo-50 pb-2">Admin Account</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Admin Full Name</label>
@@ -385,18 +427,27 @@ export default function Schools() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Login Email</label>
-                          <input type="email" required={!editingId} value={formData.adminEmail} onChange={(e) => setFormData({...formData, adminEmail: e.target.value})} className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900" placeholder="admin@school.com" />
+                          <input type="email" required={!editingId} value={formData.adminEmail} onChange={(e) => setFormData({...formData, adminEmail: e.target.value})} className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900" placeholder="admin@gmail.com" />
                         </div>
-                        <div className="space-y-2 md:col-span-2">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Security Credential (Password)</label>
-                          <input type="password" required={!editingId} value={formData.adminPassword} onChange={(e) => setFormData({...formData, adminPassword: e.target.value})} className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900" placeholder="••••••••" />
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                          <div className="relative">
+                            <input type={showAdminPassword ? 'text' : 'password'} required={!editingId} value={formData.adminPassword} onChange={(e) => setFormData({...formData, adminPassword: e.target.value})} className="w-full px-6 py-4 pr-12 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900" placeholder="••••••••" />
+                            <button type="button" onClick={() => setShowAdminPassword(!showAdminPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                              {showAdminPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Confirm Password</label>
+                          <input type={showAdminPassword ? 'text' : 'password'} required={!editingId} value={adminPasswordConfirm} onChange={(e) => setAdminPasswordConfirm(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900" placeholder="••••••••" />
                         </div>
                       </div>
                     </div>
                   )}
 
                   <button type="submit" className="w-full py-5 bg-gray-900 text-white font-black uppercase tracking-[0.4em] text-[10px] rounded-[2rem] shadow-2xl hover:bg-black transition-all active:scale-95">
-                    {editingId ? 'Push Manifest Updates' : 'Deploy Unified Tenant'}
+                    {editingId ? 'Save Changes' : 'Create School'}
                   </button>
                 </form>
               </div>

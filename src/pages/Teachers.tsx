@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api, { teacherService, schoolService } from '../services/api';
-import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin, CheckCircle, BookOpen, Book, CheckSquare, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin, CheckCircle, BookOpen, Book, CheckSquare, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
 
@@ -65,6 +65,23 @@ export default function Teachers({ user }: { user: any }) {
     subjectAssignments: [] as any[],
   });
 
+  const COUNTRY_CODES = [
+    { code: '+234', country: 'Nigeria' },
+    { code: '+1', country: 'United States' },
+    { code: '+1', country: 'Canada' },
+    { code: '+44', country: 'United Kingdom' },
+    { code: '+233', country: 'Ghana' },
+    { code: '+254', country: 'Kenya' },
+    { code: '+27', country: 'South Africa' },
+    { code: '+91', country: 'India' },
+    { code: '+20', country: 'Egypt' },
+  ];
+
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+234');
+  const [phoneLocalNumber, setPhoneLocalNumber] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+
   const [fetchedSubjects, setFetchedSubjects] = useState<any[]>([]);
   const [fetchedSessions, setFetchedSessions] = useState<any[]>([]);
   const [generatedCreds, setGeneratedCreds] = useState<any>(null);
@@ -107,8 +124,11 @@ export default function Teachers({ user }: { user: any }) {
       showToast('Please enter a valid email address (e.g. name@gmail.com).', 'error');
       return;
     }
+    if (!editingId && formData.password !== passwordConfirm) {
+      showToast('Passwords do not match.', 'error');
+      return;
+    }
     try {
-      // Calculate union of assigned classes for downstream compatibility
       const classTeacherIds = formData.roleType === 'CLASS' || formData.roleType === 'BOTH' ? formData.classAssignments : [];
       const subjectTeacherIds = formData.roleType === 'SUBJECT' || formData.roleType === 'BOTH' 
         ? formData.subjectAssignments.map(sa => sa.classId).filter(Boolean)
@@ -117,10 +137,12 @@ export default function Teachers({ user }: { user: any }) {
       const finalSubjectNames = formData.roleType === 'SUBJECT' || formData.roleType === 'BOTH'
         ? [...new Set(formData.subjectAssignments.map(sa => sa.subjectName).filter(Boolean))]
         : [];
+      const combinedPhone = phoneLocalNumber ? `${phoneCountryCode} ${phoneLocalNumber}`.trim() : '';
 
       const submitData = {
         ...formData,
         email: formData.email.trim().toLowerCase(),
+        phone: combinedPhone,
         roleType: formData.roleType,
         classAssignments: formData.classAssignments,
         subjectAssignments: formData.subjectAssignments,
@@ -163,6 +185,8 @@ export default function Teachers({ user }: { user: any }) {
   const openModal = (teacher?: any) => {
     setGeneratedCreds(null);
     setIsImageUploading(false);
+    setShowPassword(false);
+    setPasswordConfirm('');
     if (teacher) {
       setEditingId(teacher.id);
       setFormData({
@@ -182,6 +206,10 @@ export default function Teachers({ user }: { user: any }) {
         classAssignments: teacher.classAssignments || teacher.assignedClassIds || [],
         subjectAssignments: teacher.subjectAssignments || [],
       });
+      const existingPhone = teacher.phone || '';
+      const matchedCode = COUNTRY_CODES.find(c => existingPhone.startsWith(c.code));
+      setPhoneCountryCode(matchedCode ? matchedCode.code : '+234');
+      setPhoneLocalNumber(matchedCode ? existingPhone.slice(matchedCode.code.length).trim() : existingPhone);
     } else {
       setEditingId(null);
       setFormData({ 
@@ -201,6 +229,8 @@ export default function Teachers({ user }: { user: any }) {
         classAssignments: [],
         subjectAssignments: [],
       });
+      setPhoneCountryCode('+234');
+      setPhoneLocalNumber('');
     }
     setIsModalOpen(true);
   };
@@ -485,6 +515,7 @@ export default function Teachers({ user }: { user: any }) {
                           required={!editingId}
                           value={formData.email}
                           onChange={(e) => setFormData({...formData, email: e.target.value})}
+                          placeholder="name@gmail.com"
                           className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
                         />
                       </div>
@@ -499,17 +530,35 @@ export default function Teachers({ user }: { user: any }) {
                         />
                       </div>
                       {!editingId && (
-                        <div className="space-y-2 md:col-span-2">
-                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Password</label>
-                          <input
-                            type="password"
-                            required
-                            value={formData.password}
-                            onChange={(e) => setFormData({...formData, password: e.target.value})}
-                            placeholder="Set a secure password"
-                            className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
-                          />
-                        </div>
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Password</label>
+                            <div className="relative">
+                              <input
+                                type={showPassword ? 'text' : 'password'}
+                                required
+                                value={formData.password}
+                                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                placeholder="Set a secure password"
+                                className="w-full px-4 py-3 pr-12 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                              />
+                              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Confirm Password</label>
+                            <input
+                              type={showPassword ? 'text' : 'password'}
+                              required
+                              value={passwordConfirm}
+                              onChange={(e) => setPasswordConfirm(e.target.value)}
+                              placeholder="Re-enter password"
+                              className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                            />
+                          </div>
+                        </>
                       )}
                       
                       <div className="space-y-2 md:col-span-2">
@@ -749,13 +798,24 @@ export default function Teachers({ user }: { user: any }) {
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone Number</label>
-                        <input
-                          type="text"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                          className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
-                          placeholder="+234 ..."
-                        />
+                        <div className="flex gap-2">
+                          <select
+                            value={phoneCountryCode}
+                            onChange={(e) => setPhoneCountryCode(e.target.value)}
+                            className="w-36 px-2 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-sm"
+                          >
+                            {COUNTRY_CODES.map((c, i) => (
+                              <option key={i} value={c.code}>{c.country} ({c.code})</option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            value={phoneLocalNumber}
+                            onChange={(e) => setPhoneLocalNumber(e.target.value)}
+                            className="flex-1 px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                            placeholder="801 234 5678"
+                          />
+                        </div>
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Home Address</label>
