@@ -1037,14 +1037,14 @@ export default function Messages({ user }: { user: any }) {
 
   if (!user) {
     return (
-      <div className="h-screen w-screen fixed inset-0 flex items-center justify-center bg-gray-100">
+      <div className="h-full w-full flex items-center justify-center bg-gray-100">
         <Loader2 className="animate-spin text-blue-600" size={24} />
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen fixed inset-0 flex bg-gray-100 overflow-hidden animate-in fade-in duration-500">
+    <div className="h-full w-full flex bg-gray-100 overflow-hidden animate-in fade-in duration-500">
       
       {/* Sidebar - Dynamically responsive */}
       {(showSidebar || window.innerWidth >= 1024) ? (
