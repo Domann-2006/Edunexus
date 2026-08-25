@@ -34,15 +34,15 @@ export default function Schools() {
   });
 
   const COUNTRY_CODES = [
-    { code: '+234', country: 'Nigeria' },
-    { code: '+1', country: 'United States' },
-    { code: '+1', country: 'Canada' },
-    { code: '+44', country: 'United Kingdom' },
-    { code: '+233', country: 'Ghana' },
-    { code: '+254', country: 'Kenya' },
-    { code: '+27', country: 'South Africa' },
-    { code: '+91', country: 'India' },
-    { code: '+20', country: 'Egypt' },
+    { code: '+234', country: 'Nigeria', iso: 'NG' },
+    { code: '+1', country: 'United States', iso: 'US' },
+    { code: '+1', country: 'Canada', iso: 'CA' },
+    { code: '+44', country: 'United Kingdom', iso: 'GB' },
+    { code: '+233', country: 'Ghana', iso: 'GH' },
+    { code: '+254', country: 'Kenya', iso: 'KE' },
+    { code: '+27', country: 'South Africa', iso: 'ZA' },
+    { code: '+91', country: 'India', iso: 'IN' },
+    { code: '+20', country: 'Egypt', iso: 'EG' },
   ];
 
   const [phoneCountryCode, setPhoneCountryCode] = useState('+234');
@@ -335,21 +335,21 @@ export default function Schools() {
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contact Phone</label>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2 min-w-0">
                               <select
                                   value={phoneCountryCode}
                                   onChange={(e) => setPhoneCountryCode(e.target.value)}
-                                  className="w-36 px-3 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 text-sm"
+                                  className="w-full sm:w-24 shrink-0 px-2 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 text-sm"
                               >
                                   {COUNTRY_CODES.map((c, i) => (
-                                    <option key={i} value={c.code}>{c.country} ({c.code})</option>
+                                    <option key={i} value={c.code}>{c.iso} {c.code}</option>
                                   ))}
                               </select>
                               <input
                                   type="text"
                                   value={phoneLocalNumber}
                                   onChange={(e) => setPhoneLocalNumber(e.target.value)}
-                                  className="flex-1 px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 font-mono"
+                                  className="w-full sm:flex-1 min-w-0 px-6 py-4 bg-gray-50 border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold text-gray-900 font-mono"
                                   placeholder="801 234 5678"
                               />
                             </div>
