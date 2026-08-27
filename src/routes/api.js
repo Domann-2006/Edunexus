@@ -2497,4 +2497,92 @@ router.get('/results/collated', authenticate, async (req, res) => {
   }
 });
 
+// Teacher Attendance Summary - auto-marks a teacher "Present" for a date if
+// they submitted class attendance that day (recordedBy matches their userId).
+// School Admins can manually override any teacher's status via the mark endpoint.
+router.get('/attendance/teacher-summary', authenticate, authorize(['SCHOOL_ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+  try {
+    const schoolId = req.user.schoolId;
+    const date = req.query.date || new Date().toISOString().split('T')[0];
+
+    const teachersSnap = await db.collection('teachers').where('schoolId', '==', schoolId).get();
+    const attendanceSnap = await db.collection('attendance')
+      .where('schoolId', '==', schoolId)
+      .where('date', '==', date)
+      .get();
+
+    const submittedByUserId = new Set();
+    attendanceSnap.docs.forEach(doc => {
+      const rec = doc.data();
+      if (rec.recordedBy) submittedByUserId.add(rec.recordedBy);
+    });
+
+    const overridesSnap = await db.collection('teacherAttendance')
+      .where('schoolId', '==', schoolId)
+      .where('date', '==', date)
+      .get();
+    const overrideMap = {};
+    overridesSnap.docs.forEach(doc => {
+      const rec = doc.data();
+      overrideMap[rec.teacherId] = rec.status;
+    });
+
+    const summary = teachersSnap.docs.map(doc => {
+      const t = doc.data();
+      const teacherId = doc.id;
+      const autoPresent = t.userId && submittedByUserId.has(t.userId);
+      let status = 'PENDING';
+      let source = 'none';
+      if (overrideMap[teacherId]) {
+        status = overrideMap[teacherId];
+        source = 'manual';
+      } else if (autoPresent) {
+        status = 'PRESENT';
+        source = 'auto';
+      }
+      return {
+        teacherId,
+        name: t.name || 'Unknown Teacher',
+        avatarUrl: t.avatarUrl || '',
+        roleType: t.roleType || 'BOTH',
+        status,
+        source,
+      };
+    });
+
+    summary.sort((a, b) => a.name.localeCompare(b.name));
+
+    const presentCount = summary.filter(s => s.status === 'PRESENT').length;
+    const totalCount = summary.length;
+
+    res.json({ summary, present: presentCount, total: totalCount, date });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manually mark or override a teacher's attendance status for a given date.
+router.post('/attendance/teacher/mark', authenticate, authorize(['SCHOOL_ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+  try {
+    const { teacherId, date, status } = req.body;
+    if (!teacherId || !date || !status) {
+      return res.status(400).json({ message: 'teacherId, date, and status are required.' });
+    }
+    const schoolId = req.user.schoolId;
+    const docId = `${teacherId}_${date}`;
+    await db.collection('teacherAttendance').doc(docId).set({
+      teacherId,
+      schoolId,
+      date,
+      status,
+      markedBy: req.user.id,
+      source: 'manual',
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
