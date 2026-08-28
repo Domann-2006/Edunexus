@@ -61,6 +61,9 @@ export default function Attendance({ user }: { user: any }) {
   const [drillDownClass, setDrillDownClass] = useState<any | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [teacherHistorySummary, setTeacherHistorySummary] = useState<any[]>([]);
+  const [teacherHistoryStats, setTeacherHistoryStats] = useState({ present: 0, total: 0 });
+  const [loadingTeacherHistory, setLoadingTeacherHistory] = useState(false);
 
   // Initial load
   useEffect(() => {
@@ -86,6 +89,7 @@ export default function Attendance({ user }: { user: any }) {
   useEffect(() => {
     if (activeTab === 'history') {
       fetchHistory();
+      fetchTeacherHistorySummary();
     }
   }, [activeTab, historyDate, historyClassId]);
 
@@ -171,13 +175,31 @@ export default function Attendance({ user }: { user: any }) {
     }
   };
 
-  const handleMarkTeacher = async (teacherId: string, status: string) => {
+  const handleMarkTeacher = async (teacherId: string, status: string, date: string, onDone?: () => void) => {
     try {
-      await api.post('/v1/attendance/teacher/mark', { teacherId, date: summaryDate, status });
+      await api.post('/v1/attendance/teacher/mark', { teacherId, date, status });
       showToast('Teacher attendance updated.');
-      fetchTeacherSummary();
+      if (onDone) onDone();
     } catch (err: any) {
       showToast(err.response?.data?.message || err.message, 'error');
+    }
+  };
+
+  const fetchTeacherHistorySummary = async () => {
+    if (!historyDate) {
+      setTeacherHistorySummary([]);
+      setTeacherHistoryStats({ present: 0, total: 0 });
+      return;
+    }
+    setLoadingTeacherHistory(true);
+    try {
+      const res = await api.get(`/v1/attendance/teacher-summary?date=${historyDate}`);
+      setTeacherHistorySummary(res.data.summary || []);
+      setTeacherHistoryStats({ present: res.data.present || 0, total: res.data.total || 0 });
+    } catch (err) {
+      console.error('Failed to fetch teacher attendance history:', err);
+    } finally {
+      setLoadingTeacherHistory(false);
     }
   };
 
@@ -676,7 +698,7 @@ export default function Attendance({ user }: { user: any }) {
                                 ].map((btn) => (
                                   <button
                                     key={btn.id}
-                                    onClick={() => handleMarkTeacher(t.teacherId, btn.id)}
+                                    onClick={() => handleMarkTeacher(t.teacherId, btn.id, summaryDate, fetchTeacherSummary)}
                                     className={`w-8 h-8 rounded-lg text-[10px] font-black border-2 transition-all ${
                                       t.status === btn.id
                                         ? `bg-${btn.color}-50 border-${btn.color}-200 text-${btn.color}-600`
@@ -846,6 +868,104 @@ export default function Attendance({ user }: { user: any }) {
             >
               Clear Filters
             </button>
+          </div>
+
+          {/* Teacher Attendance History */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Teacher Attendance</h3>
+                <p className="text-xs text-gray-400 mt-1 normal-case">
+                  {historyDate ? 'Auto-marked present when a teacher submits class attendance. Override manually if needed.' : 'Select a date above to view teacher attendance for that day.'}
+                </p>
+              </div>
+              {historyDate && (
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Present: <span className="text-emerald-600 font-black">{teacherHistoryStats.present}</span> / {teacherHistoryStats.total}
+                </div>
+              )}
+            </div>
+            {historyDate && (
+              <div className="overflow-x-auto text-sm uppercase">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50/50 text-gray-400 text-xs font-bold tracking-widest border-b border-gray-50">
+                    <tr>
+                      <th className="px-6 py-4">Teacher</th>
+                      <th className="px-6 py-4 text-center">Status</th>
+                      <th className="px-6 py-4 text-center">Source</th>
+                      <th className="px-6 py-4 text-center">Override</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 uppercase tracking-tight">
+                    {loadingTeacherHistory ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-12 text-center text-gray-400">
+                          <Loader2 className="animate-spin inline mr-2 text-blue-600" size={20} />
+                          Loading Teacher Attendance...
+                        </td>
+                      </tr>
+                    ) : teacherHistorySummary.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-12 text-center text-gray-400 lowercase italic">
+                          No teachers found.
+                        </td>
+                      </tr>
+                    ) : (
+                      teacherHistorySummary.map((t) => (
+                        <tr key={t.teacherId} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                                {t.avatarUrl ? (
+                                  <img src={t.avatarUrl} alt={t.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <span className="text-xs font-black text-gray-400">{(t.name || '?').charAt(0).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <span className="font-bold text-gray-900 normal-case">{t.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                              t.status === 'PRESENT' ? 'bg-emerald-50 text-emerald-600' :
+                              t.status === 'ABSENT' ? 'bg-rose-50 text-rose-600' :
+                              t.status === 'LATE' ? 'bg-amber-50 text-amber-600' :
+                              'bg-gray-100 text-gray-400'
+                            }`}>
+                              {t.status === 'PENDING' ? 'NOT MARKED' : t.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center text-[10px] font-bold text-gray-400">
+                            {t.source === 'auto' ? 'AUTO' : t.source === 'manual' ? 'MANUAL' : '—'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex justify-center items-center gap-2">
+                              {[
+                                { id: 'PRESENT', color: 'emerald', label: 'P' },
+                                { id: 'ABSENT', color: 'rose', label: 'A' },
+                                { id: 'LATE', color: 'amber', label: 'L' },
+                              ].map((btn) => (
+                                <button
+                                  key={btn.id}
+                                  onClick={() => handleMarkTeacher(t.teacherId, btn.id, historyDate, fetchTeacherHistorySummary)}
+                                  className={`w-8 h-8 rounded-lg text-[10px] font-black border-2 transition-all ${
+                                    t.status === btn.id
+                                      ? `bg-${btn.color}-50 border-${btn.color}-200 text-${btn.color}-600`
+                                      : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'
+                                  }`}
+                                >
+                                  {btn.label}
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Group records by date then class */}
