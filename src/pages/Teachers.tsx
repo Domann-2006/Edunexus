@@ -134,9 +134,12 @@ export default function Teachers({ user }: { user: any }) {
         ? formData.subjectAssignments.map(sa => sa.classId).filter(Boolean)
         : [];
       const finalClassIds = [...new Set([...classTeacherIds, ...subjectTeacherIds])];
-      const finalSubjectNames = formData.roleType === 'SUBJECT' || formData.roleType === 'BOTH'
+      let finalSubjectNames = formData.roleType === 'SUBJECT' || formData.roleType === 'BOTH'
         ? [...new Set(formData.subjectAssignments.map(sa => sa.subjectName).filter(Boolean))]
         : [];
+      if (finalSubjectNames.length === 0 && formData.specialization && formData.specialization.trim()) {
+        finalSubjectNames = formData.specialization.split(',').map(s => s.trim()).filter(Boolean);
+      }
       const combinedPhone = phoneLocalNumber ? `${phoneCountryCode} ${phoneLocalNumber}`.trim() : '';
 
       const submitData = {
@@ -787,7 +790,7 @@ export default function Teachers({ user }: { user: any }) {
                       )}
 
                       <div className="space-y-2">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Specialization</label>
+                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Subjects Taught</label>
                          <input
                           type="text"
                           value={formData.specialization}
@@ -795,6 +798,7 @@ export default function Teachers({ user }: { user: any }) {
                           className="w-full px-4 py-3 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
                           placeholder="e.g. Mathematics, Physics"
                         />
+                        <p className="text-[10px] text-gray-400 normal-case">Only used if no subjects were selected in Subject Assignment above. Separate multiple subjects with commas.</p>
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone Number</label>

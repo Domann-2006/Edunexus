@@ -495,6 +495,19 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
           }
         });
 
+        // Prevent duplicate subjects (same name, same class, same school)
+        if (collectionName === 'subjects' && data.name && data.class && data.schoolId) {
+          const dupName = data.name.trim().toLowerCase();
+          const dupSnap = await db.collection('subjects')
+            .where('schoolId', '==', data.schoolId)
+            .where('class', '==', data.class)
+            .get();
+          const isDuplicate = dupSnap.docs.some(d => (d.data().name || '').trim().toLowerCase() === dupName);
+          if (isDuplicate) {
+            return res.status(400).json({ message: `"${data.name.trim()}" already exists for ${data.class}. Please choose a different name or edit the existing subject instead.` });
+          }
+        }
+
         const ref = await db.collection(collectionName).add(data);
 
         // Trigger notifications in fire-and-forget fashion
@@ -662,6 +675,23 @@ const createCRUD = (collectionName, roles, transform, options = {}) => {
             const assignedClassIds = teacherData.assignedClassIds || [];
             if (!assignedClassIds.includes(targetClassId)) {
               return res.status(403).json({ message: 'You can only update data for your assigned classes' });
+            }
+          }
+        }
+
+        // Prevent duplicate subjects (same name, same class, same school) when renaming/editing
+        if (collectionName === 'subjects') {
+          const newName = (req.body.name !== undefined ? req.body.name : existingData.name || '').trim().toLowerCase();
+          const newClass = req.body.class !== undefined ? req.body.class : existingData.class;
+          const checkSchoolId = existingData.schoolId;
+          if (newName && newClass && checkSchoolId) {
+            const dupSnap = await db.collection('subjects')
+              .where('schoolId', '==', checkSchoolId)
+              .where('class', '==', newClass)
+              .get();
+            const isDuplicate = dupSnap.docs.some(d => d.id !== req.params.id && (d.data().name || '').trim().toLowerCase() === newName);
+            if (isDuplicate) {
+              return res.status(400).json({ message: `"${req.body.name || existingData.name}" already exists for ${newClass}. Please choose a different name.` });
             }
           }
         }
