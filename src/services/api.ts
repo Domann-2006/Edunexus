@@ -164,15 +164,10 @@ function applyOptimisticUpdatesToCache(method: string, url: string, payload: any
     let items = [...entry.data];
 
     if (method === 'POST') {
-      const isDuplicate = items.some((item: any) => item.id === payload.id || item.admissionNumber === payload.admissionNumber);
-      if (!isDuplicate) {
-        items.unshift({
-          ...payload,
-          id: payload.id || `temp-${Date.now()}`,
-          isPendingSync: true,
-          createdAt: new Date().toISOString()
-        });
-      }
+      // Skip optimistic insert — page refetches after POST anyway.
+      // Optimistic inserts cause duplicates because the temp ID never
+      // matches the real Firestore ID returned by the server.
+      continue;
     } else if (method === 'PUT') {
       const matchId = segments[3] || payload.id;
       items = items.map((item: any) => 

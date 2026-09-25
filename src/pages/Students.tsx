@@ -132,9 +132,15 @@ export default function Students({ user }: { user: any }) {
       }
 
       setStudents(prev => {
+        const seen = new Set<string>();
+        const deduped = fetchedStudents.filter((s: any) => {
+          if (seen.has(s.id)) return false;
+          seen.add(s.id);
+          return true;
+        });
         const prevStr = JSON.stringify(prev.map((s: any) => s.id).sort());
-        const nextStr = JSON.stringify(fetchedStudents.map((s: any) => s.id).sort());
-        return prevStr === nextStr ? prev : fetchedStudents;
+        const nextStr = JSON.stringify(deduped.map((s: any) => s.id).sort());
+        return prevStr === nextStr ? prev : deduped;
       });
       setClasses(prev => {
         const prevStr = JSON.stringify(prev.map((c: any) => c.id).sort());
@@ -206,7 +212,13 @@ export default function Students({ user }: { user: any }) {
         );
       }
 
-      setStudents(fetchedStudents);
+      const seen = new Set<string>();
+      const dedupedStudents = fetchedStudents.filter((s: any) => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
+      setStudents(dedupedStudents);
       setClasses(sortClasses(fetchedClasses));
       if (results[2]) setSchools(results[2].data);
     } catch (err) {
