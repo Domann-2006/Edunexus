@@ -108,9 +108,12 @@ export default function Students({ user }: { user: any }) {
           const classIdentifiers = profile.assignedClassIds || [];
           
           if (classIdentifiers.length > 0) {
-            fetchedClasses = fetchedClasses.filter((c: any) => 
-              classIdentifiers.includes(c.id) || 
-              classIdentifiers.includes(c.name)
+            const allAreNames = classIdentifiers.every((id: string) => !id.match(/^[a-zA-Z0-9]{15,}$/));
+            fetchedClasses = fetchedClasses.filter((c: any) =>
+              classIdentifiers.includes(c.id) ||
+              (allAreNames && classIdentifiers.some((identifier: string) =>
+                identifier.trim().toLowerCase() === c.name.trim().toLowerCase()
+              ))
             );
             const resolvedIds = fetchedClasses.map((c: any) => c.id);
             fetchedStudents = fetchedStudents.filter((s: any) => resolvedIds.includes(s.classId));
@@ -169,10 +172,12 @@ export default function Students({ user }: { user: any }) {
           const classIdentifiers = profile.assignedClassIds || [];
           
           if (classIdentifiers.length > 0) {
-            // Filter classes by ID or Name (since it might be names)
-            fetchedClasses = fetchedClasses.filter((c: any) => 
-              classIdentifiers.includes(c.id) || 
-              classIdentifiers.includes(c.name)
+            const allAreNames = classIdentifiers.every((id: string) => !id.match(/^[a-zA-Z0-9]{15,}$/));
+            fetchedClasses = fetchedClasses.filter((c: any) =>
+              classIdentifiers.includes(c.id) ||
+              (allAreNames && classIdentifiers.some((identifier: string) =>
+                identifier.trim().toLowerCase() === c.name.trim().toLowerCase()
+              ))
             );
             
             // The backend already filters students if it detects a TEACHER role, 
