@@ -218,7 +218,7 @@ export default function Announcements() {
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="relative w-full max-w-xl bg-white rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50 overflow-y-auto flex-1">
+              <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
                  <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center">
                       <Megaphone size={22} />
@@ -233,7 +233,7 @@ export default function Announcements() {
                  </button>
               </div>
 
-              <form onSubmit={handleCreate} className="p-10 space-y-6">
+              <form onSubmit={handleCreate} className="p-10 space-y-6 overflow-y-auto flex-1">
                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Message Title</label>
                     <input 
