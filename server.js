@@ -103,14 +103,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const path = await import('path');
-    const { fileURLToPath } = await import('url');
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const distPath = path.resolve(__dirname, 'dist');
-
-    app.use(express.static(distPath));
+    // Frontend is deployed separately on Vercel.
+    // Do not attempt to serve static files on the backend.
     app.get('*', (req, res) => {
-      res.sendFile(path.resolve(distPath, 'index.html'));
+      res.status(404).json({ message: 'API endpoint not found.' });
     });
   }
 
