@@ -131,8 +131,16 @@ export default function Students({ user }: { user: any }) {
         );
       }
 
-      setStudents(fetchedStudents);
-      setClasses(sortClasses(fetchedClasses));
+      setStudents(prev => {
+        const prevStr = JSON.stringify(prev.map((s: any) => s.id).sort());
+        const nextStr = JSON.stringify(fetchedStudents.map((s: any) => s.id).sort());
+        return prevStr === nextStr ? prev : fetchedStudents;
+      });
+      setClasses(prev => {
+        const prevStr = JSON.stringify(prev.map((c: any) => c.id).sort());
+        const nextStr = JSON.stringify(fetchedClasses.map((c: any) => c.id).sort());
+        return prevStr === nextStr ? prev : sortClasses(fetchedClasses);
+      });
       if (results[2]) setSchools(results[2].data);
     } catch (err) {
       console.debug('Background silent student fetch skipped:', err);
