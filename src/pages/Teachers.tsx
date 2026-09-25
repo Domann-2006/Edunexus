@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api, { teacherService, schoolService } from '../services/api';
+import api, { teacherService, schoolService, cacheEvents } from '../services/api';
 import { Plus, Search, Edit2, Trash2, X, Loader2, User as UserIcon, Phone, MapPin, CheckCircle, BookOpen, Book, CheckSquare, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileImage from '../components/ProfileImage';
@@ -88,6 +88,20 @@ export default function Teachers({ user }: { user: any }) {
 
   useEffect(() => {
     fetchData();
+  }, [selectedSchoolId]);
+
+  useEffect(() => {
+    const unsubscribe = cacheEvents.subscribe((eventKey: string) => {
+      if (
+        eventKey === 'sync_completed' ||
+        eventKey === 'cache_updated' ||
+        eventKey.includes('/v1/teachers') ||
+        eventKey.includes('/v1/classes')
+      ) {
+        fetchData();
+      }
+    });
+    return unsubscribe;
   }, [selectedSchoolId]);
 
   const fetchData = async () => {
