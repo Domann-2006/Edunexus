@@ -597,9 +597,9 @@ export default function Students({ user }: { user: any }) {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="p-8">
+              <div className="p-6 overflow-y-auto flex-1">
                 <header className="flex justify-between items-center mb-8 text-sm font-bold uppercase tracking-widest text-gray-900">
                   <h2>{editingId ? 'Edit Student' : 'New Student'}</h2>
                   <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
